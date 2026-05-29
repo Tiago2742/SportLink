@@ -1,0 +1,14 @@
+# Dépendances
+/back/vendor/
+/front/node_modules/
+
+# Env & secrets
+/back/.env.local
+/back/config/jwt/*.pem
+
+# Cache / build
+/back/var/
+/front/dist/
+
+# Données Docker
+/back/.env.local.php

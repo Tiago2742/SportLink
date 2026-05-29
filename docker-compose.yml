@@ -1,0 +1,49 @@
+services:
+  php:
+    build: ./back
+    container_name: sportlink_api
+    volumes:
+      - ./back:/var/www/html
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: sportlink_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sportlink
+      MYSQL_USER: sportlink
+      MYSQL_PASSWORD: sportlink
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  node:
+    image: node:22
+    container_name: front
+    working_dir: /app
+    volumes:
+      - ./front:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+    tty: true
+
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: sportlink
+      PMA_PASSWORD: sportlink
+    depends_on:
+      - db
+
+volumes:
+  db_data:
