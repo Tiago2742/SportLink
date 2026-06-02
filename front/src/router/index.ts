@@ -1,23 +1,76 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/',
-      name: 'home',
-      component: HomeView,
+      path: '/connexion',
+      name: 'connexion',
+      component: () => import('@/views/ConnexionView.vue'),
     },
     {
-      path: '/about',
-      name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
-      component: () => import('../views/AboutView.vue'),
+      path: '/inscription',
+      name: 'inscription',
+      component: () => import('@/views/InscriptionView.vue'),
+    },
+    {
+      path: '/',
+      name: 'accueil',
+      component: () => import('@/views/AccueilView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/mes-matchs',
+      name: 'mes-matchs',
+      component: () => import('@/views/MesMatchsView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/rechercher',
+      name: 'rechercher',
+      component: () => import('@/views/RechercheView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/creer-match',
+      name: 'creer-match',
+      component: () => import('@/views/CreerMatchView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/profil',
+      name: 'profil',
+      component: () => import('@/views/ProfilView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/equipes/:id',
+      name: 'equipe',
+      component: () => import('@/views/EquipeView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/matchs/:id',
+      name: 'match-detail',
+      component: () => import('@/views/DetailMatchView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      redirect: '/',
     },
   ],
+})
+
+router.beforeEach((to) => {
+  const auth = useAuthStore()
+  if (to.meta.requiertAuth && !auth.estConnecte) {
+    return { name: 'connexion' }
+  }
+  if ((to.name === 'connexion' || to.name === 'inscription') && auth.estConnecte) {
+    return { name: 'accueil' }
+  }
 })
 
 export default router

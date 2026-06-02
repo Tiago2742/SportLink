@@ -17,9 +17,15 @@ class EquipeRepository extends ServiceEntityRepository
     }
 
     /** @return Equipe[] */
-    public function trouverAvecFiltres(?string $sport, ?string $niveau, ?string $localisation): array
-    {
-        $qb = $this->createQueryBuilder('e');
+    public function trouverAvecFiltres(
+        ?string $sport,
+        ?string $niveau,
+        ?string $localisation,
+        ?int $createurId = null,
+    ): array {
+        $qb = $this->createQueryBuilder('e')
+            ->addSelect('c')
+            ->leftJoin('e.createur', 'c');
 
         if ($sport) {
             $qb->andWhere('LOWER(e.sport) = LOWER(:sport)')
@@ -34,6 +40,11 @@ class EquipeRepository extends ServiceEntityRepository
         if ($localisation) {
             $qb->andWhere('LOWER(e.localisation) LIKE LOWER(:localisation)')
                ->setParameter('localisation', '%' . $localisation . '%');
+        }
+
+        if ($createurId) {
+            $qb->andWhere('c.id = :createurId')
+               ->setParameter('createurId', $createurId);
         }
 
         return $qb->orderBy('e.id', 'DESC')->getQuery()->getResult();

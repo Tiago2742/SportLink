@@ -17,9 +17,16 @@ class GameRepository extends ServiceEntityRepository
     }
 
     /** @return Game[] */
-    public function trouverAvecFiltres(?string $sport, ?string $lieu, ?string $statut, ?string $niveauRequis): array
-    {
-        $qb = $this->createQueryBuilder('g');
+    public function trouverAvecFiltres(
+        ?string $sport,
+        ?string $lieu,
+        ?string $statut,
+        ?string $niveauRequis,
+        ?int $createurId = null,
+    ): array {
+        $qb = $this->createQueryBuilder('g')
+            ->addSelect('c')
+            ->leftJoin('g.createur', 'c');
 
         if ($sport) {
             $qb->andWhere('LOWER(g.sport) = LOWER(:sport)')
@@ -39,6 +46,11 @@ class GameRepository extends ServiceEntityRepository
         if ($niveauRequis) {
             $qb->andWhere('LOWER(g.niveauRequis) = LOWER(:niveauRequis)')
                ->setParameter('niveauRequis', $niveauRequis);
+        }
+
+        if ($createurId) {
+            $qb->andWhere('c.id = :createurId')
+               ->setParameter('createurId', $createurId);
         }
 
         return $qb->orderBy('g.dateMatch', 'ASC')->getQuery()->getResult();

@@ -25,6 +25,7 @@ class EquipeController extends AbstractController
             $request->query->get('sport'),
             $request->query->get('niveau'),
             $request->query->get('localisation'),
+            $request->query->getInt('createurId') ?: null,
         );
 
         return $this->json($equipes, 200, [], ['groups' => ['equipe:list', 'utilisateur:read']]);

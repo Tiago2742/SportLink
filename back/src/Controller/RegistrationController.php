@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
+use App\Entity\UtilisateurSport;
+use App\Reference\SportNiveaux;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -39,9 +41,22 @@ class RegistrationController extends AbstractController
         $utilisateur->setNom($donnees['nom']);
         $utilisateur->setPrenom($donnees['prenom']);
         $utilisateur->setType($donnees['type']);
-        $utilisateur->setNiveau($donnees['niveau'] ?? null);
         $utilisateur->setLocalisation($donnees['localisation'] ?? null);
         $utilisateur->setDateInscription(new \DateTime());
+
+        // Sports optionnels : [{sport: "Football", niveau: "D1"}, ...]
+        foreach ($donnees['sports'] ?? [] as $entree) {
+            if (empty($entree['sport']) || empty($entree['niveau'])) {
+                continue;
+            }
+            if (!SportNiveaux::estValide($entree['sport'], $entree['niveau'])) {
+                continue;
+            }
+            $us = new UtilisateurSport();
+            $us->setSport($entree['sport']);
+            $us->setNiveau($entree['niveau']);
+            $utilisateur->addSport($us);
+        }
 
         $erreurs = $validator->validate($utilisateur);
         if (count($erreurs) > 0) {
@@ -61,6 +76,10 @@ class RegistrationController extends AbstractController
             'nom'    => $utilisateur->getNom(),
             'prenom' => $utilisateur->getPrenom(),
             'type'   => $utilisateur->getType(),
+            'sports' => array_map(
+                fn(UtilisateurSport $s) => ['sport' => $s->getSport(), 'niveau' => $s->getNiveau()],
+                $utilisateur->getSports()->toArray(),
+            ),
         ], 201);
     }
 }

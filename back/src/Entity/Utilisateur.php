@@ -50,11 +50,14 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['utilisateur:read'])]
-    private ?string $niveau = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['utilisateur:read'])]
     private ?string $localisation = null;
+
+    /**
+     * @var Collection<int, UtilisateurSport>
+     */
+    #[ORM\OneToMany(targetEntity: UtilisateurSport::class, mappedBy: 'utilisateur', orphanRemoval: true, cascade: ['persist'])]
+    #[Groups(['utilisateur_sport:read'])]
+    private Collection $sports;
 
     #[ORM\Column]
     private ?\DateTime $dateInscription = null;
@@ -96,6 +99,7 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         $this->equipesJoueur = new ArrayCollection();
         $this->participations = new ArrayCollection();
         $this->messages = new ArrayCollection();
+        $this->sports = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -211,18 +215,6 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     public function setType(string $type): static
     {
         $this->type = $type;
-
-        return $this;
-    }
-
-    public function getNiveau(): ?string
-    {
-        return $this->niveau;
-    }
-
-    public function setNiveau(?string $niveau): static
-    {
-        $this->niveau = $niveau;
 
         return $this;
     }
@@ -367,6 +359,31 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
                 $participation->setUtilisateur(null);
             }
         }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, UtilisateurSport>
+     */
+    public function getSports(): Collection
+    {
+        return $this->sports;
+    }
+
+    public function addSport(UtilisateurSport $sport): static
+    {
+        if (!$this->sports->contains($sport)) {
+            $this->sports->add($sport);
+            $sport->setUtilisateur($this);
+        }
+
+        return $this;
+    }
+
+    public function removeSport(UtilisateurSport $sport): static
+    {
+        $this->sports->removeElement($sport);
 
         return $this;
     }

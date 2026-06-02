@@ -32,6 +32,7 @@ class MatchController extends AbstractController
             $request->query->get('lieu'),
             $request->query->get('statut'),
             $request->query->get('niveauRequis'),
+            $request->query->getInt('createurId') ?: null,
         );
 
         return $this->json($matchs, 200, [], ['groups' => ['game:list', 'utilisateur:read']]);
