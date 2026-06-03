@@ -40,6 +40,13 @@ function deconnecter() {
         >
           Mes équipes
         </RouterLink>
+        <RouterLink
+          v-if="auth.utilisateur?.type === 'joueur'"
+          to="/invitations-equipes"
+          @click="menuOuvert = false"
+        >
+          Invitations équipe
+        </RouterLink>
         <RouterLink to="/rechercher" @click="menuOuvert = false">Rechercher</RouterLink>
         <RouterLink to="/creer-match" @click="menuOuvert = false">Créer un match</RouterLink>
         <RouterLink to="/profil" @click="menuOuvert = false">Profil</RouterLink>

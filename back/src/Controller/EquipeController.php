@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Equipe;
+use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeUtilisateur;
+use App\Repository\EquipeJoueurRepository;
 use App\Repository\EquipeRepository;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
@@ -17,14 +19,16 @@ use Symfony\Component\Routing\Attribute\Route;
 class EquipeController extends AbstractController
 {
     public function __construct(
-        private EquipeService    $equipeService,
-        private EquipeRepository $equipeRepository,
-        private SportRepository  $sportRepository,
-        private NiveauRepository $niveauRepository,
+        private EquipeService          $equipeService,
+        private EquipeRepository     $equipeRepository,
+        private EquipeJoueurRepository $equipeJoueurRepository,
+        private SportRepository      $sportRepository,
+        private NiveauRepository     $niveauRepository,
     ) {}
 
-    private const GROUPES_LIST = ['equipe:list', 'utilisateur:read', 'sport:read', 'niveau:read'];
-    private const GROUPES_READ = ['equipe:read', 'utilisateur:read', 'sport:read', 'niveau:read', 'equipe_joueur:read'];
+    private const GROUPES_LIST = ['equipe:list', 'utilisateur:embed', 'sport:read', 'niveau:read'];
+    private const GROUPES_READ = ['equipe:read', 'utilisateur:embed', 'sport:read', 'niveau:read', 'equipe_joueur:read'];
+    private const GROUPES_MEMBRE = ['equipe_joueur:read', 'utilisateur:embed'];
 
     #[Route('', name: 'api_equipes_lister', methods: ['GET'])]
     public function lister(Request $request): JsonResponse
@@ -61,7 +65,6 @@ class EquipeController extends AbstractController
             return $this->json(['erreur' => 'Sport introuvable.'], 404);
         }
 
-        // R4 : le niveau doit appartenir au sport
         $niveau = null;
         if (!empty($donnees['niveauId'])) {
             $niveau = $this->niveauRepository->find((int) $donnees['niveauId']);
@@ -154,52 +157,76 @@ class EquipeController extends AbstractController
 
     // ---- Membres ------------------------------------------------------------
 
-    #[Route('/{id}/membres', name: 'api_equipes_ajouter_membre', methods: ['POST'])]
-    public function ajouterMembre(Request $request, Equipe $equipe): JsonResponse
+    #[Route('/{id}/membres', name: 'api_equipes_inviter_membre', methods: ['POST'])]
+    public function inviterMembre(Request $request, Equipe $equipe): JsonResponse
     {
-        if ($equipe->getClub() !== $this->getUser()) {
+        $moi = $this->getUser();
+        if ($moi->getType() !== TypeUtilisateur::Club || $equipe->getClub() !== $moi) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
         $donnees = json_decode($request->getContent(), true);
-
-        if (empty($donnees['utilisateur_id'])) {
+        if (!\is_array($donnees) || empty($donnees['utilisateur_id'])) {
             return $this->json(['erreur' => 'Le champ "utilisateur_id" est requis.'], 400);
         }
 
         try {
-            $membre = $this->equipeService->ajouterMembre(
-                $equipe,
-                (int) $donnees['utilisateur_id'],
-                $donnees['role'] ?? null,
-            );
+            $membre = $this->equipeService->inviterJoueur($equipe, (int) $donnees['utilisateur_id'], $moi);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
 
-        return $this->json($membre, 201, [], ['groups' => ['equipe_joueur:read', 'utilisateur:read']]);
+        return $this->json($membre, 201, [], ['groups' => self::GROUPES_MEMBRE]);
+    }
+
+    #[Route('/{id}/membres/{membreId}', name: 'api_equipes_repondre_membre', methods: ['PATCH'])]
+    public function repondreMembre(Request $request, Equipe $equipe, int $membreId): JsonResponse
+    {
+        $membre = $this->equipeJoueurRepository->find($membreId);
+
+        if (!$membre || $membre->getEquipe() !== $equipe) {
+            return $this->json(['erreur' => 'Membre introuvable dans cette équipe.'], 404);
+        }
+
+        $donnees = json_decode($request->getContent(), true);
+        if (!\is_array($donnees) || empty($donnees['statut'])) {
+            return $this->json(['erreur' => 'Le champ "statut" est requis.'], 400);
+        }
+
+        try {
+            $nouveauStatut = StatutMembreEquipe::from($donnees['statut']);
+        } catch (\ValueError) {
+            return $this->json(['erreur' => 'Statut invalide. Valeurs acceptées : confirme, refuse.'], 400);
+        }
+
+        try {
+            $membre = $this->equipeService->repondreInvitation($membre, $nouveauStatut, $this->getUser());
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
+
+        return $this->json($membre, 200, [], ['groups' => self::GROUPES_MEMBRE]);
     }
 
     #[Route('/{id}/membres/{membreId}', name: 'api_equipes_retirer_membre', methods: ['DELETE'])]
     public function retirerMembre(Equipe $equipe, int $membreId): JsonResponse
     {
-        if ($equipe->getClub() !== $this->getUser()) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
+        $moi = $this->getUser();
+        $membre = $this->equipeJoueurRepository->find($membreId);
 
-        $membre = null;
-        foreach ($equipe->getMembres() as $m) {
-            if ($m->getId() === $membreId) {
-                $membre = $m;
-                break;
-            }
-        }
-
-        if (!$membre) {
+        if (!$membre || $membre->getEquipe() !== $equipe) {
             return $this->json(['erreur' => 'Membre introuvable dans cette équipe.'], 404);
         }
 
-        $this->equipeService->retirerMembre($membre);
+        try {
+            if ($moi->getType() === TypeUtilisateur::Club && $equipe->getClub() === $moi) {
+                $this->equipeService->annulerInvitation($membre, $moi);
+            } else {
+                return $this->json(['erreur' => 'Accès refusé.'], 403);
+            }
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
 
         return $this->json(null, 204);
     }

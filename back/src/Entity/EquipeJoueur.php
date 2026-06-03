@@ -23,8 +23,10 @@ class EquipeJoueur
     #[Groups(['equipe_joueur:read'])]
     private ?Utilisateur $utilisateur = null;
 
+    /** Exposé uniquement pour la liste d'invitations joueur (pas dans equipe:read → membres). */
     #[ORM\ManyToOne(inversedBy: 'membres')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['equipe_joueur:invitation'])]
     private ?Equipe $equipe = null;
 
     #[ORM\Column(enumType: RoleEquipe::class)]

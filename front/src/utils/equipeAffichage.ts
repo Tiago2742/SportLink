@@ -12,3 +12,17 @@ export function libelleRoleEquipe(role?: string | null): string {
   if (role === 'gestionnaire') return 'Gestionnaire'
   return 'Joueur'
 }
+
+export function libelleStatutMembre(statut?: string | null): string {
+  if (statut === 'en_attente') return 'En attente'
+  if (statut === 'confirme') return 'Confirmé'
+  if (statut === 'refuse') return 'Refusé'
+  return statut ?? ''
+}
+
+export function classeBadgeStatutMembre(statut?: string | null): string {
+  if (statut === 'en_attente') return 'badge-attente'
+  if (statut === 'confirme') return 'badge-confirme'
+  if (statut === 'refuse') return 'badge-refuse'
+  return ''
+}

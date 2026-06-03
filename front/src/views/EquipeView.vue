@@ -1,26 +1,50 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerEquipe } from '@/services/api'
+import {
+  chargerEquipe,
+  inviterMembre,
+  rechercherJoueurs,
+  retirerMembre,
+} from '@/services/api'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { libelleRoleEquipe } from '@/utils/equipeAffichage'
+import {
+  classeBadgeStatutMembre,
+  libelleRoleEquipe,
+  libelleStatutMembre,
+} from '@/utils/equipeAffichage'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 
 const auth = useAuthStore()
 const route = useRoute()
-const router = useRouter()
 
 const equipe = ref<any>(null)
 const chargement = ref(true)
 const erreur = ref('')
+const messageSucces = ref('')
+
+const rechercheJoueur = ref('')
+const resultatsRecherche = ref<any[]>([])
+const rechercheEnCours = ref(false)
+const invitationEnCours = ref<number | null>(null)
+const annulationEnCours = ref<number | null>(null)
+
+let debounceRecherche: ReturnType<typeof setTimeout> | null = null
 
 const equipeId = Number(route.params.id)
+
+const estProprietaire = computed(() => {
+  const club = equipe.value?.club
+  const clubId = typeof club === 'object' ? club?.id : club
+  return auth.utilisateur?.type === 'club' && clubId === auth.utilisateur?.id
+})
 
 onMounted(charger)
 
 async function charger() {
   chargement.value = true
+  erreur.value = ''
   try {
     equipe.value = await chargerEquipe(auth.token!, equipeId)
   } catch (e: any) {
@@ -34,28 +58,80 @@ async function charger() {
   }
 }
 
-const matchsAvenir = computed(() => {
-  if (!equipe.value?.membres) return []
-  return []
-})
-
-function formaterDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+function onRechercheInput() {
+  messageSucces.value = ''
+  if (debounceRecherche) clearTimeout(debounceRecherche)
+  const q = rechercheJoueur.value.trim()
+  if (q.length < 2) {
+    resultatsRecherche.value = []
+    return
+  }
+  debounceRecherche = setTimeout(() => lancerRecherche(q), 350)
 }
 
+async function lancerRecherche(q: string) {
+  rechercheEnCours.value = true
+  try {
+    resultatsRecherche.value = await rechercherJoueurs(auth.token!, q)
+  } catch {
+    resultatsRecherche.value = []
+  } finally {
+    rechercheEnCours.value = false
+  }
+}
+
+async function inviter(joueurId: number) {
+  invitationEnCours.value = joueurId
+  erreur.value = ''
+  messageSucces.value = ''
+  try {
+    await inviterMembre(auth.token!, equipeId, joueurId)
+    messageSucces.value = 'Invitation envoyée.'
+    rechercheJoueur.value = ''
+    resultatsRecherche.value = []
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Invitation impossible.'
+  } finally {
+    invitationEnCours.value = null
+  }
+}
+
+async function annulerInvitation(membreId: number) {
+  annulationEnCours.value = membreId
+  erreur.value = ''
+  try {
+    await retirerMembre(auth.token!, equipeId, membreId)
+    messageSucces.value = 'Invitation annulée.'
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Annulation impossible.'
+  } finally {
+    annulationEnCours.value = null
+  }
+}
+
+function peutAnnulerInvitation(membre: any): boolean {
+  return (
+    membre.statut === 'en_attente' &&
+    membre.origine === 'invitation_club' &&
+    membre.role !== 'gestionnaire'
+  )
+}
+
+function dejaDansEquipe(joueurId: number): boolean {
+  return equipe.value?.membres?.some(
+    (m: any) =>
+      m.utilisateur?.id === joueurId &&
+      m.statut !== 'refuse',
+  )
+}
 </script>
 
 <template>
   <div class="page-equipe">
     <div v-if="chargement" class="chargement conteneur">Chargement...</div>
-    <div v-else-if="erreur" class="conteneur alerte alerte-erreur" style="margin-top: var(--espace-xl)">
+    <div v-else-if="erreur && !equipe" class="conteneur alerte alerte-erreur" style="margin-top: var(--espace-xl)">
       {{ erreur }}
     </div>
 
@@ -70,7 +146,6 @@ function formaterDate(dateStr: string) {
         </RouterLink>
       </div>
 
-      <!-- En-tête équipe -->
       <div class="equipe-entete">
         <div class="conteneur equipe-entete-interieur">
           <div class="equipe-identite">
@@ -84,19 +159,52 @@ function formaterDate(dateStr: string) {
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
-      <!-- Contenu principal -->
       <div class="conteneur equipe-contenu">
+        <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
+        <div v-if="messageSucces" class="alerte alerte-succes">{{ messageSucces }}</div>
 
-        <!-- Membres -->
+        <section v-if="estProprietaire" class="carte section-inviter">
+          <div class="section-titre-icone">
+            <span>✉️</span>
+            <h2>Inviter un joueur</h2>
+          </div>
+          <p class="inviter-aide">
+            Recherchez par nom, prénom ou e-mail. Le joueur devra accepter l'invitation (une équipe par sport).
+          </p>
+          <input
+            v-model="rechercheJoueur"
+            type="search"
+            class="champ-recherche"
+            placeholder="Ex. Dupont ou jean.dupont@test.com"
+            @input="onRechercheInput"
+          />
+          <p v-if="rechercheEnCours" class="recherche-etat">Recherche...</p>
+          <ul v-else-if="resultatsRecherche.length" class="resultats-recherche">
+            <li v-for="j in resultatsRecherche" :key="j.id">
+              <span>{{ nomAffichage(j) }} <small>{{ j.email }}</small></span>
+              <button
+                v-if="!dejaDansEquipe(j.id)"
+                class="btn btn-primaire btn-compact"
+                :disabled="invitationEnCours === j.id"
+                @click="inviter(j.id)"
+              >
+                Inviter
+              </button>
+              <span v-else class="deja-membre">Déjà dans l'équipe</span>
+            </li>
+          </ul>
+        </section>
+
         <section class="carte section-membres">
           <div class="section-titre-icone">
             <span>👥</span>
             <h2>Membres de l'équipe</h2>
-            <span class="membres-count">{{ equipe.membres?.length ?? 0 }} membre{{ (equipe.membres?.length ?? 0) > 1 ? 's' : '' }}</span>
+            <span class="membres-count">
+              {{ equipe.membres?.length ?? 0 }} membre{{ (equipe.membres?.length ?? 0) > 1 ? 's' : '' }}
+            </span>
           </div>
 
           <div v-if="!equipe.membres?.length" class="vide-section">
@@ -115,20 +223,32 @@ function formaterDate(dateStr: string) {
               <div class="membre-info">
                 <strong>{{ nomAffichage(membre.utilisateur) }}</strong>
                 <span class="membre-role">{{ libelleRoleEquipe(membre.role) }}</span>
+                <span
+                  v-if="membre.statut && membre.statut !== 'confirme'"
+                  class="membre-statut"
+                  :class="classeBadgeStatutMembre(membre.statut)"
+                >
+                  {{ libelleStatutMembre(membre.statut) }}
+                </span>
               </div>
+              <button
+                v-if="estProprietaire && peutAnnulerInvitation(membre)"
+                class="btn-annuler-invitation"
+                :disabled="annulationEnCours === membre.id"
+                @click="annulerInvitation(membre.id)"
+              >
+                Annuler l'invitation
+              </button>
             </div>
           </div>
         </section>
 
-        <!-- Statistiques + Calendrier -->
         <div class="bas-contenu">
-          <!-- Calendrier -->
           <section class="carte section-calendrier">
             <div class="section-titre-icone">
               <span>📅</span>
               <h2>Calendrier</h2>
             </div>
-
             <div class="vide-section">
               <p>Inscrivez l'équipe à des matchs pour voir le calendrier.</p>
               <RouterLink to="/rechercher" class="btn btn-secondaire" style="margin-top: var(--espace-m)">
@@ -137,13 +257,11 @@ function formaterDate(dateStr: string) {
             </div>
           </section>
 
-          <!-- Statistiques -->
           <section class="carte section-stats">
             <div class="section-titre-icone">
               <span>📊</span>
               <h2>Statistiques de l'équipe</h2>
             </div>
-
             <div class="stats-grille">
               <div class="stat-principale">
                 <span class="stat-nombre">0</span>
@@ -160,7 +278,6 @@ function formaterDate(dateStr: string) {
                 </div>
               </div>
             </div>
-
             <div class="taux-victoire">
               <div class="taux-label">
                 <span>Taux de victoires</span>
@@ -170,7 +287,6 @@ function formaterDate(dateStr: string) {
                 <div class="barre-remplie" style="width: 0%"></div>
               </div>
             </div>
-
             <div class="stats-buts">
               <div class="stat-but">
                 <span>Buts marqués</span>
@@ -247,10 +363,66 @@ function formaterDate(dateStr: string) {
   gap: var(--espace-l);
 }
 
+.section-inviter,
 .section-membres,
 .section-calendrier,
 .section-stats {
   padding: var(--espace-l);
+}
+
+.inviter-aide {
+  font-size: 0.88rem;
+  color: var(--couleur-texte-discret);
+  margin-bottom: var(--espace-m);
+}
+
+.champ-recherche {
+  width: 100%;
+  max-width: 420px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--couleur-bordure);
+  border-radius: var(--rayon-bouton);
+  font-size: 0.95rem;
+}
+
+.recherche-etat {
+  font-size: 0.85rem;
+  color: var(--couleur-texte-discret);
+  margin-top: var(--espace-s);
+}
+
+.resultats-recherche {
+  list-style: none;
+  margin: var(--espace-m) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-s);
+}
+
+.resultats-recherche li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espace-m);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--couleur-bordure);
+  font-size: 0.9rem;
+}
+
+.resultats-recherche small {
+  color: var(--couleur-texte-discret);
+  margin-left: 0.35rem;
+}
+
+.btn-compact {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.deja-membre {
+  font-size: 0.8rem;
+  color: var(--couleur-texte-discret);
 }
 
 .section-titre-icone {
@@ -278,7 +450,7 @@ function formaterDate(dateStr: string) {
 
 .grille-membres {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--espace-m);
 }
 
@@ -309,16 +481,53 @@ function formaterDate(dateStr: string) {
 .membre-info {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
 }
 
 .membre-info strong {
   font-size: 0.9rem;
 }
 
-.membre-info span {
+.membre-role {
   font-size: 0.78rem;
   color: var(--couleur-texte-discret);
+}
+
+.membre-statut {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--rayon-badge);
+  margin-top: 0.15rem;
+}
+
+.badge-attente {
+  background: var(--couleur-attente-fond, #fff8e1);
+  color: var(--couleur-attente, #f57c00);
+}
+
+.badge-confirme {
+  background: var(--couleur-confirme-fond);
+  color: var(--couleur-confirme);
+}
+
+.badge-refuse {
+  background: var(--couleur-refuse-fond);
+  color: var(--couleur-refuse);
+}
+
+.btn-annuler-invitation {
+  margin-top: 0.25rem;
+  background: none;
+  border: none;
+  color: var(--couleur-refuse);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.btn-annuler-invitation:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .bas-contenu {
@@ -417,7 +626,6 @@ function formaterDate(dateStr: string) {
   height: 100%;
   background: var(--couleur-primaire);
   border-radius: 4px;
-  transition: width 0.5s ease;
 }
 
 .stats-buts {

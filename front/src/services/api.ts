@@ -135,12 +135,24 @@ export const modifierEquipe = (token: string, id: number, donnees: Record<string
 export const supprimerEquipe = (token: string, id: number) =>
   requete('DELETE', `/equipes/${id}`, null, token)
 
-export const ajouterMembre = (
+export const inviterMembre = (token: string, equipeId: number, utilisateurId: number) =>
+  requete('POST', `/equipes/${equipeId}/membres`, { utilisateur_id: utilisateurId }, token)
+
+/** @deprecated Utiliser inviterMembre */
+export const ajouterMembre = inviterMembre
+
+export const repondreInvitationEquipe = (
   token: string,
   equipeId: number,
-  utilisateurId: number,
-  role: string | null = null,
-) => requete('POST', `/equipes/${equipeId}/membres`, { utilisateur_id: utilisateurId, role }, token)
+  membreId: number,
+  statut: 'confirme' | 'refuse',
+) => requete('PATCH', `/equipes/${equipeId}/membres/${membreId}`, { statut }, token)
 
 export const retirerMembre = (token: string, equipeId: number, membreId: number) =>
   requete('DELETE', `/equipes/${equipeId}/membres/${membreId}`, null, token)
+
+export const chargerInvitationsEquipes = (token: string) =>
+  requete('GET', '/invitations-equipes', null, token)
+
+export const rechercherJoueurs = (token: string, q: string) =>
+  requete('GET', '/joueurs/recherche' + construireParams({ q }), null, token)

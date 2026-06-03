@@ -21,11 +21,11 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?string $email = null;
 
     /**
@@ -41,16 +41,16 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?string $nom = null;
 
     /** Null pour un compte club (raison sociale dans nom uniquement). */
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?string $prenom = null;
 
     #[ORM\Column(enumType: TypeUtilisateur::class)]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?TypeUtilisateur $type = null;
 
     #[ORM\Column(length: 255, nullable: true)]

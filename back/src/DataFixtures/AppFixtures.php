@@ -150,6 +150,16 @@ class AppFixtures extends Fixture
             }
         }
 
+        // Invitation club en attente (démo étape 2)
+        $joueurInvite = $utilisateurs[9];
+        $invitationDemo = new EquipeJoueur();
+        $invitationDemo->setEquipe($equipes[0]);
+        $invitationDemo->setUtilisateur($joueurInvite);
+        $invitationDemo->setRole(RoleEquipe::Joueur);
+        $invitationDemo->setStatut(StatutMembreEquipe::EnAttente);
+        $invitationDemo->setOrigine(OrigineMembreEquipe::InvitationClub);
+        $manager->persist($invitationDemo);
+
         // ---------- MATCHS (Game) + MatchCamp ----------
         $lieux          = ['Stade Municipal', 'Gymnase Central', 'Court 5', 'Centre Sportif', 'Terrain Central'];
         $statutsCycles  = [StatutGame::EnAttente, StatutGame::EnAttente, StatutGame::Termine];

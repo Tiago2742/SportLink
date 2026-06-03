@@ -12,6 +12,7 @@ use App\Enum\RoleEquipe;
 use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
+use App\Repository\EquipeJoueurRepository;
 use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -20,6 +21,7 @@ class EquipeService
     public function __construct(
         private EntityManagerInterface $em,
         private UtilisateurRepository  $utilisateurRepository,
+        private EquipeJoueurRepository $equipeJoueurRepository,
     ) {}
 
     public function creer(
@@ -95,42 +97,130 @@ class EquipeService
         return $equipe;
     }
 
-    public function ajouterMembre(
-        Equipe $equipe,
-        int $utilisateurId,
-        ?string $role,
-        OrigineMembreEquipe $origine = OrigineMembreEquipe::InvitationClub,
-    ): EquipeJoueur {
-        $utilisateur = $this->utilisateurRepository->find($utilisateurId);
-        if (!$utilisateur) {
-            throw new \InvalidArgumentException('Utilisateur introuvable.');
+    /**
+     * Invitation club → joueur (étape 2).
+     */
+    public function inviterJoueur(Equipe $equipe, int $joueurId, Utilisateur $club): EquipeJoueur
+    {
+        if ($equipe->getClub() !== $club) {
+            throw new \InvalidArgumentException('Seul le club propriétaire peut inviter des joueurs.');
         }
 
-        if ($utilisateur->getType() !== TypeUtilisateur::Joueur) {
-            throw new \InvalidArgumentException('Seuls les comptes joueur peuvent rejoindre une équipe en tant que membre.');
+        $joueur = $this->utilisateurRepository->find($joueurId);
+        if (!$joueur) {
+            throw new \InvalidArgumentException('Joueur introuvable.');
+        }
+
+        if ($joueur->getType() !== TypeUtilisateur::Joueur) {
+            throw new \InvalidArgumentException('Seuls les comptes joueur peuvent être invités dans une équipe.');
         }
 
         foreach ($equipe->getMembres() as $membre) {
-            if ($membre->getUtilisateur() === $utilisateur) {
-                throw new \InvalidArgumentException('Cet utilisateur est déjà membre de l\'équipe.');
+            if ($membre->getUtilisateur() !== $joueur) {
+                continue;
             }
+
+            if ($membre->getStatut() === StatutMembreEquipe::Refuse) {
+                $this->verifierUneEquipeParSport($joueur, $equipe->getSport(), $equipe);
+
+                $membre->setStatut(StatutMembreEquipe::EnAttente);
+                $membre->setOrigine(OrigineMembreEquipe::InvitationClub);
+                $membre->setRole(RoleEquipe::Joueur);
+                $this->em->flush();
+
+                return $membre;
+            }
+
+            if ($membre->getStatut() === StatutMembreEquipe::EnAttente) {
+                throw new \InvalidArgumentException('Une invitation est déjà en attente pour ce joueur.');
+            }
+
+            throw new \InvalidArgumentException('Ce joueur fait déjà partie de cette équipe.');
         }
 
-        $roleEnum = ($role !== null && RoleEquipe::tryFrom($role) !== null)
-            ? RoleEquipe::from($role)
-            : RoleEquipe::Joueur;
+        $this->verifierUneEquipeParSport($joueur, $equipe->getSport(), $equipe);
 
         $membreEquipe = new EquipeJoueur();
-        $membreEquipe->setUtilisateur($utilisateur);
+        $membreEquipe->setUtilisateur($joueur);
         $membreEquipe->setEquipe($equipe);
-        $membreEquipe->setRole($roleEnum);
+        $membreEquipe->setRole(RoleEquipe::Joueur);
         $membreEquipe->setStatut(StatutMembreEquipe::EnAttente);
-        $membreEquipe->setOrigine($origine);
+        $membreEquipe->setOrigine(OrigineMembreEquipe::InvitationClub);
 
         $this->em->persist($membreEquipe);
         $this->em->flush();
 
         return $membreEquipe;
+    }
+
+    public function repondreInvitation(
+        EquipeJoueur $membre,
+        StatutMembreEquipe $nouveauStatut,
+        Utilisateur $joueur,
+    ): EquipeJoueur {
+        if ($membre->getUtilisateur() !== $joueur) {
+            throw new \InvalidArgumentException('Seul le joueur invité peut répondre à cette invitation.');
+        }
+
+        if ($membre->getStatut() !== StatutMembreEquipe::EnAttente) {
+            throw new \InvalidArgumentException('Cette invitation n\'est plus en attente de réponse.');
+        }
+
+        if ($membre->getOrigine() !== OrigineMembreEquipe::InvitationClub) {
+            throw new \InvalidArgumentException('Cette adhésion ne provient pas d\'une invitation de club.');
+        }
+
+        if ($nouveauStatut === StatutMembreEquipe::EnAttente) {
+            throw new \InvalidArgumentException('Statut invalide. Valeurs acceptées : confirme, refuse.');
+        }
+
+        if ($nouveauStatut === StatutMembreEquipe::Confirme) {
+            $this->verifierUneEquipeParSport($joueur, $membre->getEquipe()->getSport(), $membre->getEquipe());
+        }
+
+        $membre->setStatut($nouveauStatut);
+        $this->em->flush();
+
+        return $membre;
+    }
+
+    public function annulerInvitation(EquipeJoueur $membre, Utilisateur $club): void
+    {
+        if ($membre->getEquipe()->getClub() !== $club) {
+            throw new \InvalidArgumentException('Accès refusé.');
+        }
+
+        if ($membre->getRole() === RoleEquipe::Gestionnaire) {
+            throw new \InvalidArgumentException('Impossible de retirer le gestionnaire de l\'équipe.');
+        }
+
+        $this->em->remove($membre);
+        $this->em->flush();
+    }
+
+    /** @return EquipeJoueur[] */
+    public function listerInvitationsEnAttente(Utilisateur $joueur): array
+    {
+        if ($joueur->getType() !== TypeUtilisateur::Joueur) {
+            return [];
+        }
+
+        return $this->equipeJoueurRepository->trouverInvitationsEnAttentePourJoueur($joueur);
+    }
+
+    private function verifierUneEquipeParSport(
+        Utilisateur $joueur,
+        Sport $sport,
+        ?Equipe $exclureEquipe = null,
+    ): void {
+        if ($this->equipeJoueurRepository->aAdhesionActiveSurSport($joueur, $sport, $exclureEquipe)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Ce joueur est déjà inscrit (ou invité) dans une autre équipe de %s.',
+                    $sport->getNom(),
+                ),
+            );
+        }
     }
 
     public function retirerMembre(EquipeJoueur $membre): void
