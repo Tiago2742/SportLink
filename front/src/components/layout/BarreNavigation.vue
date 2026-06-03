@@ -33,6 +33,13 @@ function deconnecter() {
       <div class="nav-liens" :class="{ ouvert: menuOuvert }">
         <RouterLink to="/" @click="menuOuvert = false">Accueil</RouterLink>
         <RouterLink to="/mes-matchs" @click="menuOuvert = false">Mes matchs</RouterLink>
+        <RouterLink
+          v-if="auth.utilisateur?.type === 'club'"
+          to="/mes-equipes"
+          @click="menuOuvert = false"
+        >
+          Mes équipes
+        </RouterLink>
         <RouterLink to="/rechercher" @click="menuOuvert = false">Rechercher</RouterLink>
         <RouterLink to="/creer-match" @click="menuOuvert = false">Créer un match</RouterLink>
         <RouterLink to="/profil" @click="menuOuvert = false">Profil</RouterLink>

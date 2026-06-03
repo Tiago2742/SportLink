@@ -68,8 +68,9 @@ Les permissions sont **strictes** (voir §6) et appliquées via des Voters Symfo
 - id
 - utilisateur → ManyToOne Utilisateur
 - equipe → ManyToOne Equipe
-- role : `capitaine` | `joueur`
-- statut : `invite` | `confirme` (gestion des invitations)
+- role : `gestionnaire` | `joueur`
+- origine : `invitation_club` | `demande_joueur`
+- statut : `en_attente` | `confirme` | `refuse`
 
 ### Game (le match) — table `game`
 - id

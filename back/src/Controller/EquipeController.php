@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Equipe;
+use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeRepository;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
@@ -41,7 +42,15 @@ class EquipeController extends AbstractController
     #[Route('', name: 'api_equipes_creer', methods: ['POST'])]
     public function creer(Request $request): JsonResponse
     {
+        $moi = $this->getUser();
+        if ($moi->getType() !== TypeUtilisateur::Club) {
+            return $this->json(['erreur' => 'Seul un compte club peut créer une équipe.'], 403);
+        }
+
         $donnees = json_decode($request->getContent(), true);
+        if (!\is_array($donnees)) {
+            return $this->json(['erreur' => 'Corps JSON invalide.'], 400);
+        }
 
         if (empty($donnees['nom']) || empty($donnees['sportId'])) {
             return $this->json(['erreur' => 'Les champs "nom" et "sportId" sont requis.'], 400);
@@ -61,14 +70,22 @@ class EquipeController extends AbstractController
             }
         }
 
-        $equipe = $this->equipeService->creer(
-            $donnees['nom'],
-            $sport,
-            $niveau,
-            $donnees['localisation'] ?? null,
-            $donnees['logo'] ?? null,
-            $this->getUser(),
-        );
+        try {
+            $equipe = $this->equipeService->creer(
+                trim((string) $donnees['nom']),
+                $sport,
+                $niveau,
+                isset($donnees['localisation']) && $donnees['localisation'] !== ''
+                    ? (string) $donnees['localisation']
+                    : null,
+                isset($donnees['logo']) && $donnees['logo'] !== ''
+                    ? (string) $donnees['logo']
+                    : null,
+                $moi,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
 
         return $this->json($equipe, 201, [], ['groups' => self::GROUPES_READ]);
     }

@@ -10,9 +10,12 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: UtilisateurRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[Assert\Callback('validerPrenomSelonType')]
 class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -195,9 +198,22 @@ $this->messages = new ArrayCollection();
 
     public function setPrenom(?string $prenom): static
     {
-        $this->prenom = $prenom;
+        $this->prenom = $prenom !== null && $prenom !== '' ? $prenom : null;
 
         return $this;
+    }
+
+    public function validerPrenomSelonType(ExecutionContextInterface $context): void
+    {
+        if ($this->type !== TypeUtilisateur::Joueur) {
+            return;
+        }
+
+        if ($this->prenom === null || trim($this->prenom) === '') {
+            $context->buildViolation('Le prénom est requis pour un compte joueur.')
+                ->atPath('prenom')
+                ->addViolation();
+        }
     }
 
     public function getType(): ?TypeUtilisateur

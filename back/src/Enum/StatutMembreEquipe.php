@@ -4,6 +4,7 @@ namespace App\Enum;
 
 enum StatutMembreEquipe: string
 {
-    case Invite   = 'invite';
-    case Confirme = 'confirme';
+    case EnAttente = 'en_attente';
+    case Confirme  = 'confirme';
+    case Refuse    = 'refuse';
 }

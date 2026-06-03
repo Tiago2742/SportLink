@@ -68,7 +68,7 @@ Entités :
 - **Utilisateur** : email, password, roles, nom, prenom, type (\`club\`|\`joueur\`), localisation, dateInscription. PAS de champ niveau direct.
 - **UtilisateurNiveau** : utilisateur, sport, niveau (un niveau par sport pratiqué)
 - **Equipe** : nom, sport (collectif), niveau, localisation, logo, club (créateur) ; OneToMany EquipeJoueur
-- **EquipeJoueur** : utilisateur, equipe, role (\`capitaine\`|\`joueur\`), statut (\`invite\`|\`confirme\`)
+- **EquipeJoueur** : utilisateur, equipe, role (\`gestionnaire\`|\`joueur\`), origine, statut (\`en_attente\`|\`confirme\`|\`refuse\`)
 - **Game** (table \`game\`) : sport, niveauRequis (nullable), dateMatch, lieu, statut (\`en_attente\`|\`confirme\`|\`termine\`|\`annule\`), createur ; OneToMany MatchCamp
 - **MatchCamp** (remplace Disputer + Participation) : game, role (\`camp_1\`|\`camp_2\`), statut (\`invite\`|\`confirme\`|\`refuse\`), equipe (nullable, si collectif), joueur (nullable, si individuel). Règle : equipe XOR joueur.
 - **Resultat** : game (OneToOne, FK unique), scoreCamp1, scoreCamp2

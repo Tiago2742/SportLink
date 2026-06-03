@@ -16,6 +16,7 @@ use App\Enum\RoleEquipe;
 use App\Enum\RoleMatchCamp;
 use App\Enum\StatutGame;
 use App\Enum\StatutMatchCamp;
+use App\Enum\OrigineMembreEquipe;
 use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
@@ -113,16 +114,38 @@ class AppFixtures extends Fixture
             $e->setSport($sportEntites[$sportNom]);
             $e->setNiveau($niveauxDispo[array_rand($niveauxDispo)]);
             $e->setLocalisation($villes[$i % count($villes)]);
-            $e->setClub($utilisateurs[$i % 3]); // les 3 premiers sont des clubs
+            if ($i < 2) {
+                $e->setLogo('https://placehold.co/96x96/png?text=' . rawurlencode(substr($nomsEquipes[$i], 0, 2)));
+            }
+            $club = $utilisateurs[$i % 3];
+            $e->setClub($club);
             $manager->persist($e);
             $equipes[] = $e;
 
-            for ($j = 0; $j < rand(3, 5); $j++) {
+            $gestionnaireClub = new EquipeJoueur();
+            $gestionnaireClub->setEquipe($e);
+            $gestionnaireClub->setUtilisateur($club);
+            $gestionnaireClub->setRole(RoleEquipe::Gestionnaire);
+            $gestionnaireClub->setStatut(StatutMembreEquipe::Confirme);
+            $gestionnaireClub->setOrigine(OrigineMembreEquipe::InvitationClub);
+            $e->addMembre($gestionnaireClub);
+            $manager->persist($gestionnaireClub);
+
+            $joueursOnly = array_values(array_filter(
+                $utilisateurs,
+                fn($u) => $u->getType() === TypeUtilisateur::Joueur,
+            ));
+            for ($j = 0; $j < rand(2, 4); $j++) {
                 $ej = new EquipeJoueur();
                 $ej->setEquipe($e);
-                $ej->setUtilisateur($utilisateurs[($i + $j) % count($utilisateurs)]);
-                $ej->setRole($j === 0 ? RoleEquipe::Capitaine : RoleEquipe::Joueur);
+                $ej->setUtilisateur($joueursOnly[($i + $j) % count($joueursOnly)]);
+                $ej->setRole(RoleEquipe::Joueur);
                 $ej->setStatut(StatutMembreEquipe::Confirme);
+                $ej->setOrigine(
+                    $j % 2 === 0
+                        ? OrigineMembreEquipe::InvitationClub
+                        : OrigineMembreEquipe::DemandeJoueur,
+                );
                 $manager->persist($ej);
             }
         }

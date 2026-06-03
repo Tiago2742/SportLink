@@ -34,16 +34,22 @@ async function soumettre() {
       localisation: form.value.localisation,
       sports: sports.value,
     }
-    if (!estClub.value) {
-      donnees.prenom = form.value.prenom
+    if (estClub.value) {
+      delete donnees.prenom
+    } else {
+      donnees.prenom = form.value.prenom.trim()
     }
     await auth.sInscrire(donnees as Record<string, unknown> & { email: string; password: string })
     router.push('/')
   } catch (e: any) {
     if (e.statut === 409) {
       erreur.value = 'Cette adresse email est déjà utilisée.'
-    } else if (e.statut === 400) {
-      erreur.value = 'Veuillez remplir tous les champs obligatoires.'
+    } else if (e.statut === 400 || e.statut === 422) {
+      const msg =
+        e.message ||
+        (e.donnees as { erreur?: string })?.erreur ||
+        (e.donnees as { erreurs?: Record<string, string> })?.erreurs?.prenom
+      erreur.value = msg || 'Veuillez remplir tous les champs obligatoires.'
     } else {
       erreur.value = "Une erreur est survenue lors de l'inscription."
     }

@@ -105,7 +105,7 @@ class EquipeServiceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Utilisateur introuvable.');
 
-        $this->service->ajouterMembre($equipe, 99, 'capitaine');
+        $this->service->ajouterMembre($equipe, 99, 'gestionnaire');
     }
 
     public function testAjouterMembre_DejaPresent_LeveException(): void
@@ -134,11 +134,11 @@ class EquipeServiceTest extends TestCase
         $this->em->expects($this->once())->method('persist')->with($this->isInstanceOf(EquipeJoueur::class));
         $this->em->expects($this->once())->method('flush');
 
-        $membreEquipe = $this->service->ajouterMembre($equipe, 1, 'capitaine');
+        $membreEquipe = $this->service->ajouterMembre($equipe, 1, 'gestionnaire');
 
         $this->assertSame($utilisateur, $membreEquipe->getUtilisateur());
         $this->assertSame($equipe, $membreEquipe->getEquipe());
-        $this->assertEquals('capitaine', $membreEquipe->getRole());
+        $this->assertEquals('gestionnaire', $membreEquipe->getRole()->value);
     }
 
     public function testRetirerMembre(): void

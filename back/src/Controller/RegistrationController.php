@@ -27,22 +27,29 @@ class RegistrationController extends AbstractController
         NiveauRepository $niveauRepo,
     ): JsonResponse {
         $donnees = json_decode($request->getContent(), true);
-
-        $champsRequis = ['email', 'password', 'nom', 'type'];
-        foreach ($champsRequis as $champ) {
-            if (empty($donnees[$champ])) {
-                return $this->json(['erreur' => "Le champ \"$champ\" est requis."], 400);
-            }
+        if (!\is_array($donnees)) {
+            return $this->json(['erreur' => 'Corps JSON invalide.'], 400);
         }
 
         try {
-            $typeEnum = TypeUtilisateur::from($donnees['type']);
+            $typeEnum = TypeUtilisateur::from((string) ($donnees['type'] ?? ''));
         } catch (\ValueError) {
             return $this->json(['erreur' => 'Type invalide. Valeurs acceptées : club, joueur.'], 400);
         }
 
-        if ($typeEnum === TypeUtilisateur::Joueur && empty($donnees['prenom'])) {
-            return $this->json(['erreur' => 'Le champ "prenom" est requis pour un compte joueur.'], 400);
+        // prenom volontairement absent de cette liste : requis uniquement pour les joueurs
+        $champsRequis = ['email', 'password', 'nom', 'type'];
+        foreach ($champsRequis as $champ) {
+            if (!isset($donnees[$champ]) || $donnees[$champ] === '' || $donnees[$champ] === null) {
+                return $this->json(['erreur' => "Le champ \"$champ\" est requis."], 400);
+            }
+        }
+
+        if ($typeEnum === TypeUtilisateur::Joueur) {
+            $prenom = isset($donnees['prenom']) ? trim((string) $donnees['prenom']) : '';
+            if ($prenom === '') {
+                return $this->json(['erreur' => 'Le champ "prenom" est requis pour un compte joueur.'], 400);
+            }
         }
 
         if ($em->getRepository(Utilisateur::class)->findOneBy(['email' => $donnees['email']])) {
@@ -52,14 +59,16 @@ class RegistrationController extends AbstractController
         $utilisateur = new Utilisateur();
         $utilisateur->setEmail($donnees['email']);
         $utilisateur->setPassword($passwordHasher->hashPassword($utilisateur, $donnees['password']));
-        $utilisateur->setNom($donnees['nom']);
+        $utilisateur->setNom(trim((string) $donnees['nom']));
+        $utilisateur->setType($typeEnum);
         $utilisateur->setPrenom(
             $typeEnum === TypeUtilisateur::Club
-                ? (isset($donnees['prenom']) && $donnees['prenom'] !== '' ? $donnees['prenom'] : null)
-                : $donnees['prenom'],
+                ? null
+                : trim((string) $donnees['prenom']),
         );
-        $utilisateur->setType($typeEnum);
-        $utilisateur->setLocalisation($donnees['localisation'] ?? null);
+        $utilisateur->setLocalisation(isset($donnees['localisation']) && $donnees['localisation'] !== ''
+            ? (string) $donnees['localisation']
+            : null);
         $utilisateur->setDateInscription(new \DateTime());
 
         // Sports optionnels : [{sportId: N, niveauId: M}, ...]
@@ -91,6 +100,7 @@ class RegistrationController extends AbstractController
             foreach ($erreurs as $erreur) {
                 $messages[$erreur->getPropertyPath()] = $erreur->getMessage();
             }
+
             return $this->json(['erreurs' => $messages], 422);
         }
 

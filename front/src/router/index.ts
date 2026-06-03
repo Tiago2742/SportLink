@@ -45,6 +45,18 @@ const router = createRouter({
       meta: { requiertAuth: true },
     },
     {
+      path: '/mes-equipes',
+      name: 'mes-equipes',
+      component: () => import('@/views/MesEquipesView.vue'),
+      meta: { requiertAuth: true, requiertClub: true },
+    },
+    {
+      path: '/equipes/creer',
+      name: 'creer-equipe',
+      component: () => import('@/views/CreerEquipeView.vue'),
+      meta: { requiertAuth: true, requiertClub: true },
+    },
+    {
       path: '/equipes/:id',
       name: 'equipe',
       component: () => import('@/views/EquipeView.vue'),
@@ -67,6 +79,9 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiertAuth && !auth.estConnecte) {
     return { name: 'connexion' }
+  }
+  if (to.meta.requiertClub && auth.utilisateur?.type !== 'club') {
+    return { name: 'accueil' }
   }
   if ((to.name === 'connexion' || to.name === 'inscription') && auth.estConnecte) {
     return { name: 'accueil' }

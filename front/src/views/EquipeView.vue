@@ -3,6 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerEquipe } from '@/services/api'
+import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
+import { libelleRoleEquipe } from '@/utils/equipeAffichage'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 
 const auth = useAuthStore()
@@ -32,10 +34,6 @@ async function charger() {
   }
 }
 
-const estCreateur = computed(
-  () => equipe.value?.club?.id === auth.utilisateur?.id,
-)
-
 const matchsAvenir = computed(() => {
   if (!equipe.value?.membres) return []
   return []
@@ -62,13 +60,21 @@ function formaterDate(dateStr: string) {
     </div>
 
     <template v-else-if="equipe">
+      <div class="conteneur lien-equipe-haut">
+        <RouterLink
+          v-if="auth.utilisateur?.type === 'club'"
+          to="/mes-equipes"
+          class="lien-retour"
+        >
+          ← Mes équipes
+        </RouterLink>
+      </div>
+
       <!-- En-tête équipe -->
       <div class="equipe-entete">
         <div class="conteneur equipe-entete-interieur">
           <div class="equipe-identite">
-            <div class="equipe-logo">
-              {{ equipe.nom.substring(0, 2).toUpperCase() }}
-            </div>
+            <AvatarEquipe :equipe="equipe" taille="lg" />
             <div>
               <h1 class="equipe-nom">{{ equipe.nom }}</h1>
               <div class="equipe-meta">
@@ -79,10 +85,6 @@ function formaterDate(dateStr: string) {
             </div>
           </div>
 
-          <div class="equipe-actions" v-if="estCreateur">
-            <button class="btn btn-secondaire">👥 Inviter joueur</button>
-            <button class="btn btn-secondaire">✏️ Éditer équipe</button>
-          </div>
         </div>
       </div>
 
@@ -112,7 +114,7 @@ function formaterDate(dateStr: string) {
               </div>
               <div class="membre-info">
                 <strong>{{ nomAffichage(membre.utilisateur) }}</strong>
-                <span>{{ membre.role || 'Joueur' }}</span>
+                <span class="membre-role">{{ libelleRoleEquipe(membre.role) }}</span>
               </div>
             </div>
           </div>
@@ -191,6 +193,20 @@ function formaterDate(dateStr: string) {
   padding-bottom: var(--espace-xxl);
 }
 
+.lien-equipe-haut {
+  padding-top: var(--espace-m);
+}
+
+.lien-retour {
+  font-size: 0.9rem;
+  color: var(--couleur-texte-discret);
+  text-decoration: none;
+}
+
+.lien-retour:hover {
+  color: var(--couleur-primaire);
+}
+
 .equipe-entete {
   background: white;
   border-bottom: 1px solid var(--couleur-bordure);
@@ -212,20 +228,6 @@ function formaterDate(dateStr: string) {
   gap: var(--espace-l);
 }
 
-.equipe-logo {
-  width: 64px;
-  height: 64px;
-  background: var(--couleur-primaire);
-  color: white;
-  border-radius: var(--rayon-carte);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.3rem;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
 .equipe-nom {
   font-size: 1.5rem;
   font-weight: 700;
@@ -237,11 +239,6 @@ function formaterDate(dateStr: string) {
   color: var(--couleur-texte-discret);
   display: flex;
   gap: 0.5rem;
-}
-
-.equipe-actions {
-  display: flex;
-  gap: var(--espace-s);
 }
 
 .equipe-contenu {

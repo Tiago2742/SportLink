@@ -16,6 +16,7 @@ import {
 } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composables/useMatchCamps'
+import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 
 const auth = useAuthStore()
@@ -299,11 +300,23 @@ function formaterHeure(dateStr: string) {
               <p class="resultat-mesure-libelle">{{ libelleMesure }}</p>
               <div class="score-affichage">
                 <div class="score-bloc">
+                  <AvatarEquipe
+                    v-if="camp1?.equipe"
+                    :equipe="camp1.equipe"
+                    taille="sm"
+                    class="score-avatar-equipe"
+                  />
                   <span class="score-nom">{{ nomParticipant(camp1) }}</span>
                   <span class="score-valeur">{{ resultat.scoreCamp1 }}</span>
                 </div>
                 <span class="score-separateur">—</span>
                 <div class="score-bloc">
+                  <AvatarEquipe
+                    v-if="camp2?.equipe"
+                    :equipe="camp2.equipe"
+                    taille="sm"
+                    class="score-avatar-equipe"
+                  />
                   <span class="score-nom">{{ nomParticipant(camp2) }}</span>
                   <span class="score-valeur">{{ resultat.scoreCamp2 }}</span>
                 </div>
@@ -482,12 +495,14 @@ function formaterHeure(dateStr: string) {
                 :key="camp.id"
                 class="participant"
               >
-                <div class="participant-avatar">
-                  {{
-                    camp.equipe
-                      ? camp.equipe.nom[0].toUpperCase()
-                      : initialesUtilisateur(camp.joueur)
-                  }}
+                <AvatarEquipe
+                  v-if="camp.equipe"
+                  :equipe="camp.equipe"
+                  taille="sm"
+                  class="participant-avatar-equipe"
+                />
+                <div v-else class="participant-avatar participant-avatar-joueur">
+                  {{ initialesUtilisateur(camp.joueur) }}
                 </div>
                 <span v-if="camp.equipe">{{ camp.equipe.nom }}</span>
                 <span v-else>{{ nomAffichage(camp.joueur) }}</span>
@@ -610,6 +625,10 @@ function formaterHeure(dateStr: string) {
   padding: var(--espace-l);
   background: var(--couleur-fond);
   border-radius: var(--rayon-carte);
+}
+
+.score-avatar-equipe {
+  margin-bottom: 0.15rem;
 }
 
 .score-bloc {
@@ -805,7 +824,11 @@ function formaterHeure(dateStr: string) {
   border-bottom: none;
 }
 
-.participant-avatar {
+.participant-avatar-equipe {
+  flex-shrink: 0;
+}
+
+.participant-avatar-joueur {
   width: 28px;
   height: 28px;
   border-radius: 50%;

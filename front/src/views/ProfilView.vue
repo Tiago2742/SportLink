@@ -145,31 +145,18 @@ const estClub = computed(() => profil.value?.type === 'club')
           <p class="bientot">Fonctionnalité à venir</p>
         </section>
 
-        <!-- Mes équipes -->
-        <section class="carte section-profil">
+        <!-- Mes équipes (club) -->
+        <section v-if="profil?.type === 'club'" class="carte section-profil">
           <div class="section-titre-icone">
             <span class="titre-icone">👥</span>
             <h2>Mes équipes</h2>
           </div>
-
-          <div v-if="mesEquipes.length === 0" class="vide-section">
-            Vous n'avez pas encore d'équipe.
-          </div>
-
-          <div v-else class="liste-equipes">
-            <div v-for="equipe in mesEquipes" :key="equipe.id" class="item-equipe">
-              <div class="equipe-info">
-                <strong>{{ equipe.nom }}</strong>
-                <span>
-                  {{ equipe.sport?.nom ?? equipe.sport }}
-                  <template v-if="equipe.niveau"> — {{ equipe.niveau?.libelle ?? equipe.niveau }}</template>
-                </span>
-              </div>
-              <RouterLink :to="`/equipes/${equipe.id}`" class="btn btn-secondaire btn-petit">
-                Voir équipe
-              </RouterLink>
-            </div>
-          </div>
+          <p class="section-desc">
+            {{ mesEquipes.length === 0 ? 'Aucune équipe créée.' : `${mesEquipes.length} équipe(s) enregistrée(s).` }}
+          </p>
+          <RouterLink to="/mes-equipes" class="btn btn-primaire">
+            Gérer mes équipes
+          </RouterLink>
         </section>
 
         <!-- Mes matchs -->

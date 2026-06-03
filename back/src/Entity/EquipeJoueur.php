@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\OrigineMembreEquipe;
 use App\Enum\RoleEquipe;
 use App\Enum\StatutMembreEquipe;
 use App\Repository\EquipeJoueurRepository;
@@ -33,6 +34,10 @@ class EquipeJoueur
     #[ORM\Column(enumType: StatutMembreEquipe::class)]
     #[Groups(['equipe_joueur:read'])]
     private ?StatutMembreEquipe $statut = null;
+
+    #[ORM\Column(enumType: OrigineMembreEquipe::class)]
+    #[Groups(['equipe_joueur:read'])]
+    private ?OrigineMembreEquipe $origine = null;
 
     public function getId(): ?int
     {
@@ -80,6 +85,17 @@ class EquipeJoueur
     public function setStatut(StatutMembreEquipe $statut): static
     {
         $this->statut = $statut;
+        return $this;
+    }
+
+    public function getOrigine(): ?OrigineMembreEquipe
+    {
+        return $this->origine;
+    }
+
+    public function setOrigine(OrigineMembreEquipe $origine): static
+    {
+        $this->origine = $origine;
         return $this;
     }
 }
