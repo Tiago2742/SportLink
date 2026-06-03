@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import SelecteurSportNiveau from '@/components/form/SelecteurSportNiveau.vue'
-import type { EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
+import SelecteurSportNiveau, { type EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -17,6 +16,8 @@ const form = ref({
   localisation: '',
 })
 
+const estClub = computed(() => form.value.type === 'club')
+
 const sports = ref<EntreeSportNiveau[]>([])
 const erreur = ref('')
 const chargement = ref(false)
@@ -25,7 +26,18 @@ async function soumettre() {
   erreur.value = ''
   chargement.value = true
   try {
-    await auth.sInscrire({ ...form.value, sports: sports.value })
+    const donnees: Record<string, unknown> = {
+      email: form.value.email,
+      password: form.value.password,
+      nom: form.value.nom,
+      type: form.value.type,
+      localisation: form.value.localisation,
+      sports: sports.value,
+    }
+    if (!estClub.value) {
+      donnees.prenom = form.value.prenom
+    }
+    await auth.sInscrire(donnees as Record<string, unknown> & { email: string; password: string })
     router.push('/')
   } catch (e: any) {
     if (e.statut === 409) {
@@ -53,7 +65,28 @@ async function soumettre() {
       <form @submit.prevent="soumettre">
         <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
 
-        <div class="grille-2">
+                <div class="champ-groupe">
+          <label for="type">Type de profil <span class="obligatoire">*</span></label>
+          <select id="type" v-model="form.type" class="champ" required>
+            <option value="joueur">Joueur</option>
+            <option value="club">Club / Association</option>
+          </select>
+        </div>
+
+        <template v-if="estClub">
+          <div class="champ-groupe">
+            <label for="nom">Nom du club <span class="obligatoire">*</span></label>
+            <input
+              id="nom"
+              v-model="form.nom"
+              type="text"
+              class="champ"
+              placeholder="AS Arras Sport"
+              required
+            />
+          </div>
+        </template>
+        <div v-else class="grille-2">
           <div class="champ-groupe">
             <label for="prenom">Prénom <span class="obligatoire">*</span></label>
             <input
@@ -102,15 +135,6 @@ async function soumettre() {
             required
             autocomplete="new-password"
           />
-        </div>
-
-        <div class="champ-groupe">
-          <label for="type">Type de profil <span class="obligatoire">*</span></label>
-          <select id="type" v-model="form.type" class="champ" required>
-            <option value="joueur">Joueur</option>
-            <option value="entraineur">Entraîneur</option>
-            <option value="organisateur">Organisateur</option>
-          </select>
         </div>
 
         <div class="champ-groupe">

@@ -2,51 +2,116 @@
 
 namespace App\Service;
 
-use App\Entity\Disputer;
 use App\Entity\Game;
+use App\Entity\MatchCamp;
 use App\Entity\Message;
-use App\Entity\Participation;
+use App\Entity\Niveau;
 use App\Entity\Resultat;
+use App\Entity\Sport;
 use App\Entity\Utilisateur;
+use App\Enum\RoleMatchCamp;
+use App\Enum\StatutGame;
+use App\Enum\StatutMatchCamp;
+use App\Enum\TypeSport;
+use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeRepository;
-use App\Repository\ParticipationRepository;
+use App\Repository\MatchCampRepository;
+use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 class MatchService
 {
-    public const STATUTS_VALIDES = ['invité', 'confirmé', 'refusé'];
-
     public function __construct(
         private EntityManagerInterface $em,
-        private ParticipationRepository $participationRepository,
-        private EquipeRepository $equipeRepository,
+        private EquipeRepository       $equipeRepository,
+        private UtilisateurRepository  $utilisateurRepository,
+        private MatchCampRepository    $matchCampRepository,
     ) {}
 
-    // --- Match ---
+    // -------------------------------------------------------------------------
+    // Match CRUD
+    // -------------------------------------------------------------------------
 
-    public function creer(array $donnees, Utilisateur $createur): Game
-    {
+    public function creer(
+        Sport $sport,
+        ?Niveau $niveauRequis,
+        string $dateMatch,
+        ?string $lieu,
+        Utilisateur $createur,
+        ?string $description = null,
+        ?int $equipeId = null,
+    ): Game {
         $match = new Game();
-        $match->setSport($donnees['sport']);
-        $match->setDateMatch(new \DateTime($donnees['dateMatch']));
-        $match->setLieu($donnees['lieu'] ?? null);
-        $match->setNiveauRequis($donnees['niveauRequis'] ?? null);
-        $match->setStatut($donnees['statut'] ?? 'ouvert');
+        $match->setSport($sport);
+        $match->setNiveauRequis($niveauRequis);
+        $match->setDateMatch(new \DateTime($dateMatch));
+        $match->setLieu($lieu);
+        $match->setDescription($description);
+        $match->setStatut(StatutGame::EnAttente);
         $match->setCreateur($createur);
 
         $this->em->persist($match);
+        $this->inscrireCreateurCommeCamp1($match, $createur, $equipeId);
         $this->em->flush();
 
         return $match;
     }
 
-    public function modifier(Game $match, array $donnees): Game
+    private function inscrireCreateurCommeCamp1(Game $match, Utilisateur $createur, ?int $equipeId): void
     {
-        if (isset($donnees['sport']))                    $match->setSport($donnees['sport']);
-        if (isset($donnees['dateMatch']))                $match->setDateMatch(new \DateTime($donnees['dateMatch']));
-        if (array_key_exists('lieu', $donnees))          $match->setLieu($donnees['lieu']);
-        if (array_key_exists('niveauRequis', $donnees))  $match->setNiveauRequis($donnees['niveauRequis']);
-        if (array_key_exists('statut', $donnees))        $match->setStatut($donnees['statut']);
+        $sport = $match->getSport();
+        $camp  = new MatchCamp();
+        $camp->setRole(RoleMatchCamp::Camp1);
+        $camp->setStatut(StatutMatchCamp::Confirme);
+
+        if ($sport->getType() === TypeSport::Individuel) {
+            $camp->setJoueur($createur);
+        } else {
+            if ($equipeId === null) {
+                throw new \InvalidArgumentException(
+                    'Le champ "equipeId" est requis pour créer un match de sport collectif.'
+                );
+            }
+            $equipe = $this->equipeRepository->find($equipeId);
+            if (!$equipe) {
+                throw new \InvalidArgumentException('Équipe introuvable.');
+            }
+            if ($equipe->getClub() !== $createur) {
+                throw new \InvalidArgumentException('Cette équipe ne vous appartient pas.');
+            }
+            if ($equipe->getSport() !== $sport) {
+                throw new \InvalidArgumentException(
+                    sprintf(
+                        'L\'équipe pratique "%s", le match est de "%s".',
+                        $equipe->getSport()?->getNom(),
+                        $sport->getNom(),
+                    )
+                );
+            }
+            $camp->setEquipe($equipe);
+        }
+
+        $match->addCamp($camp);
+        $this->em->persist($camp);
+    }
+
+    public function modifier(
+        Game $match,
+        ?Sport $sport = null,
+        ?Niveau $niveauRequis = null,
+        bool $effacerNiveau = false,
+        ?string $dateMatch = null,
+        ?string $lieu = null,
+        ?string $description = null,
+        bool $effacerDescription = false,
+    ): Game {
+        if ($sport !== null)                   $match->setSport($sport);
+        if ($niveauRequis !== null)            $match->setNiveauRequis($niveauRequis);
+        elseif ($effacerNiveau)                $match->setNiveauRequis(null);
+        if ($dateMatch !== null)               $match->setDateMatch(new \DateTime($dateMatch));
+        if ($lieu !== null)                    $match->setLieu($lieu);
+        if ($description !== null)             $match->setDescription($description);
+        elseif ($effacerDescription)           $match->setDescription(null);
 
         $this->em->flush();
 
@@ -59,87 +124,169 @@ class MatchService
         $this->em->flush();
     }
 
-    // --- Participations ---
-
-    public function participer(Game $match, Utilisateur $utilisateur): Participation
-    {
-        $participationExistante = $this->participationRepository->findOneBy([
-            'game'        => $match,
-            'utilisateur' => $utilisateur,
-        ]);
-
-        if ($participationExistante) {
-            throw new \InvalidArgumentException('Vous participez déjà à ce match.');
-        }
-
-        $participation = new Participation();
-        $participation->setGame($match);
-        $participation->setUtilisateur($utilisateur);
-        $participation->setStatut('invité');
-
-        $this->em->persist($participation);
-        $this->em->flush();
-
-        return $participation;
-    }
-
-    public function modifierStatut(Participation $participation, string $statut): Participation
-    {
-        if (!in_array($statut, self::STATUTS_VALIDES, true)) {
+    public function creerCamp(
+        Game $match,
+        ?int $equipeId,
+        ?int $joueurId,
+        Utilisateur $acteur,
+        bool $confirmerInscription = true,
+    ): MatchCamp {
+        // R5 — validation stricte : XOR équipe/joueur
+        if ($equipeId !== null && $joueurId !== null) {
             throw new \InvalidArgumentException(
-                'Statut invalide. Valeurs acceptées : ' . implode(', ', self::STATUTS_VALIDES) . '.'
+                'Fournissez soit "equipeId" (sport collectif) soit "joueurId" (sport individuel), pas les deux.'
+            );
+        }
+        if ($equipeId === null && $joueurId === null) {
+            throw new \InvalidArgumentException(
+                'Fournissez soit "equipeId" (sport collectif) soit "joueurId" (sport individuel).'
             );
         }
 
-        $participation->setStatut($statut);
-        $this->em->flush();
+        $typeSport = $match->getSport()->getType();
 
-        return $participation;
-    }
-
-    public function annulerParticipation(Participation $participation): void
-    {
-        $this->em->remove($participation);
-        $this->em->flush();
-    }
-
-    // --- Équipes disputant ---
-
-    public function inscrireEquipe(Game $match, int $equipeId, ?string $role): Disputer
-    {
-        $equipe = $this->equipeRepository->find($equipeId);
-        if (!$equipe) {
-            throw new \InvalidArgumentException('Équipe introuvable.');
+        if ($equipeId !== null && $typeSport === TypeSport::Individuel) {
+            throw new \InvalidArgumentException(
+                'Ce match est de sport individuel : fournissez "joueurId", pas "equipeId".'
+            );
+        }
+        if ($joueurId !== null && $typeSport === TypeSport::Collectif) {
+            throw new \InvalidArgumentException(
+                'Ce match oppose des équipes : inscrivez une équipe (foot, rugby, volley…), pas un joueur seul.'
+            );
         }
 
-        foreach ($match->getEquipesDisputant() as $dispute) {
-            if ($dispute->getEquipe() === $equipe) {
-                throw new \InvalidArgumentException('Cette équipe est déjà inscrite à ce match.');
+        if ($equipeId !== null && $acteur->getType() !== TypeUtilisateur::Club) {
+            throw new \InvalidArgumentException(
+                'Seul un compte club peut inscrire une équipe à un match collectif.'
+            );
+        }
+
+        if (count($match->getCamps()) >= 2) {
+            throw new \InvalidArgumentException('Ce match a déjà deux camps inscrits.');
+        }
+
+        $role = count($match->getCamps()) === 0 ? RoleMatchCamp::Camp1 : RoleMatchCamp::Camp2;
+
+        $camp = new MatchCamp();
+        $camp->setRole($role);
+        // Rejoindre volontairement = confirmé ; invitation d'un tiers = invité
+        $camp->setStatut($confirmerInscription ? StatutMatchCamp::Confirme : StatutMatchCamp::Invite);
+
+        if ($equipeId !== null) {
+            $equipe = $this->equipeRepository->find($equipeId);
+            if (!$equipe) {
+                throw new \InvalidArgumentException('Équipe introuvable.');
+            }
+            // Vérifier que l'équipe joue bien ce sport
+            if ($equipe->getSport() !== $match->getSport()) {
+                throw new \InvalidArgumentException(
+                    sprintf('L\'équipe pratique "%s", le match est de "%s".',
+                        $equipe->getSport()?->getNom(),
+                        $match->getSport()->getNom()
+                    )
+                );
+            }
+            // Vérifier que l'équipe n'est pas déjà inscrite
+            foreach ($match->getCamps() as $c) {
+                if ($c->getEquipe() === $equipe) {
+                    throw new \InvalidArgumentException('Cette équipe est déjà inscrite à ce match.');
+                }
+            }
+            if ($equipe->getClub() !== $acteur) {
+                throw new \InvalidArgumentException('Vous ne pouvez inscrire que vos propres équipes.');
+            }
+            $camp->setEquipe($equipe);
+        } else {
+            $joueur = $this->utilisateurRepository->find($joueurId);
+            if (!$joueur) {
+                throw new \InvalidArgumentException('Joueur introuvable.');
+            }
+            // Vérifier que le joueur n'est pas déjà inscrit
+            foreach ($match->getCamps() as $c) {
+                if ($c->getJoueur() === $joueur) {
+                    throw new \InvalidArgumentException('Ce joueur est déjà inscrit à ce match.');
+                }
+            }
+            if ($joueur !== $acteur) {
+                throw new \InvalidArgumentException('Vous ne pouvez inscrire que vous-même à un match individuel.');
+            }
+            $camp->setJoueur($joueur);
+        }
+
+        $match->addCamp($camp);
+        $this->em->persist($camp);
+        $this->actualiserStatutMatch($match);
+        $this->em->flush();
+
+        return $camp;
+    }
+
+    public function repondreInvitation(MatchCamp $camp, StatutMatchCamp $nouveauStatut): MatchCamp
+    {
+        if ($nouveauStatut === StatutMatchCamp::Invite) {
+            throw new \InvalidArgumentException(
+                'Statut invalide. Valeurs acceptées : confirme, refuse.'
+            );
+        }
+
+        $camp->setStatut($nouveauStatut);
+        $this->actualiserStatutMatch($camp->getGame());
+        $this->em->flush();
+
+        return $camp;
+    }
+
+    /** R2 — le match passe en « confirmé » quand les 2 inscriptions sont confirmées. */
+    private function actualiserStatutMatch(Game $match): void
+    {
+        if ($match->getStatut() === StatutGame::Termine || $match->getStatut() === StatutGame::Annule) {
+            return;
+        }
+
+        if (count($match->getCamps()) < 2) {
+            if ($match->getStatut() === StatutGame::Confirme) {
+                $match->setStatut(StatutGame::EnAttente);
+            }
+
+            return;
+        }
+
+        foreach ($match->getCamps() as $c) {
+            if ($c->getStatut() !== StatutMatchCamp::Confirme) {
+                if ($match->getStatut() === StatutGame::Confirme) {
+                    $match->setStatut(StatutGame::EnAttente);
+                }
+
+                return;
             }
         }
 
-        if (count($match->getEquipesDisputant()) >= 2) {
-            throw new \InvalidArgumentException('Ce match a déjà deux équipes inscrites.');
+        $match->setStatut(StatutGame::Confirme);
+    }
+
+    public function supprimerCamp(MatchCamp $camp): void
+    {
+        $match = $camp->getGame();
+        $this->em->remove($camp);
+        $this->actualiserStatutMatch($match);
+        $this->em->flush();
+    }
+
+    public function peutQuitterCamp(MatchCamp $camp, Utilisateur $utilisateur): bool
+    {
+        if ($camp->getJoueur() === $utilisateur) {
+            return true;
         }
 
-        $disputer = new Disputer();
-        $disputer->setGame($match);
-        $disputer->setEquipe($equipe);
-        $disputer->setRole($role);
+        $equipe = $camp->getEquipe();
 
-        $this->em->persist($disputer);
-        $this->em->flush();
-
-        return $disputer;
+        return $equipe !== null && $equipe->getClub() === $utilisateur;
     }
 
-    public function retirerEquipe(Disputer $disputer): void
-    {
-        $this->em->remove($disputer);
-        $this->em->flush();
-    }
-
-    // --- Messages ---
+    // -------------------------------------------------------------------------
+    // Messages
+    // -------------------------------------------------------------------------
 
     public function envoyerMessage(Game $match, Utilisateur $expediteur, string $contenu): Message
     {
@@ -155,18 +302,45 @@ class MatchService
         return $message;
     }
 
-    // --- Résultat ---
+    // -------------------------------------------------------------------------
+    // Résultat (R3)
+    // -------------------------------------------------------------------------
 
-    public function saisirResultat(Game $match, int $scoreEquipe1, int $scoreEquipe2): Resultat
+    public function saisirResultat(Game $match, int $scoreCamp1, int $scoreCamp2): Resultat
     {
+        $this->validerScoresResultat($match, $scoreCamp1, $scoreCamp2);
+
+        // R3a — 2 camps confirmés
+        $campsConfirmes = 0;
+        foreach ($match->getCamps() as $camp) {
+            if ($camp->getStatut() === StatutMatchCamp::Confirme) {
+                $campsConfirmes++;
+            }
+        }
+        if ($campsConfirmes < 2) {
+            throw new \InvalidArgumentException(
+                'Le résultat ne peut être saisi que si les 2 camps sont confirmés (R3).'
+            );
+        }
+
+        // R3b — dateMatch passée
+        if ($match->getDateMatch() > new \DateTime()) {
+            throw new \InvalidArgumentException(
+                'Le résultat ne peut être saisi qu\'après la date du match (R3).'
+            );
+        }
+
+        // R3c — pas de résultat existant
         if ($match->getResultat()) {
-            throw new \InvalidArgumentException('Ce match a déjà un résultat. Utilisez PUT pour le modifier.');
+            throw new \InvalidArgumentException('Ce match a déjà un résultat.');
         }
 
         $resultat = new Resultat();
         $resultat->setGame($match);
-        $resultat->setScoreEquipe1($scoreEquipe1);
-        $resultat->setScoreEquipe2($scoreEquipe2);
+        $resultat->setScoreCamp1($scoreCamp1);
+        $resultat->setScoreCamp2($scoreCamp2);
+
+        $match->setStatut(StatutGame::Termine);
 
         $this->em->persist($resultat);
         $this->em->flush();
@@ -174,19 +348,50 @@ class MatchService
         return $resultat;
     }
 
-    public function modifierResultat(Game $match, int $scoreEquipe1, int $scoreEquipe2): Resultat
+    public function modifierResultat(Game $match, int $scoreCamp1, int $scoreCamp2): Resultat
     {
         $resultat = $match->getResultat();
         if (!$resultat) {
             throw new \InvalidArgumentException('Ce match n\'a pas encore de résultat. Utilisez POST pour le créer.');
         }
 
-        $resultat->setScoreEquipe1($scoreEquipe1);
-        $resultat->setScoreEquipe2($scoreEquipe2);
+        $this->validerScoresResultat($match, $scoreCamp1, $scoreCamp2);
+
+        $resultat->setScoreCamp1($scoreCamp1);
+        $resultat->setScoreCamp2($scoreCamp2);
 
         $this->em->flush();
 
         return $resultat;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function validerScoresResultat(Game $match, int $scoreCamp1, int $scoreCamp2): void
+    {
+        foreach ([$scoreCamp1, $scoreCamp2] as $score) {
+            if ($score < 0) {
+                throw new \InvalidArgumentException(
+                    'Les scores doivent être supérieurs ou égaux à 0.'
+                );
+            }
+
+            $collectif = $match->getSport()->getType() === TypeSport::Collectif;
+
+            if (!$collectif && $score > 5) {
+                throw new \InvalidArgumentException(
+                    'Le score d\'un sport individuel doit être entre 0 et 5.'
+                );
+            }
+
+            if ($collectif && $score > 200) {
+                throw new \InvalidArgumentException(
+                    'Le score d\'un sport collectif doit être entre 0 et 200.'
+                );
+            }
+        }
     }
 
     public function estParticipant(Game $match, Utilisateur $utilisateur): bool
@@ -195,12 +400,25 @@ class MatchService
             return true;
         }
 
-        $participation = $this->participationRepository->findOneBy([
-            'game'        => $match,
-            'utilisateur' => $utilisateur,
-            'statut'      => 'confirmé',
-        ]);
+        foreach ($match->getCamps() as $camp) {
+            if ($camp->getStatut() !== StatutMatchCamp::Confirme) {
+                continue;
+            }
+            // Sport individuel : le joueur direct
+            if ($camp->getJoueur() === $utilisateur) {
+                return true;
+            }
+            // Sport collectif : membre confirmé de l'équipe
+            if ($camp->getEquipe() !== null) {
+                foreach ($camp->getEquipe()->getMembres() as $membre) {
+                    if ($membre->getUtilisateur() === $utilisateur
+                        && $membre->getStatut() === \App\Enum\StatutMembreEquipe::Confirme) {
+                        return true;
+                    }
+                }
+            }
+        }
 
-        return $participation !== null;
+        return false;
     }
 }

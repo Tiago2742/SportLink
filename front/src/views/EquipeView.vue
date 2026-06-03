@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerEquipe } from '@/services/api'
+import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -32,7 +33,7 @@ async function charger() {
 }
 
 const estCreateur = computed(
-  () => equipe.value?.createur?.id === auth.utilisateur?.id,
+  () => equipe.value?.club?.id === auth.utilisateur?.id,
 )
 
 const matchsAvenir = computed(() => {
@@ -51,9 +52,6 @@ function formaterDate(dateStr: string) {
   })
 }
 
-function initialesNom(nom: string, prenom: string) {
-  return `${(prenom || '?')[0]}${(nom || '?')[0]}`.toUpperCase()
-}
 </script>
 
 <template>
@@ -74,8 +72,8 @@ function initialesNom(nom: string, prenom: string) {
             <div>
               <h1 class="equipe-nom">{{ equipe.nom }}</h1>
               <div class="equipe-meta">
-                <span>{{ equipe.sport }}</span>
-                <span v-if="equipe.niveau">· {{ equipe.niveau }}</span>
+                <span>{{ equipe.sport?.nom ?? equipe.sport }}</span>
+                <span v-if="equipe.niveau">· {{ equipe.niveau?.libelle ?? equipe.niveau }}</span>
                 <span v-if="equipe.localisation">· 📍 {{ equipe.localisation }}</span>
               </div>
             </div>
@@ -110,10 +108,10 @@ function initialesNom(nom: string, prenom: string) {
               class="carte-membre"
             >
               <div class="membre-avatar">
-                {{ initialesNom(membre.utilisateur?.nom ?? '?', membre.utilisateur?.prenom ?? '?') }}
+                {{ initialesUtilisateur(membre.utilisateur) }}
               </div>
               <div class="membre-info">
-                <strong>{{ membre.utilisateur?.prenom }} {{ membre.utilisateur?.nom }}</strong>
+                <strong>{{ nomAffichage(membre.utilisateur) }}</strong>
                 <span>{{ membre.role || 'Joueur' }}</span>
               </div>
             </div>

@@ -4,7 +4,7 @@ namespace App\Entity;
 
 use App\Repository\ResultatRepository;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: ResultatRepository::class)]
 class Resultat
@@ -19,13 +19,13 @@ class Resultat
     #[ORM\JoinColumn(nullable: false)]
     private ?Game $game = null;
 
-    #[ORM\Column(nullable: true)]
+    #[ORM\Column]
     #[Groups(['resultat:read'])]
-    private ?int $scoreEquipe1 = null;
+    private ?int $scoreCamp1 = null;
 
-    #[ORM\Column(nullable: true)]
+    #[ORM\Column]
     #[Groups(['resultat:read'])]
-    private ?int $scoreEquipe2 = null;
+    private ?int $scoreCamp2 = null;
 
     public function getId(): ?int
     {
@@ -40,31 +40,28 @@ class Resultat
     public function setGame(Game $game): static
     {
         $this->game = $game;
-
         return $this;
     }
 
-    public function getScoreEquipe1(): ?int
+    public function getScoreCamp1(): ?int
     {
-        return $this->scoreEquipe1;
+        return $this->scoreCamp1;
     }
 
-    public function setScoreEquipe1(?int $scoreEquipe1): static
+    public function setScoreCamp1(int $scoreCamp1): static
     {
-        $this->scoreEquipe1 = $scoreEquipe1;
-
+        $this->scoreCamp1 = $scoreCamp1;
         return $this;
     }
 
-    public function getScoreEquipe2(): ?int
+    public function getScoreCamp2(): ?int
     {
-        return $this->scoreEquipe2;
+        return $this->scoreCamp2;
     }
 
-    public function setScoreEquipe2(?int $scoreEquipe2): static
+    public function setScoreCamp2(int $scoreCamp2): static
     {
-        $this->scoreEquipe2 = $scoreEquipe2;
-
+        $this->scoreCamp2 = $scoreCamp2;
         return $this;
     }
 }

@@ -27,6 +27,11 @@ doctrine:
         controller_resolver:
             auto_mapping: false
 
+when@dev:
+    doctrine:
+        orm:
+            validate_xml_mapping: false
+
 when@test:
     doctrine:
         dbal:

@@ -19,7 +19,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('utilisateur', JSON.stringify(profil))
   }
 
-  async function sInscrire(donnees: Record<string, string>) {
+  async function sInscrire(donnees: Record<string, unknown> & { email: string; password: string }) {
     await apiInscrire(donnees)
     await seConnecter(donnees.email, donnees.password)
   }

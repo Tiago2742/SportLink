@@ -5,84 +5,33 @@ namespace App\Reference;
 class SportNiveaux
 {
     public const CATALOGUE = [
-        'Football' => [
-            'Amateur',
-            'R3 — Régional 3',
-            'R2 — Régional 2',
-            'R1 — Régional 1',
-            'D2 — Division 2',
-            'D1 — Division 1',
-        ],
-        'Tennis' => [
-            'Non classé',
-            '40',
-            '30/5',
-            '30/4',
-            '30/3',
-            '30/2',
-            '30/1',
-            '30',
-            '15/5',
-            '15/4',
-            '15/3',
-            '15/2',
-            '15/1',
-            '15',
-            '4/6',
-            '3/6',
-            '2/6',
-            '1/6',
+        'Badminton' => [
+            'type'    => 'individuel',
+            'niveaux' => ['Loisir', 'Débutant', 'Intermédiaire', 'Confirmé', 'Expert', 'Série nationale'],
         ],
         'Basketball' => [
-            'Loisir',
-            'Départementale',
-            'Régionale',
-            'Nationale 3',
-            'Nationale 2',
-            'Nationale 1',
-            'Pro B',
-            'Pro A',
+            'type'    => 'collectif',
+            'niveaux' => ['Loisir', 'Départementale', 'Régionale', 'N3', 'N2', 'N1', 'Pro B', 'Pro A'],
         ],
-        'Volleyball' => [
-            'Loisir',
-            'Départementale',
-            'Régionale',
-            'Nationale',
-            'Ligue A',
-        ],
-        'Rugby' => [
-            'Loisir',
-            'Fédérale 3',
-            'Fédérale 2',
-            'Fédérale 1',
-            'Pro D2',
-            'Top 14',
+        'Football' => [
+            'type'    => 'collectif',
+            'niveaux' => ['Amateur', 'D6', 'D5', 'D4', 'D3', 'D2', 'D1', 'R3', 'R2', 'R1', 'N3', 'N2', 'N1', 'L2', 'L1'],
         ],
         'Handball' => [
-            'Loisir',
-            'Départementale',
-            'Régionale',
-            'Nationale 3',
-            'Nationale 2',
-            'Nationale 1',
-            'Pro D2',
-            'Starligue',
+            'type'    => 'collectif',
+            'niveaux' => ['Loisir', 'Départementale', 'Régionale', 'N3', 'N2', 'N1', 'Pro D2', 'Starligue'],
         ],
-        'Badminton' => [
-            'Loisir',
-            'Débutant',
-            'Intermédiaire',
-            'Confirmé',
-            'Expert',
-            'Série nationale',
+        'Rugby' => [
+            'type'    => 'collectif',
+            'niveaux' => ['Loisir', 'Fédérale 3', 'Fédérale 2', 'Fédérale 1', 'Pro D2', 'Top 14'],
         ],
-        'Natation' => [
-            'Loisir',
-            'Débutant',
-            'Intermédiaire',
-            'Confirmé',
-            'Régional',
-            'National',
+        'Tennis' => [
+            'type'    => 'individuel',
+            'niveaux' => ['Non classé', '40', '30/5', '30/4', '30/3', '30/2', '30/1', '30', '15/5', '15/4', '15/3', '15/2', '15/1', '15', '4/6', '3/6', '2/6', '1/6'],
+        ],
+        'Volleyball' => [
+            'type'    => 'collectif',
+            'niveaux' => ['Loisir', 'Départementale', 'Régionale', 'Nationale', 'Ligue A'],
         ],
     ];
 
@@ -93,11 +42,16 @@ class SportNiveaux
 
     public static function getNiveaux(string $sport): array
     {
-        return self::CATALOGUE[$sport] ?? [];
+        return self::CATALOGUE[$sport]['niveaux'] ?? [];
+    }
+
+    public static function getType(string $sport): string
+    {
+        return self::CATALOGUE[$sport]['type'] ?? 'collectif';
     }
 
     public static function estValide(string $sport, string $niveau): bool
     {
-        return in_array($niveau, self::CATALOGUE[$sport] ?? [], true);
+        return in_array($niveau, self::CATALOGUE[$sport]['niveaux'] ?? [], true);
     }
 }

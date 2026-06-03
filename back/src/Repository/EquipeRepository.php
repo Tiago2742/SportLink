@@ -6,9 +6,6 @@ use App\Entity\Equipe;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-/**
- * @extends ServiceEntityRepository<Equipe>
- */
 class EquipeRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -18,23 +15,25 @@ class EquipeRepository extends ServiceEntityRepository
 
     /** @return Equipe[] */
     public function trouverAvecFiltres(
-        ?string $sport,
-        ?string $niveau,
-        ?string $localisation,
-        ?int $createurId = null,
+        ?int    $sportId      = null,
+        ?int    $niveauId     = null,
+        ?string $localisation = null,
+        ?int    $clubId       = null,
     ): array {
         $qb = $this->createQueryBuilder('e')
-            ->addSelect('c')
-            ->leftJoin('e.createur', 'c');
+            ->addSelect('s', 'n', 'c')
+            ->leftJoin('e.sport', 's')
+            ->leftJoin('e.niveau', 'n')
+            ->leftJoin('e.club', 'c');
 
-        if ($sport) {
-            $qb->andWhere('LOWER(e.sport) = LOWER(:sport)')
-               ->setParameter('sport', $sport);
+        if ($sportId) {
+            $qb->andWhere('s.id = :sportId')
+               ->setParameter('sportId', $sportId);
         }
 
-        if ($niveau) {
-            $qb->andWhere('LOWER(e.niveau) = LOWER(:niveau)')
-               ->setParameter('niveau', $niveau);
+        if ($niveauId) {
+            $qb->andWhere('n.id = :niveauId')
+               ->setParameter('niveauId', $niveauId);
         }
 
         if ($localisation) {
@@ -42,9 +41,9 @@ class EquipeRepository extends ServiceEntityRepository
                ->setParameter('localisation', '%' . $localisation . '%');
         }
 
-        if ($createurId) {
-            $qb->andWhere('c.id = :createurId')
-               ->setParameter('createurId', $createurId);
+        if ($clubId) {
+            $qb->andWhere('c.id = :clubId')
+               ->setParameter('clubId', $clubId);
         }
 
         return $qb->orderBy('e.id', 'DESC')->getQuery()->getResult();

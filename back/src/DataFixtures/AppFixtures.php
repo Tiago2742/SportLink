@@ -2,15 +2,23 @@
 
 namespace App\DataFixtures;
 
-use App\Entity\Disputer;
 use App\Entity\Equipe;
 use App\Entity\EquipeJoueur;
 use App\Entity\Game;
+use App\Entity\MatchCamp;
 use App\Entity\Message;
-use App\Entity\Participation;
+use App\Entity\Niveau;
 use App\Entity\Resultat;
+use App\Entity\Sport;
 use App\Entity\Utilisateur;
-use App\Entity\UtilisateurSport;
+use App\Entity\UtilisateurNiveau;
+use App\Enum\RoleEquipe;
+use App\Enum\RoleMatchCamp;
+use App\Enum\StatutGame;
+use App\Enum\StatutMatchCamp;
+use App\Enum\StatutMembreEquipe;
+use App\Enum\TypeSport;
+use App\Enum\TypeUtilisateur;
 use App\Reference\SportNiveaux;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -24,108 +32,155 @@ class AppFixtures extends Fixture
 
     public function load(ObjectManager $manager): void
     {
-        $sports  = SportNiveaux::getSports();
         $villes  = ['Paris', 'Lyon', 'Marseille', 'Lille', 'Arras', 'Bordeaux'];
         $prenoms = ['Jean', 'Marc', 'Thomas', 'Pierre', 'Antoine', 'Lucas', 'Hugo', 'Léa', 'Marie', 'Julie'];
         $noms    = ['Dupont', 'Dubois', 'Martin', 'Leroy', 'Moreau', 'Bernard', 'Petit', 'Durand', 'Robert', 'Richard'];
+        $clubs   = ['AS Arras Sport', 'FC Lyon Métropole', 'Olympique Marseille Club'];
+
+        // ---------- SPORTS & NIVEAUX ----------
+        $sportEntites  = []; // ['Football' => Sport, ...]
+        $niveauEntites = []; // ['Football' => ['D1' => Niveau, ...], ...]
+
+        foreach (SportNiveaux::CATALOGUE as $nom => $config) {
+            $sport = new Sport();
+            $sport->setNom($nom);
+            $sport->setType(TypeSport::from($config['type']));
+            $sportEntites[$nom]  = $sport;
+            $niveauEntites[$nom] = [];
+
+            foreach ($config['niveaux'] as $i => $libelle) {
+                $niveau = new Niveau();
+                $niveau->setLibelle($libelle);
+                $niveau->setOrdre($i + 1);
+                $sport->addNiveau($niveau);
+                $niveauEntites[$nom][$libelle] = $niveau;
+            }
+
+            $manager->persist($sport);
+        }
 
         // ---------- UTILISATEURS ----------
         $utilisateurs = [];
         for ($i = 0; $i < 10; $i++) {
             $u = new Utilisateur();
-            $u->setEmail(strtolower($prenoms[$i]) . '.' . strtolower($noms[$i]) . '@test.com');
-            $u->setNom($noms[$i]);
-            $u->setPrenom($prenoms[$i]);
+            $estClub = $i < 3;
+            $u->setEmail(
+                $estClub
+                    ? 'club' . ($i + 1) . '@test.com'
+                    : strtolower($prenoms[$i]) . '.' . strtolower($noms[$i]) . '@test.com',
+            );
+            if ($estClub) {
+                $u->setNom($clubs[$i]);
+                $u->setPrenom(null);
+            } else {
+                $u->setNom($noms[$i]);
+                $u->setPrenom($prenoms[$i]);
+            }
             $u->setRoles(['ROLE_USER']);
             $u->setPassword($this->hasher->hashPassword($u, 'password'));
-            $u->setType($i < 3 ? 'organisateur' : 'joueur');
+            $u->setType($estClub ? TypeUtilisateur::Club : TypeUtilisateur::Joueur);
             $u->setLocalisation($villes[$i % count($villes)]);
             $u->setDateInscription(new \DateTime('-' . rand(1, 200) . ' days'));
 
             // 1 à 3 sports avec niveaux cohérents
-            $nbSports = rand(1, 3);
-            $sportsChoisis = (array) array_rand(array_flip($sports), $nbSports);
-            foreach ($sportsChoisis as $sport) {
-                $niveaux = SportNiveaux::getNiveaux($sport);
-                $us = new UtilisateurSport();
-                $us->setSport($sport);
-                $us->setNiveau($niveaux[array_rand($niveaux)]);
-                $u->addSport($us);
-                $manager->persist($us);
+            $sportsNomsTous = array_keys(SportNiveaux::CATALOGUE);
+            $nbSports       = rand(1, 3);
+            $sportsChoisis  = (array) array_rand(array_flip($sportsNomsTous), $nbSports);
+            foreach ($sportsChoisis as $sportNom) {
+                $niveauxDispo = array_values($niveauEntites[$sportNom]);
+                $un = new UtilisateurNiveau();
+                $un->setSport($sportEntites[$sportNom]);
+                $un->setNiveau($niveauxDispo[array_rand($niveauxDispo)]);
+                $u->addNiveau($un);
             }
 
             $manager->persist($u);
             $utilisateurs[] = $u;
         }
 
-        // ---------- ÉQUIPES ----------
-        $nomsEquipes = ['Les Aigles', 'FC Dynamite', 'Team Rocket', 'Les Lions', 'Spikers', 'Eagles'];
+        // ---------- ÉQUIPES (sports collectifs uniquement) ----------
+        $nomsEquipes      = ['Les Aigles', 'FC Dynamite', 'Team Rocket', 'Les Lions', 'Spikers', 'Eagles'];
+        $sportsCollectifs = array_keys(array_filter(
+            SportNiveaux::CATALOGUE,
+            fn($c) => $c['type'] === 'collectif',
+        ));
         $equipes = [];
         for ($i = 0; $i < 6; $i++) {
-            $sport = $sports[$i % count($sports)];
-            $niveaux = SportNiveaux::getNiveaux($sport);
+            $sportNom     = $sportsCollectifs[$i % count($sportsCollectifs)];
+            $niveauxDispo = array_values($niveauEntites[$sportNom]);
             $e = new Equipe();
             $e->setNom($nomsEquipes[$i]);
-            $e->setSport($sport);
-            $e->setNiveau($niveaux[array_rand($niveaux)]);
+            $e->setSport($sportEntites[$sportNom]);
+            $e->setNiveau($niveauxDispo[array_rand($niveauxDispo)]);
             $e->setLocalisation($villes[$i % count($villes)]);
-            $e->setCreateur($utilisateurs[$i % count($utilisateurs)]);
+            $e->setClub($utilisateurs[$i % 3]); // les 3 premiers sont des clubs
             $manager->persist($e);
             $equipes[] = $e;
 
-            // 3 à 5 membres par équipe
-            $nbMembres = rand(3, 5);
-            for ($j = 0; $j < $nbMembres; $j++) {
+            for ($j = 0; $j < rand(3, 5); $j++) {
                 $ej = new EquipeJoueur();
                 $ej->setEquipe($e);
                 $ej->setUtilisateur($utilisateurs[($i + $j) % count($utilisateurs)]);
-                $ej->setRole($j === 0 ? 'capitaine' : 'joueur');
+                $ej->setRole($j === 0 ? RoleEquipe::Capitaine : RoleEquipe::Joueur);
+                $ej->setStatut(StatutMembreEquipe::Confirme);
                 $manager->persist($ej);
             }
         }
 
-        // ---------- MATCHS (Game) ----------
-        $lieux   = ['Stade Municipal', 'Gymnase Central', 'Court 5', 'Centre Sportif', 'Terrain Central'];
-        $statuts = ['ouvert', 'ouvert', 'terminé'];
-        $games = [];
+        // ---------- MATCHS (Game) + MatchCamp ----------
+        $lieux          = ['Stade Municipal', 'Gymnase Central', 'Court 5', 'Centre Sportif', 'Terrain Central'];
+        $statutsCycles  = [StatutGame::EnAttente, StatutGame::EnAttente, StatutGame::Termine];
+        $sportsIndividu = array_keys(array_filter(SportNiveaux::CATALOGUE, fn($c) => $c['type'] === 'individuel'));
+        $joueurs        = array_filter($utilisateurs, fn($u) => $u->getType() === TypeUtilisateur::Joueur);
+        $joueurs        = array_values($joueurs);
+
         for ($i = 0; $i < 8; $i++) {
-            $sport = $sports[$i % count($sports)];
-            $niveaux = SportNiveaux::getNiveaux($sport);
-            $statut = $statuts[$i % count($statuts)];
+            $statut     = $statutsCycles[$i % count($statutsCycles)];
+            $estTermine = $statut === StatutGame::Termine;
+
+            // Alterner sports collectifs et individuels
+            if ($i % 2 === 0) {
+                $sportNom = $sportsCollectifs[$i % count($sportsCollectifs)];
+            } else {
+                $sportNom = $sportsIndividu[$i % count($sportsIndividu)];
+            }
+
+            $sportEntite  = $sportEntites[$sportNom];
+            $niveauxDispo = array_values($niveauEntites[$sportNom]);
+
             $g = new Game();
-            $g->setSport($sport);
-            $offset = $statut === 'terminé' ? '-' . rand(1, 30) . ' days' : '+' . rand(1, 30) . ' days';
+            $g->setSport($sportEntite);
+            $g->setNiveauRequis($niveauxDispo[array_rand($niveauxDispo)]);
+            $offset = $estTermine ? '-' . rand(1, 30) . ' days' : '+' . rand(1, 30) . ' days';
             $g->setDateMatch(new \DateTime($offset));
             $g->setLieu($lieux[$i % count($lieux)]);
-            $g->setNiveauRequis($niveaux[array_rand($niveaux)]);
             $g->setStatut($statut);
             $g->setCreateur($utilisateurs[$i % count($utilisateurs)]);
             $manager->persist($g);
-            $games[] = $g;
 
-            // Participations
-            $nbPart = rand(2, 4);
-            for ($j = 0; $j < $nbPart; $j++) {
-                $p = new Participation();
-                $p->setGame($g);
-                $p->setUtilisateur($utilisateurs[($i + $j) % count($utilisateurs)]);
-                $p->setStatut(['invité', 'confirmé', 'refusé'][rand(0, 2)]);
-                $manager->persist($p);
+            // 2 camps selon le type de sport
+            $statutCamp = $estTermine ? StatutMatchCamp::Confirme : StatutMatchCamp::Invite;
+
+            if ($sportEntite->getType() === TypeSport::Collectif) {
+                foreach ([RoleMatchCamp::Camp1, RoleMatchCamp::Camp2] as $j => $role) {
+                    $camp = new MatchCamp();
+                    $camp->setGame($g);
+                    $camp->setRole($role);
+                    $camp->setStatut($statutCamp);
+                    $camp->setEquipe($equipes[($i + $j) % count($equipes)]);
+                    $manager->persist($camp);
+                }
+            } else {
+                foreach ([RoleMatchCamp::Camp1, RoleMatchCamp::Camp2] as $j => $role) {
+                    $camp = new MatchCamp();
+                    $camp->setGame($g);
+                    $camp->setRole($role);
+                    $camp->setStatut($statutCamp);
+                    $camp->setJoueur($joueurs[($i + $j) % count($joueurs)]);
+                    $manager->persist($camp);
+                }
             }
 
-            // Deux équipes
-            $d1 = new Disputer();
-            $d1->setGame($g);
-            $d1->setEquipe($equipes[$i % count($equipes)]);
-            $d1->setRole('equipe_1');
-            $manager->persist($d1);
-            $d2 = new Disputer();
-            $d2->setGame($g);
-            $d2->setEquipe($equipes[($i + 1) % count($equipes)]);
-            $d2->setRole('equipe_2');
-            $manager->persist($d2);
-
-            // Message
             $m = new Message();
             $m->setGame($g);
             $m->setExpediteur($utilisateurs[$i % count($utilisateurs)]);
@@ -133,11 +188,11 @@ class AppFixtures extends Fixture
             $m->setDateEnvoi(new \DateTime('-' . rand(1, 10) . ' days'));
             $manager->persist($m);
 
-            if ($statut === 'terminé') {
+            if ($estTermine) {
                 $r = new Resultat();
                 $r->setGame($g);
-                $r->setScoreEquipe1(rand(0, 5));
-                $r->setScoreEquipe2(rand(0, 5));
+                $r->setScoreCamp1(rand(0, 5));
+                $r->setScoreCamp2(rand(0, 5));
                 $manager->persist($r);
             }
         }

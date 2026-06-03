@@ -6,24 +6,24 @@ const props = defineProps<{
 }>()
 
 const libelles: Record<string, string> = {
-  confirmé: 'Confirmé',
-  invité: 'En attente',
-  refusé: 'Refusé',
-  ouvert: 'Ouvert',
-  complet: 'Complet',
-  terminé: 'Terminé',
-  'à venir': 'À venir',
+  // Statuts Game
+  en_attente: 'En attente',
+  confirme:   'Confirmé',
+  termine:    'Terminé',
+  annule:     'Annulé',
+  // Statuts MatchCamp
+  invite:     'Invité',
+  refuse:     'Refusé',
 }
 
 const classeStatut = computed(() => {
   const correspondances: Record<string, string> = {
-    confirmé: 'confirme',
-    ouvert: 'confirme',
-    'à venir': 'confirme',
-    invité: 'attente',
-    refusé: 'refuse',
-    complet: 'refuse',
-    terminé: 'termine',
+    confirme:   'confirme',
+    en_attente: 'attente',
+    invite:     'attente',
+    refuse:     'refuse',
+    annule:     'refuse',
+    termine:    'termine',
   }
   return `badge-${correspondances[props.statut] ?? 'neutre'}`
 })

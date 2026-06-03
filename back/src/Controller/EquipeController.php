@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\Equipe;
 use App\Repository\EquipeRepository;
+use App\Repository\NiveauRepository;
+use App\Repository\SportRepository;
 use App\Service\EquipeService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -14,21 +16,26 @@ use Symfony\Component\Routing\Attribute\Route;
 class EquipeController extends AbstractController
 {
     public function __construct(
-        private EquipeService $equipeService,
+        private EquipeService    $equipeService,
         private EquipeRepository $equipeRepository,
+        private SportRepository  $sportRepository,
+        private NiveauRepository $niveauRepository,
     ) {}
+
+    private const GROUPES_LIST = ['equipe:list', 'utilisateur:read', 'sport:read', 'niveau:read'];
+    private const GROUPES_READ = ['equipe:read', 'utilisateur:read', 'sport:read', 'niveau:read', 'equipe_joueur:read'];
 
     #[Route('', name: 'api_equipes_lister', methods: ['GET'])]
     public function lister(Request $request): JsonResponse
     {
         $equipes = $this->equipeRepository->trouverAvecFiltres(
-            $request->query->get('sport'),
-            $request->query->get('niveau'),
+            $request->query->getInt('sportId') ?: null,
+            $request->query->getInt('niveauId') ?: null,
             $request->query->get('localisation'),
-            $request->query->getInt('createurId') ?: null,
+            $request->query->getInt('clubId') ?: null,
         );
 
-        return $this->json($equipes, 200, [], ['groups' => ['equipe:list', 'utilisateur:read']]);
+        return $this->json($equipes, 200, [], ['groups' => self::GROUPES_LIST]);
     }
 
     #[Route('', name: 'api_equipes_creer', methods: ['POST'])]
@@ -36,38 +43,90 @@ class EquipeController extends AbstractController
     {
         $donnees = json_decode($request->getContent(), true);
 
-        if (empty($donnees['nom']) || empty($donnees['sport'])) {
-            return $this->json(['erreur' => 'Les champs "nom" et "sport" sont requis.'], 400);
+        if (empty($donnees['nom']) || empty($donnees['sportId'])) {
+            return $this->json(['erreur' => 'Les champs "nom" et "sportId" sont requis.'], 400);
         }
 
-        $equipe = $this->equipeService->creer($donnees, $this->getUser());
+        $sport = $this->sportRepository->find((int) $donnees['sportId']);
+        if (!$sport) {
+            return $this->json(['erreur' => 'Sport introuvable.'], 404);
+        }
 
-        return $this->json($equipe, 201, [], ['groups' => ['equipe:read', 'utilisateur:read', 'equipe_joueur:read']]);
+        // R4 : le niveau doit appartenir au sport
+        $niveau = null;
+        if (!empty($donnees['niveauId'])) {
+            $niveau = $this->niveauRepository->find((int) $donnees['niveauId']);
+            if (!$niveau || $niveau->getSport() !== $sport) {
+                return $this->json(['erreur' => 'Niveau invalide pour ce sport (R4).'], 422);
+            }
+        }
+
+        $equipe = $this->equipeService->creer(
+            $donnees['nom'],
+            $sport,
+            $niveau,
+            $donnees['localisation'] ?? null,
+            $donnees['logo'] ?? null,
+            $this->getUser(),
+        );
+
+        return $this->json($equipe, 201, [], ['groups' => self::GROUPES_READ]);
     }
 
     #[Route('/{id}', name: 'api_equipes_afficher', methods: ['GET'])]
     public function afficher(Equipe $equipe): JsonResponse
     {
-        return $this->json($equipe, 200, [], ['groups' => ['equipe:read', 'utilisateur:read', 'equipe_joueur:read']]);
+        return $this->json($equipe, 200, [], ['groups' => self::GROUPES_READ]);
     }
 
     #[Route('/{id}', name: 'api_equipes_modifier', methods: ['PUT'])]
     public function modifier(Request $request, Equipe $equipe): JsonResponse
     {
-        if ($equipe->getCreateur() !== $this->getUser()) {
+        if ($equipe->getClub() !== $this->getUser()) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
         $donnees = json_decode($request->getContent(), true);
-        $equipe = $this->equipeService->modifier($equipe, $donnees);
 
-        return $this->json($equipe, 200, [], ['groups' => ['equipe:read', 'utilisateur:read', 'equipe_joueur:read']]);
+        $sport = null;
+        if (!empty($donnees['sportId'])) {
+            $sport = $this->sportRepository->find((int) $donnees['sportId']);
+            if (!$sport) {
+                return $this->json(['erreur' => 'Sport introuvable.'], 404);
+            }
+        }
+
+        $niveau        = null;
+        $effacerNiveau = false;
+        if (array_key_exists('niveauId', $donnees)) {
+            if ($donnees['niveauId'] !== null) {
+                $sportRef = $sport ?? $equipe->getSport();
+                $niveau   = $this->niveauRepository->find((int) $donnees['niveauId']);
+                if (!$niveau || $niveau->getSport() !== $sportRef) {
+                    return $this->json(['erreur' => 'Niveau invalide pour ce sport (R4).'], 422);
+                }
+            } else {
+                $effacerNiveau = true;
+            }
+        }
+
+        $equipe = $this->equipeService->modifier(
+            $equipe,
+            $donnees['nom'] ?? null,
+            $sport,
+            $niveau,
+            $effacerNiveau,
+            $donnees['localisation'] ?? null,
+            $donnees['logo'] ?? null,
+        );
+
+        return $this->json($equipe, 200, [], ['groups' => self::GROUPES_READ]);
     }
 
     #[Route('/{id}', name: 'api_equipes_supprimer', methods: ['DELETE'])]
     public function supprimer(Equipe $equipe): JsonResponse
     {
-        if ($equipe->getCreateur() !== $this->getUser()) {
+        if ($equipe->getClub() !== $this->getUser()) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
@@ -76,12 +135,12 @@ class EquipeController extends AbstractController
         return $this->json(null, 204);
     }
 
-    // --- Membres ---
+    // ---- Membres ------------------------------------------------------------
 
     #[Route('/{id}/membres', name: 'api_equipes_ajouter_membre', methods: ['POST'])]
     public function ajouterMembre(Request $request, Equipe $equipe): JsonResponse
     {
-        if ($equipe->getCreateur() !== $this->getUser()) {
+        if ($equipe->getClub() !== $this->getUser()) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
@@ -92,7 +151,11 @@ class EquipeController extends AbstractController
         }
 
         try {
-            $membre = $this->equipeService->ajouterMembre($equipe, (int) $donnees['utilisateur_id'], $donnees['role'] ?? null);
+            $membre = $this->equipeService->ajouterMembre(
+                $equipe,
+                (int) $donnees['utilisateur_id'],
+                $donnees['role'] ?? null,
+            );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
@@ -103,7 +166,7 @@ class EquipeController extends AbstractController
     #[Route('/{id}/membres/{membreId}', name: 'api_equipes_retirer_membre', methods: ['DELETE'])]
     public function retirerMembre(Equipe $equipe, int $membreId): JsonResponse
     {
-        if ($equipe->getCreateur() !== $this->getUser()) {
+        if ($equipe->getClub() !== $this->getUser()) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 

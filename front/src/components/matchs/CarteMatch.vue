@@ -1,31 +1,36 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
+import {
+  libellePlacesMatch,
+  utilisateurEstInscrit,
+  type CampResume,
+} from '@/composables/useMatchCamps'
+import { nomAffichage } from '@/utils/nomAffichage'
 
 const props = defineProps<{
   match: {
     id: number
-    sport: string
+    sport?: { id: number; nom: string; type: string }
     dateMatch: string
     lieu?: string
-    niveauRequis?: string
+    niveauRequis?: { id: number; libelle: string; ordre: number }
     statut: string
-    createur?: { nom: string; prenom: string }
-    participations?: any[]
+    createur?: { id: number; nom: string; prenom?: string | null; type?: string }
+    nombreCamps?: number
+    camps?: CampResume[]
   }
   afficherBoutonRejoindre?: boolean
 }>()
+
+const auth = useAuthStore()
 
 const emit = defineEmits<{
   rejoindre: [matchId: number]
 }>()
 
-const titreMatch = computed(() => {
-  const sport = props.match.sport
-    ? props.match.sport.charAt(0).toUpperCase() + props.match.sport.slice(1)
-    : 'Sport'
-  return `Match de ${sport}`
-})
+const titreMatch = computed(() => `Match de ${props.match.sport?.nom ?? 'Sport'}`)
 
 const dateFormatee = computed(() => {
   if (!props.match.dateMatch) return ''
@@ -39,7 +44,36 @@ const dateFormatee = computed(() => {
   })
 })
 
-const nombreParticipants = computed(() => props.match.participations?.length ?? 0)
+const nombreInscrits = computed(
+  () => props.match.nombreCamps ?? props.match.camps?.length ?? 0,
+)
+
+const placesRestantes = computed(() => Math.max(0, 2 - nombreInscrits.value))
+
+const libellePlaces = computed(() => libellePlacesMatch(nombreInscrits.value))
+
+const dejaInscrit = computed(() =>
+  utilisateurEstInscrit(props.match, auth.utilisateur?.id),
+)
+
+const peutRejoindreIndividuel = computed(
+  () =>
+    props.afficherBoutonRejoindre &&
+    !dejaInscrit.value &&
+    props.match.sport?.type === 'individuel' &&
+    props.match.statut !== 'termine' &&
+    props.match.statut !== 'annule' &&
+    placesRestantes.value > 0,
+)
+
+const lienEquipeCollectif = computed(
+  () =>
+    props.afficherBoutonRejoindre &&
+    !dejaInscrit.value &&
+    props.match.sport?.type === 'collectif' &&
+    auth.utilisateur?.type === 'club' &&
+    placesRestantes.value > 0,
+)
 </script>
 
 <template>
@@ -58,27 +92,33 @@ const nombreParticipants = computed(() => props.match.participations?.length ?? 
         </li>
         <li v-if="match.createur">
           <span class="icone">👤</span>
-          <span>{{ match.createur.prenom }} {{ match.createur.nom }}</span>
+          <span>{{ nomAffichage(match.createur) }}</span>
         </li>
       </ul>
 
       <div class="carte-tags" v-if="match.niveauRequis || match.statut">
         <BadgeStatut :statut="match.statut" />
-        <span v-if="match.niveauRequis" class="tag-niveau">{{ match.niveauRequis }}</span>
-        <span v-if="match.participations !== undefined" class="tag-joueurs">
-          👥 {{ nombreParticipants }} joueur{{ nombreParticipants > 1 ? 's' : '' }}
-        </span>
+        <span v-if="match.niveauRequis" class="tag-niveau">{{ match.niveauRequis.libelle }}</span>
+        <span class="tag-joueurs">👥 {{ libellePlaces }}</span>
+        <span v-if="dejaInscrit" class="tag-inscrit">Vous participez</span>
       </div>
     </div>
 
     <div class="carte-actions">
       <button
-        v-if="afficherBoutonRejoindre && match.statut === 'ouvert'"
+        v-if="peutRejoindreIndividuel"
         class="btn btn-primaire"
         @click="emit('rejoindre', match.id)"
       >
-        Rejoindre match
+        Rejoindre le match
       </button>
+      <RouterLink
+        v-else-if="lienEquipeCollectif"
+        :to="`/matchs/${match.id}`"
+        class="btn btn-primaire"
+      >
+        Inscrire une équipe
+      </RouterLink>
       <RouterLink :to="`/matchs/${match.id}`" class="btn btn-secondaire">
         Voir détails
       </RouterLink>
@@ -151,6 +191,15 @@ const nombreParticipants = computed(() => props.match.participations?.length ?? 
 .tag-joueurs {
   font-size: 0.82rem;
   color: var(--couleur-texte-discret);
+}
+
+.tag-inscrit {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--couleur-primaire);
+  background: var(--couleur-primaire-tres-claire);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--rayon-badge);
   margin-left: auto;
 }
 

@@ -1,43 +1,98 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { creerMatch } from '@/services/api'
+import { creerMatch, chargerEquipes } from '@/services/api'
+import { useSports } from '@/composables/useSports'
+import type { NiveauRef } from '@/services/api'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { listeSports, niveauxPour, chargerCatalogue } = useSports()
+
+onMounted(chargerCatalogue)
 
 const form = ref({
-  sport: '',
-  dateMatch: '',
-  lieu: '',
-  nbreJoueurs: '',
-  niveauRequis: '',
-  description: '',
+  sportId:       '' as number | '',
+  equipeId:      '' as number | '',
+  dateMatch:     '',
+  lieu:          '',
+  niveauRequisId: '' as number | '',
+  description:   '',
 })
 
+const equipes = ref<{ id: number; nom: string }[]>([])
+const chargementEquipes = ref(false)
+
+const niveauxDisponibles = computed<NiveauRef[]>(() =>
+  form.value.sportId !== '' ? niveauxPour(form.value.sportId as number) : [],
+)
+
+const sportSelectionne = computed(() =>
+  listeSports.value.find((s) => s.id === form.value.sportId),
+)
+
+const besoinEquipe = computed(
+  () => sportSelectionne.value?.type === 'collectif' && auth.utilisateur?.type === 'club',
+)
+
+async function chargerEquipesDuClub() {
+  form.value.equipeId = ''
+  if (!besoinEquipe.value || form.value.sportId === '') {
+    equipes.value = []
+    return
+  }
+  chargementEquipes.value = true
+  try {
+    equipes.value = await chargerEquipes(auth.token!, {
+      sportId: form.value.sportId,
+      clubId: auth.utilisateur.id,
+    })
+  } catch {
+    equipes.value = []
+  } finally {
+    chargementEquipes.value = false
+  }
+}
+
+function onSportChange() {
+  form.value.niveauRequisId = ''
+  chargerEquipesDuClub()
+}
+
 const erreur = ref('')
-const succes = ref(false)
 const chargement = ref(false)
 
 async function soumettre() {
   erreur.value = ''
-  if (!form.value.sport || !form.value.dateMatch || !form.value.lieu || !form.value.niveauRequis) {
+  if (!form.value.sportId || !form.value.dateMatch || !form.value.lieu) {
     erreur.value = 'Veuillez remplir tous les champs obligatoires.'
+    return
+  }
+  if (sportSelectionne.value?.type === 'collectif' && auth.utilisateur?.type !== 'club') {
+    erreur.value = 'Seul un compte club peut créer un match de sport collectif.'
+    return
+  }
+  if (besoinEquipe.value && form.value.equipeId === '') {
+    erreur.value = 'Sélectionnez l\'équipe qui participera à ce match.'
     return
   }
   chargement.value = true
   try {
     const match = await creerMatch(auth.token!, {
-      sport: form.value.sport,
-      dateMatch: form.value.dateMatch,
-      lieu: form.value.lieu,
-      niveauRequis: form.value.niveauRequis,
+      sportId:        form.value.sportId,
+      dateMatch:      form.value.dateMatch,
+      lieu:           form.value.lieu,
+      niveauRequisId: form.value.niveauRequisId !== '' ? form.value.niveauRequisId : undefined,
+      description:    form.value.description || undefined,
+      equipeId:       form.value.equipeId !== '' ? form.value.equipeId : undefined,
     })
     router.push(`/matchs/${match.id}`)
   } catch (e: any) {
     if (e.statut === 400) {
       erreur.value = 'Données invalides. Vérifiez les champs.'
+    } else if (e.statut === 422) {
+      erreur.value = (e as Error).message
     } else {
       erreur.value = 'Impossible de créer le match. Réessayez.'
     }
@@ -97,15 +152,9 @@ function annuler() {
             <div class="grille-2">
               <div class="champ-groupe">
                 <label for="sport">Sport <span class="obligatoire">*</span></label>
-                <select id="sport" v-model="form.sport" class="champ" required>
+                <select id="sport" v-model="form.sportId" class="champ" required @change="onSportChange">
                   <option value="">Choisir un sport</option>
-                  <option value="football">Football</option>
-                  <option value="basketball">Basketball</option>
-                  <option value="tennis">Tennis</option>
-                  <option value="volleyball">Volleyball</option>
-                  <option value="rugby">Rugby</option>
-                  <option value="handball">Handball</option>
-                  <option value="badminton">Badminton</option>
+                  <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">{{ sport.nom }}</option>
                 </select>
               </div>
 
@@ -121,6 +170,30 @@ function annuler() {
               </div>
             </div>
 
+            <div v-if="besoinEquipe" class="champ-groupe">
+              <label for="equipe">Votre équipe <span class="obligatoire">*</span></label>
+              <select
+                id="equipe"
+                v-model="form.equipeId"
+                class="champ"
+                required
+                :disabled="chargementEquipes || equipes.length === 0"
+              >
+                <option value="">
+                  {{
+                    chargementEquipes
+                      ? 'Chargement…'
+                      : equipes.length === 0
+                        ? '— aucune équipe pour ce sport —'
+                        : 'Choisir une équipe'
+                  }}
+                </option>
+                <option v-for="equipe in equipes" :key="equipe.id" :value="equipe.id">
+                  {{ equipe.nom }}
+                </option>
+              </select>
+            </div>
+
             <div class="champ-groupe">
               <label for="lieu">Lieu <span class="obligatoire">*</span></label>
               <input
@@ -133,30 +206,21 @@ function annuler() {
               />
             </div>
 
-            <div class="grille-2">
-              <div class="champ-groupe">
-                <label for="nbreJoueurs">Nombre de joueurs requis</label>
-                <input
-                  id="nbreJoueurs"
-                  v-model="form.nbreJoueurs"
-                  type="number"
-                  min="2"
-                  max="100"
-                  class="champ"
-                  placeholder="Nombre de joueurs"
-                />
-              </div>
-
-              <div class="champ-groupe">
-                <label for="niveauRequis">Niveau requis <span class="obligatoire">*</span></label>
-                <select id="niveauRequis" v-model="form.niveauRequis" class="champ" required>
-                  <option value="">Débutant / Intermédiaire / Avancé</option>
-                  <option value="débutant">Débutant</option>
-                  <option value="intermédiaire">Intermédiaire</option>
-                  <option value="avancé">Avancé</option>
-                  <option value="tous niveaux">Tous niveaux</option>
-                </select>
-              </div>
+            <div class="champ-groupe">
+              <label for="niveauRequis">Niveau requis</label>
+              <select
+                id="niveauRequis"
+                v-model="form.niveauRequisId"
+                class="champ"
+                :disabled="form.sportId === ''"
+              >
+                <option value="">
+                  {{ form.sportId !== '' ? 'Choisir un niveau' : '— choisir un sport d\'abord —' }}
+                </option>
+                <option v-for="niveau in niveauxDisponibles" :key="niveau.id" :value="niveau.id">
+                  {{ niveau.libelle }}
+                </option>
+              </select>
             </div>
 
             <div class="champ-groupe">

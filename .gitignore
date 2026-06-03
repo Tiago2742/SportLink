@@ -12,3 +12,5 @@
 
 # Données Docker
 /back/.env.local.php
+
+.CLAUDE.md

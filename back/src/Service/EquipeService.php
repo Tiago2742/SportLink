@@ -4,7 +4,11 @@ namespace App\Service;
 
 use App\Entity\Equipe;
 use App\Entity\EquipeJoueur;
+use App\Entity\Niveau;
+use App\Entity\Sport;
 use App\Entity\Utilisateur;
+use App\Enum\RoleEquipe;
+use App\Enum\StatutMembreEquipe;
 use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -12,18 +16,24 @@ class EquipeService
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private UtilisateurRepository $utilisateurRepository,
+        private UtilisateurRepository  $utilisateurRepository,
     ) {}
 
-    public function creer(array $donnees, Utilisateur $createur): Equipe
-    {
+    public function creer(
+        string $nom,
+        Sport $sport,
+        ?Niveau $niveau,
+        ?string $localisation,
+        ?string $logo,
+        Utilisateur $club,
+    ): Equipe {
         $equipe = new Equipe();
-        $equipe->setNom($donnees['nom']);
-        $equipe->setSport($donnees['sport']);
-        $equipe->setNiveau($donnees['niveau'] ?? null);
-        $equipe->setLocalisation($donnees['localisation'] ?? null);
-        $equipe->setLogo($donnees['logo'] ?? null);
-        $equipe->setCreateur($createur);
+        $equipe->setNom($nom);
+        $equipe->setSport($sport);
+        $equipe->setNiveau($niveau);
+        $equipe->setLocalisation($localisation);
+        $equipe->setLogo($logo);
+        $equipe->setClub($club);
 
         $this->em->persist($equipe);
         $this->em->flush();
@@ -31,13 +41,21 @@ class EquipeService
         return $equipe;
     }
 
-    public function modifier(Equipe $equipe, array $donnees): Equipe
-    {
-        if (isset($donnees['nom']))                         $equipe->setNom($donnees['nom']);
-        if (isset($donnees['sport']))                       $equipe->setSport($donnees['sport']);
-        if (array_key_exists('niveau', $donnees))           $equipe->setNiveau($donnees['niveau']);
-        if (array_key_exists('localisation', $donnees))     $equipe->setLocalisation($donnees['localisation']);
-        if (array_key_exists('logo', $donnees))             $equipe->setLogo($donnees['logo']);
+    public function modifier(
+        Equipe $equipe,
+        ?string $nom,
+        ?Sport $sport,
+        ?Niveau $niveau,
+        bool $effacerNiveau,
+        ?string $localisation,
+        ?string $logo,
+    ): Equipe {
+        if ($nom !== null)          $equipe->setNom($nom);
+        if ($sport !== null)        $equipe->setSport($sport);
+        if ($niveau !== null)       $equipe->setNiveau($niveau);
+        elseif ($effacerNiveau)     $equipe->setNiveau(null);
+        if ($localisation !== null) $equipe->setLocalisation($localisation);
+        if ($logo !== null)         $equipe->setLogo($logo);
 
         $this->em->flush();
 
@@ -57,10 +75,15 @@ class EquipeService
             }
         }
 
+        $roleEnum = ($role !== null && RoleEquipe::tryFrom($role) !== null)
+            ? RoleEquipe::from($role)
+            : RoleEquipe::Joueur;
+
         $membreEquipe = new EquipeJoueur();
         $membreEquipe->setUtilisateur($utilisateur);
         $membreEquipe->setEquipe($equipe);
-        $membreEquipe->setRole($role);
+        $membreEquipe->setRole($roleEnum);
+        $membreEquipe->setStatut(StatutMembreEquipe::Invite);
 
         $this->em->persist($membreEquipe);
         $this->em->flush();

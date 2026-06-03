@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs } from '@/services/api'
+import { chargerMesMatchs } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 
 const auth = useAuthStore()
@@ -17,9 +17,10 @@ onMounted(charger)
 
 async function charger() {
   chargement.value = true
+  erreur.value = ''
   const userId = auth.utilisateur?.id
   try {
-    matchs.value = await chargerMatchs(auth.token!, userId ? { createurId: userId } : {})
+    matchs.value = userId ? await chargerMesMatchs(auth.token!) : []
   } catch {
     erreur.value = 'Impossible de charger vos matchs.'
   } finally {
@@ -27,22 +28,46 @@ async function charger() {
   }
 }
 
+function estPasse(dateMatch: string) {
+  return new Date(dateMatch) < new Date()
+}
+
+function estTermine(match: { statut: string; dateMatch: string }) {
+  return match.statut === 'termine' || estPasse(match.dateMatch)
+}
+
 const mesMatchs = computed(() => matchs.value)
 
 const matchsFiltres = computed(() => {
-  if (!filtreStatut.value) return mesMatchs.value
-  return mesMatchs.value.filter((m) => m.statut === filtreStatut.value)
+  let liste = mesMatchs.value
+
+  if (filtreStatut.value === 'passe') {
+    return liste.filter((m) => estPasse(m.dateMatch))
+  }
+  if (filtreStatut.value === 'avenir') {
+    return liste.filter((m) => !estPasse(m.dateMatch))
+  }
+  if (filtreStatut.value === 'termine') {
+    return liste.filter((m) => estTermine(m))
+  }
+  if (filtreStatut.value) {
+    return liste.filter((m) => m.statut === filtreStatut.value)
+  }
+
+  return liste
 })
 
-const matchsAvenir = computed(() => {
-  const maintenant = new Date()
-  return matchsFiltres.value.filter((m) => new Date(m.dateMatch) >= maintenant)
-})
+const matchsAvenir = computed(() =>
+  matchsFiltres.value.filter((m) => !estPasse(m.dateMatch)),
+)
 
-const matchsPasses = computed(() => {
-  const maintenant = new Date()
-  return matchsFiltres.value.filter((m) => new Date(m.dateMatch) < maintenant)
-})
+const matchsPasses = computed(() =>
+  matchsFiltres.value.filter((m) => estPasse(m.dateMatch)),
+)
+
+const afficherSections = computed(() => filtreStatut.value === '')
+
+const listeUnique = computed(() => (afficherSections.value ? [] : matchsFiltres.value))
 
 function formaterDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('fr-FR', {
@@ -61,31 +86,39 @@ function formaterDate(dateStr: string) {
     <div class="page-entete">
       <div>
         <h1>Mes matchs</h1>
-        <p class="sous-titre">Gérez vos matchs créés</p>
+        <p class="sous-titre">Matchs que vous organisez ou auxquels vous participez</p>
       </div>
       <RouterLink to="/creer-match" class="btn btn-primaire">+ Créer un match</RouterLink>
     </div>
 
-    <!-- Filtres rapides -->
     <div class="filtres-statut">
-      <button
-        class="chip"
-        :class="{ actif: filtreStatut === '' }"
-        @click="filtreStatut = ''"
-      >
+      <button class="chip" :class="{ actif: filtreStatut === '' }" @click="filtreStatut = ''">
         Tous ({{ mesMatchs.length }})
       </button>
-      <button
-        class="chip"
-        :class="{ actif: filtreStatut === 'ouvert' }"
-        @click="filtreStatut = 'ouvert'"
-      >
-        Ouverts
+      <button class="chip" :class="{ actif: filtreStatut === 'avenir' }" @click="filtreStatut = 'avenir'">
+        À venir
+      </button>
+      <button class="chip" :class="{ actif: filtreStatut === 'passe' }" @click="filtreStatut = 'passe'">
+        Passés
       </button>
       <button
         class="chip"
-        :class="{ actif: filtreStatut === 'terminé' }"
-        @click="filtreStatut = 'terminé'"
+        :class="{ actif: filtreStatut === 'en_attente' }"
+        @click="filtreStatut = 'en_attente'"
+      >
+        En attente
+      </button>
+      <button
+        class="chip"
+        :class="{ actif: filtreStatut === 'confirme' }"
+        @click="filtreStatut = 'confirme'"
+      >
+        Confirmés
+      </button>
+      <button
+        class="chip"
+        :class="{ actif: filtreStatut === 'termine' }"
+        @click="filtreStatut = 'termine'"
       >
         Terminés
       </button>
@@ -95,22 +128,71 @@ function formaterDate(dateStr: string) {
     <div v-else-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
 
     <template v-else>
-      <!-- Matchs à venir -->
-      <section v-if="matchsAvenir.length > 0">
-        <h2 class="section-titre">À venir ({{ matchsAvenir.length }})</h2>
-        <div class="carte liste-matchs">
+      <template v-if="afficherSections">
+        <section v-if="matchsAvenir.length > 0">
+          <h2 class="section-titre">À venir ({{ matchsAvenir.length }})</h2>
+          <div class="carte liste-matchs">
+            <div
+              v-for="match in matchsAvenir"
+              :key="match.id"
+              class="ligne-match"
+              @click="router.push(`/matchs/${match.id}`)"
+            >
+              <div class="ligne-gauche">
+                <div class="ligne-sport-icone">🏟️</div>
+                <div class="ligne-info">
+                  <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                  <span>{{ formaterDate(match.dateMatch) }}</span>
+                  <span v-if="match.lieu" class="ligne-lieu">📍 {{ match.lieu }}</span>
+                </div>
+              </div>
+              <div class="ligne-droite">
+                <BadgeStatut :statut="match.statut" />
+                <span class="ligne-fleche">›</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="matchsPasses.length > 0" class="section-passe">
+          <h2 class="section-titre">Passés ({{ matchsPasses.length }})</h2>
+          <div class="carte liste-matchs liste-passee">
+            <div
+              v-for="match in matchsPasses"
+              :key="match.id"
+              class="ligne-match"
+              @click="router.push(`/matchs/${match.id}`)"
+            >
+              <div class="ligne-gauche">
+                <div class="ligne-sport-icone passé">🏟️</div>
+                <div class="ligne-info">
+                  <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                  <span>{{ formaterDate(match.dateMatch) }}</span>
+                  <span v-if="match.lieu" class="ligne-lieu">📍 {{ match.lieu }}</span>
+                </div>
+              </div>
+              <div class="ligne-droite">
+                <BadgeStatut :statut="match.statut" />
+                <span class="ligne-fleche">›</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </template>
+
+      <section v-else-if="listeUnique.length > 0">
+        <h2 class="section-titre">Résultats ({{ listeUnique.length }})</h2>
+        <div class="carte liste-matchs" :class="{ 'liste-passee': filtreStatut === 'passe' || filtreStatut === 'termine' }">
           <div
-            v-for="match in matchsAvenir"
+            v-for="match in listeUnique"
             :key="match.id"
             class="ligne-match"
             @click="router.push(`/matchs/${match.id}`)"
           >
             <div class="ligne-gauche">
-              <div class="ligne-sport-icone">🏟️</div>
+              <div class="ligne-sport-icone" :class="{ passé: estPasse(match.dateMatch) }">🏟️</div>
               <div class="ligne-info">
-                <strong>
-                  {{ match.sport.charAt(0).toUpperCase() + match.sport.slice(1) }}
-                </strong>
+                <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
                 <span>{{ formaterDate(match.dateMatch) }}</span>
                 <span v-if="match.lieu" class="ligne-lieu">📍 {{ match.lieu }}</span>
               </div>
@@ -123,39 +205,18 @@ function formaterDate(dateStr: string) {
         </div>
       </section>
 
-      <!-- Matchs passés -->
-      <section v-if="matchsPasses.length > 0" style="margin-top: var(--espace-xl)">
-        <h2 class="section-titre">Passés ({{ matchsPasses.length }})</h2>
-        <div class="carte liste-matchs liste-passee">
-          <div
-            v-for="match in matchsPasses"
-            :key="match.id"
-            class="ligne-match"
-            @click="router.push(`/matchs/${match.id}`)"
-          >
-            <div class="ligne-gauche">
-              <div class="ligne-sport-icone passé">🏟️</div>
-              <div class="ligne-info">
-                <strong>
-                  {{ match.sport.charAt(0).toUpperCase() + match.sport.slice(1) }}
-                </strong>
-                <span>{{ formaterDate(match.dateMatch) }}</span>
-              </div>
-            </div>
-            <div class="ligne-droite">
-              <BadgeStatut statut="terminé" />
-              <span class="ligne-fleche">›</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Vide -->
       <div v-if="mesMatchs.length === 0" class="vide">
-        <p>Vous n'avez pas encore créé de match.</p>
-        <RouterLink to="/creer-match" class="btn btn-primaire" style="margin-top: var(--espace-m)">
-          Créer mon premier match
+        <p>Vous ne participez à aucun match pour le moment.</p>
+        <RouterLink to="/rechercher" class="btn btn-secondaire" style="margin-top: var(--espace-s)">
+          Trouver un match
         </RouterLink>
+      </div>
+
+      <div v-else-if="matchsFiltres.length === 0" class="vide">
+        <p>Aucun match pour ce filtre.</p>
+        <button type="button" class="btn btn-secondaire" style="margin-top: var(--espace-s)" @click="filtreStatut = ''">
+          Voir tous mes matchs
+        </button>
       </div>
     </template>
   </div>
@@ -208,7 +269,6 @@ function formaterDate(dateStr: string) {
 }
 
 .section-titre {
-  font-size: 1rem;
   font-weight: 700;
   margin-bottom: var(--espace-s);
   color: var(--couleur-texte-discret);
@@ -217,12 +277,16 @@ function formaterDate(dateStr: string) {
   letter-spacing: 0.5px;
 }
 
+.section-passe {
+  margin-top: var(--espace-xl);
+}
+
 .liste-matchs {
   overflow: hidden;
 }
 
 .liste-passee {
-  opacity: 0.75;
+  opacity: 0.85;
 }
 
 .ligne-match {

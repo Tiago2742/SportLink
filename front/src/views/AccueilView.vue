@@ -2,7 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs, participer } from '@/services/api'
+import { chargerMatchs, chargerMesMatchs, ajouterCamp } from '@/services/api'
+import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import { useSports } from '@/composables/useSports'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
@@ -16,9 +17,9 @@ const mesMatchs = ref<any[]>([])
 const chargementMatchs = ref(true)
 const erreur = ref('')
 
-const recherche = ref('')
-const filtreSport = ref('')
-const filtreNiveau = ref('')
+const recherche          = ref('')
+const filtreSport        = ref<number | ''>('')
+const filtreNiveau       = ref<number | ''>('')
 const filtreLocalisation = ref('')
 
 onMounted(() => {
@@ -31,8 +32,8 @@ async function charger() {
   const userId = auth.utilisateur?.id
   try {
     const [disponibles, miens] = await Promise.all([
-      chargerMatchs(auth.token!, { statut: 'ouvert' }),
-      userId ? chargerMatchs(auth.token!, { createurId: userId }) : Promise.resolve([]),
+      chargerMatchs(auth.token!, { statut: 'disponible' }),
+      userId ? chargerMesMatchs(auth.token!) : Promise.resolve([]),
     ])
     matchsDisponibles.value = disponibles.slice(0, 3)
     mesMatchs.value = miens
@@ -47,22 +48,27 @@ async function rechercherMatchs() {
   router.push({
     path: '/rechercher',
     query: {
-      q: recherche.value || undefined,
-      sport: filtreSport.value || undefined,
-      niveau: filtreNiveau.value || undefined,
+      q:            recherche.value || undefined,
+      sportId:      filtreSport.value !== '' ? filtreSport.value : undefined,
+      niveauId:     filtreNiveau.value !== '' ? filtreNiveau.value : undefined,
       localisation: filtreLocalisation.value || undefined,
     },
   })
 }
 
 async function rejoindreMatch(matchId: number) {
+  if (!auth.utilisateur) return
+  const m = matchsDisponibles.value.find((x) => x.id === matchId)
+  if (m && utilisateurEstInscrit(m, auth.utilisateur.id)) return
   try {
-    await participer(auth.token!, matchId)
-    await charger()
-  } catch (e: any) {
-    if (e.statut === 422) {
-      alert('Vous participez déjà à ce match.')
+    if (m?.sport?.type === 'individuel') {
+      await ajouterCamp(auth.token!, matchId, { joueurId: auth.utilisateur.id })
+      await charger()
+    } else {
+      router.push(`/matchs/${matchId}`)
     }
+  } catch (e: any) {
+    alert(e.message || 'Impossible de rejoindre ce match.')
   }
 }
 </script>
@@ -83,11 +89,11 @@ async function rejoindreMatch(matchId: number) {
           <div class="recherche-filtres">
             <select v-model="filtreSport" class="champ" @change="filtreNiveau = ''">
               <option value="">Sport</option>
-              <option v-for="sport in listeSports" :key="sport" :value="sport">{{ sport }}</option>
+              <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">{{ sport.nom }}</option>
             </select>
-            <select v-model="filtreNiveau" class="champ" :disabled="!filtreSport">
+            <select v-model="filtreNiveau" class="champ" :disabled="filtreSport === ''">
               <option value="">Niveau</option>
-              <option v-for="n in niveauxPour(filtreSport)" :key="n" :value="n">{{ n }}</option>
+              <option v-for="n in niveauxPour(filtreSport as number)" :key="n.id" :value="n.id">{{ n.libelle }}</option>
             </select>
             <input
               v-model="filtreLocalisation"
@@ -144,9 +150,7 @@ async function rejoindreMatch(matchId: number) {
           @click="router.push(`/matchs/${match.id}`)"
         >
           <div class="ligne-match-info">
-            <strong class="ligne-sport">
-              {{ match.sport.charAt(0).toUpperCase() + match.sport.slice(1) }}
-            </strong>
+            <strong class="ligne-sport">{{ match.sport?.nom ?? 'Sport' }}</strong>
             <span class="ligne-date">
               {{
                 new Date(match.dateMatch).toLocaleDateString('fr-FR', {

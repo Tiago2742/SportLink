@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
-import { chargerSports } from '@/services/api'
+import { chargerSports, type SportRef, type NiveauRef } from '@/services/api'
 
-const catalogue = ref<Record<string, string[]>>({})
+const catalogue = ref<SportRef[]>([])
 let chargementLance = false
 
 export function useSports() {
@@ -15,11 +15,23 @@ export function useSports() {
     }
   }
 
-  const listeSports = computed(() => Object.keys(catalogue.value))
+  const listeSports = computed(() => catalogue.value)
 
-  function niveauxPour(sport: string): string[] {
-    return catalogue.value[sport] ?? []
+  function niveauxPour(sportId: number): NiveauRef[] {
+    return catalogue.value.find((s) => s.id === sportId)?.niveaux ?? []
   }
 
-  return { catalogue, listeSports, niveauxPour, chargerCatalogue }
+  function nomSport(sportId: number): string {
+    return catalogue.value.find((s) => s.id === sportId)?.nom ?? ''
+  }
+
+  function nomNiveau(niveauId: number): string {
+    for (const sport of catalogue.value) {
+      const n = sport.niveaux.find((n) => n.id === niveauId)
+      if (n) return n.libelle
+    }
+    return ''
+  }
+
+  return { catalogue, listeSports, niveauxPour, nomSport, nomNiveau, chargerCatalogue }
 }

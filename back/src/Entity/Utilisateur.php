@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\TypeUtilisateur;
 use App\Repository\UtilisateurRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -40,33 +41,31 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['utilisateur:read'])]
     private ?string $nom = null;
 
-    #[ORM\Column(length: 255)]
+    /** Null pour un compte club (raison sociale dans nom uniquement). */
+    #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['utilisateur:read'])]
     private ?string $prenom = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(enumType: TypeUtilisateur::class)]
     #[Groups(['utilisateur:read'])]
-    private ?string $type = null;
+    private ?TypeUtilisateur $type = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['utilisateur:read'])]
     private ?string $localisation = null;
 
-    /**
-     * @var Collection<int, UtilisateurSport>
-     */
-    #[ORM\OneToMany(targetEntity: UtilisateurSport::class, mappedBy: 'utilisateur', orphanRemoval: true, cascade: ['persist'])]
-    #[Groups(['utilisateur_sport:read'])]
-    private Collection $sports;
+    /** @var Collection<int, UtilisateurNiveau> */
+    #[ORM\OneToMany(targetEntity: UtilisateurNiveau::class, mappedBy: 'utilisateur', orphanRemoval: true, cascade: ['persist'])]
+    #[Groups(['utilisateur:detail'])]
+    private Collection $niveaux;
 
     #[ORM\Column]
+    #[Groups(['utilisateur:read'])]
     private ?\DateTime $dateInscription = null;
 
-    /**
-     * @var Collection<int, Equipe>
-     */
-    #[ORM\OneToMany(targetEntity: Equipe::class, mappedBy: 'createur')]
-    private Collection $equipesCreees;
+    /** @var Collection<int, Equipe> */
+    #[ORM\OneToMany(targetEntity: Equipe::class, mappedBy: 'club')]
+    private Collection $equipesGerees;
 
     /**
      * @var Collection<int, Game>
@@ -80,11 +79,6 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: EquipeJoueur::class, mappedBy: 'utilisateur')]
     private Collection $equipesJoueur;
 
-    /**
-     * @var Collection<int, Participation>
-     */
-    #[ORM\OneToMany(targetEntity: Participation::class, mappedBy: 'utilisateur', orphanRemoval: true)]
-    private Collection $participations;
 
     /**
      * @var Collection<int, Message>
@@ -94,12 +88,11 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->equipesCreees = new ArrayCollection();
+        $this->equipesGerees = new ArrayCollection();
         $this->matchsCrees = new ArrayCollection();
         $this->equipesJoueur = new ArrayCollection();
-        $this->participations = new ArrayCollection();
-        $this->messages = new ArrayCollection();
-        $this->sports = new ArrayCollection();
+$this->messages = new ArrayCollection();
+        $this->niveaux = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -200,22 +193,21 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->prenom;
     }
 
-    public function setPrenom(string $prenom): static
+    public function setPrenom(?string $prenom): static
     {
         $this->prenom = $prenom;
 
         return $this;
     }
 
-    public function getType(): ?string
+    public function getType(): ?TypeUtilisateur
     {
         return $this->type;
     }
 
-    public function setType(string $type): static
+    public function setType(TypeUtilisateur $type): static
     {
         $this->type = $type;
-
         return $this;
     }
 
@@ -243,34 +235,10 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * @return Collection<int, Equipe>
-     */
-    public function getEquipesCreees(): Collection
+    /** @return Collection<int, Equipe> */
+    public function getEquipesGerees(): Collection
     {
-        return $this->equipesCreees;
-    }
-
-    public function addEquipesCreee(Equipe $equipesCreee): static
-    {
-        if (!$this->equipesCreees->contains($equipesCreee)) {
-            $this->equipesCreees->add($equipesCreee);
-            $equipesCreee->setCreateur($this);
-        }
-
-        return $this;
-    }
-
-    public function removeEquipesCreee(Equipe $equipesCreee): static
-    {
-        if ($this->equipesCreees->removeElement($equipesCreee)) {
-            // set the owning side to null (unless already changed)
-            if ($equipesCreee->getCreateur() === $this) {
-                $equipesCreee->setCreateur(null);
-            }
-        }
-
-        return $this;
+        return $this->equipesGerees;
     }
 
     /**
@@ -333,58 +301,25 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * @return Collection<int, Participation>
-     */
-    public function getParticipations(): Collection
+
+    /** @return Collection<int, UtilisateurNiveau> */
+    public function getNiveaux(): Collection
     {
-        return $this->participations;
+        return $this->niveaux;
     }
 
-    public function addParticipation(Participation $participation): static
+    public function addNiveau(UtilisateurNiveau $niveauSport): static
     {
-        if (!$this->participations->contains($participation)) {
-            $this->participations->add($participation);
-            $participation->setUtilisateur($this);
+        if (!$this->niveaux->contains($niveauSport)) {
+            $this->niveaux->add($niveauSport);
+            $niveauSport->setUtilisateur($this);
         }
-
         return $this;
     }
 
-    public function removeParticipation(Participation $participation): static
+    public function removeNiveau(UtilisateurNiveau $niveauSport): static
     {
-        if ($this->participations->removeElement($participation)) {
-            // set the owning side to null (unless already changed)
-            if ($participation->getUtilisateur() === $this) {
-                $participation->setUtilisateur(null);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, UtilisateurSport>
-     */
-    public function getSports(): Collection
-    {
-        return $this->sports;
-    }
-
-    public function addSport(UtilisateurSport $sport): static
-    {
-        if (!$this->sports->contains($sport)) {
-            $this->sports->add($sport);
-            $sport->setUtilisateur($this);
-        }
-
-        return $this;
-    }
-
-    public function removeSport(UtilisateurSport $sport): static
-    {
-        $this->sports->removeElement($sport);
-
+        $this->niveaux->removeElement($niveauSport);
         return $this;
     }
 

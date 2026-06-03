@@ -3,8 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
-use App\Entity\UtilisateurSport;
-use App\Reference\SportNiveaux;
+use App\Entity\UtilisateurNiveau;
+use App\Enum\TypeUtilisateur;
+use App\Repository\NiveauRepository;
+use App\Repository\SportRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,14 +23,26 @@ class RegistrationController extends AbstractController
         UserPasswordHasherInterface $passwordHasher,
         EntityManagerInterface $em,
         ValidatorInterface $validator,
+        SportRepository $sportRepo,
+        NiveauRepository $niveauRepo,
     ): JsonResponse {
         $donnees = json_decode($request->getContent(), true);
 
-        $champsRequis = ['email', 'password', 'nom', 'prenom', 'type'];
+        $champsRequis = ['email', 'password', 'nom', 'type'];
         foreach ($champsRequis as $champ) {
             if (empty($donnees[$champ])) {
                 return $this->json(['erreur' => "Le champ \"$champ\" est requis."], 400);
             }
+        }
+
+        try {
+            $typeEnum = TypeUtilisateur::from($donnees['type']);
+        } catch (\ValueError) {
+            return $this->json(['erreur' => 'Type invalide. Valeurs acceptées : club, joueur.'], 400);
+        }
+
+        if ($typeEnum === TypeUtilisateur::Joueur && empty($donnees['prenom'])) {
+            return $this->json(['erreur' => 'Le champ "prenom" est requis pour un compte joueur.'], 400);
         }
 
         if ($em->getRepository(Utilisateur::class)->findOneBy(['email' => $donnees['email']])) {
@@ -39,23 +53,36 @@ class RegistrationController extends AbstractController
         $utilisateur->setEmail($donnees['email']);
         $utilisateur->setPassword($passwordHasher->hashPassword($utilisateur, $donnees['password']));
         $utilisateur->setNom($donnees['nom']);
-        $utilisateur->setPrenom($donnees['prenom']);
-        $utilisateur->setType($donnees['type']);
+        $utilisateur->setPrenom(
+            $typeEnum === TypeUtilisateur::Club
+                ? (isset($donnees['prenom']) && $donnees['prenom'] !== '' ? $donnees['prenom'] : null)
+                : $donnees['prenom'],
+        );
+        $utilisateur->setType($typeEnum);
         $utilisateur->setLocalisation($donnees['localisation'] ?? null);
         $utilisateur->setDateInscription(new \DateTime());
 
-        // Sports optionnels : [{sport: "Football", niveau: "D1"}, ...]
+        // Sports optionnels : [{sportId: N, niveauId: M}, ...]
         foreach ($donnees['sports'] ?? [] as $entree) {
-            if (empty($entree['sport']) || empty($entree['niveau'])) {
+            if (empty($entree['sportId']) || empty($entree['niveauId'])) {
                 continue;
             }
-            if (!SportNiveaux::estValide($entree['sport'], $entree['niveau'])) {
+
+            $sport = $sportRepo->find((int) $entree['sportId']);
+            if (!$sport) {
                 continue;
             }
-            $us = new UtilisateurSport();
-            $us->setSport($entree['sport']);
-            $us->setNiveau($entree['niveau']);
-            $utilisateur->addSport($us);
+
+            $niveau = $niveauRepo->find((int) $entree['niveauId']);
+            // R4 : le niveau doit appartenir au sport
+            if (!$niveau || $niveau->getSport() !== $sport) {
+                continue;
+            }
+
+            $un = new UtilisateurNiveau();
+            $un->setSport($sport);
+            $un->setNiveau($niveau);
+            $utilisateur->addNiveau($un);
         }
 
         $erreurs = $validator->validate($utilisateur);
@@ -70,16 +97,8 @@ class RegistrationController extends AbstractController
         $em->persist($utilisateur);
         $em->flush();
 
-        return $this->json([
-            'id'     => $utilisateur->getId(),
-            'email'  => $utilisateur->getEmail(),
-            'nom'    => $utilisateur->getNom(),
-            'prenom' => $utilisateur->getPrenom(),
-            'type'   => $utilisateur->getType(),
-            'sports' => array_map(
-                fn(UtilisateurSport $s) => ['sport' => $s->getSport(), 'niveau' => $s->getNiveau()],
-                $utilisateur->getSports()->toArray(),
-            ),
-        ], 201);
+        return $this->json($utilisateur, 201, [], [
+            'groups' => ['utilisateur:read', 'utilisateur:detail', 'utilisateur_niveau:read', 'sport:read', 'niveau:read'],
+        ]);
     }
 }

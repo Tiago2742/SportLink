@@ -2,9 +2,10 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs, participer } from '@/services/api'
+import { chargerMatchs, ajouterCamp } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
+import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
 
 const auth = useAuthStore()
@@ -16,9 +17,9 @@ const chargement = ref(true)
 const erreur = ref('')
 
 const filtres = ref({
-  sport: (route.query.sport as string) || '',
-  niveauRequis: (route.query.niveau as string) || '',
-  statut: '',
+  sportId:  route.query.sportId  ? Number(route.query.sportId)  : '' as number | '',
+  niveauId: route.query.niveauId ? Number(route.query.niveauId) : '' as number | '',
+  statut: (route.query.statut as string) || 'disponible',
   lieu: (route.query.localisation as string) || '',
 })
 
@@ -51,10 +52,10 @@ async function charger() {
   erreur.value = ''
   try {
     const params: Record<string, string> = {}
-    if (filtres.value.sport) params.sport = filtres.value.sport
-    if (filtres.value.niveauRequis) params.niveauRequis = filtres.value.niveauRequis
-    if (filtres.value.statut) params.statut = filtres.value.statut
-    if (filtres.value.lieu) params.lieu = filtres.value.lieu
+    if (filtres.value.sportId  !== '') params.sportId  = String(filtres.value.sportId)
+    if (filtres.value.niveauId !== '') params.niveauId = String(filtres.value.niveauId)
+    if (filtres.value.statut)          params.statut   = filtres.value.statut
+    if (filtres.value.lieu)            params.lieu     = filtres.value.lieu
     matchs.value = await chargerMatchs(auth.token!, params)
     pageCourante.value = 1
   } catch {
@@ -64,8 +65,8 @@ async function charger() {
   }
 }
 
-function appliquerFiltreRapide(sport: string) {
-  filtres.value.sport = filtres.value.sport === sport ? '' : sport
+function appliquerFiltreRapide(sportId: number) {
+  filtres.value.sportId = filtres.value.sportId === sportId ? '' : sportId
 }
 
 function filtreRapideAujourdhui() {
@@ -79,9 +80,9 @@ const matchsFiltres = computed(() => {
     const q = recherche.value.toLowerCase()
     liste = liste.filter(
       (m) =>
-        m.sport?.toLowerCase().includes(q) ||
+        m.sport?.nom?.toLowerCase().includes(q) ||
         m.lieu?.toLowerCase().includes(q) ||
-        m.niveauRequis?.toLowerCase().includes(q),
+        m.niveauRequis?.libelle?.toLowerCase().includes(q),
     )
   }
   return liste
@@ -101,11 +102,18 @@ const matchsPage = computed(() =>
 )
 
 async function rejoindreMatch(matchId: number) {
+  if (!auth.utilisateur) return
+  const m = matchs.value.find((x) => x.id === matchId)
+  if (m && utilisateurEstInscrit(m, auth.utilisateur.id)) return
   try {
-    await participer(auth.token!, matchId)
-    await charger()
+    if (m?.sport?.type === 'individuel') {
+      await ajouterCamp(auth.token!, matchId, { joueurId: auth.utilisateur.id })
+      await charger()
+    } else {
+      router.push(`/matchs/${matchId}`)
+    }
   } catch (e: any) {
-    if (e.statut === 422) alert('Vous participez déjà à ce match.')
+    alert(e.message || 'Impossible de rejoindre ce match.')
   }
 }
 </script>
@@ -121,20 +129,22 @@ async function rejoindreMatch(matchId: number) {
         <div class="filtre-section">
           <label class="filtre-label">Sport &amp; Niveau</label>
           <SelecteurFiltresSport
-            :sport="filtres.sport"
-            :niveau="filtres.niveauRequis"
-            @update:sport="(v) => { filtres.sport = v; filtres.niveauRequis = '' }"
-            @update:niveau="(v) => filtres.niveauRequis = v"
+            :sport="filtres.sportId"
+            :niveau="filtres.niveauId"
+            @update:sport="(v) => { filtres.sportId = v; filtres.niveauId = '' }"
+            @update:niveau="(v) => filtres.niveauId = v"
           />
         </div>
 
         <div class="filtre-section">
           <label class="filtre-label">Statut</label>
           <select v-model="filtres.statut" class="champ">
+            <option value="disponible">Disponibles</option>
             <option value="">Tous</option>
-            <option value="ouvert">Ouvert</option>
-            <option value="complet">Complet</option>
-            <option value="terminé">Terminé</option>
+            <option value="en_attente">En attente</option>
+            <option value="confirme">Confirmé</option>
+            <option value="termine">Terminé</option>
+            <option value="annule">Annulé</option>
           </select>
         </div>
 
@@ -145,23 +155,11 @@ async function rejoindreMatch(matchId: number) {
 
         <button
           class="btn btn-secondaire btn-pleine-largeur"
-          @click="filtres = { sport: '', niveauRequis: '', statut: '', lieu: '' }"
+          @click="filtres = { sportId: '', niveauId: '', statut: 'disponible', lieu: '' }"
         >
           Réinitialiser
         </button>
 
-        <!-- Recommandations sport populaire -->
-        <div class="sidebar-recommandations" v-if="matchs.length > 0">
-          <h4>Recommandations</h4>
-          <div class="reco-item" @click="filtres.sport = 'football'">
-            <span class="reco-nom">Match populaire</span>
-            <span class="reco-detail">Football — ce weekend</span>
-          </div>
-          <div class="reco-item" @click="filtres.lieu = 'Paris'">
-            <span class="reco-nom">Près de vous</span>
-            <span class="reco-detail">Tennis — aujourd'hui 18h</span>
-          </div>
-        </div>
       </aside>
 
       <!-- Contenu principal -->
@@ -184,10 +182,10 @@ async function rejoindreMatch(matchId: number) {
             v-for="sport in chipsRapides"
             :key="sport"
             class="chip"
-            :class="{ actif: filtres.sport === sport }"
-            @click="appliquerFiltreRapide(sport)"
+            :class="{ actif: filtres.sportId === sport.id }"
+            @click="appliquerFiltreRapide(sport.id)"
           >
-            {{ sport }}
+            {{ sport.nom }}
           </button>
         </div>
 

@@ -53,6 +53,34 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $this->assertStringContainsString('email', $this->reponseJson()['erreur']);
     }
 
+    public function testInscriptionClubSansPrenom_Succes(): void
+    {
+        $this->requete('POST', '/api/register', [
+            'email'    => 'club.nouveau@test.fr',
+            'password' => 'Test1234!',
+            'nom'      => 'AS Test Club',
+            'type'     => 'club',
+        ]);
+
+        $this->assertStatut(201);
+        $reponse = $this->reponseJson();
+        $this->assertEquals('AS Test Club', $reponse['nom']);
+        $this->assertNull($reponse['prenom'] ?? null);
+    }
+
+    public function testInscriptionJoueurSansPrenom_RetourneErreur400(): void
+    {
+        $this->requete('POST', '/api/register', [
+            'email'    => 'joueur.sans.prenom@test.fr',
+            'password' => 'Test1234!',
+            'nom'      => 'Martin',
+            'type'     => 'joueur',
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('prenom', $this->reponseJson()['erreur']);
+    }
+
     public function testLoginSucces_RetourneToken(): void
     {
         $this->creerUtilisateur('connecte@test.fr', 'Test1234!');

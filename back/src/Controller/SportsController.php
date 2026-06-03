@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Reference\SportNiveaux;
+use App\Repository\SportRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -10,8 +10,10 @@ use Symfony\Component\Routing\Attribute\Route;
 class SportsController extends AbstractController
 {
     #[Route('/api/sports', name: 'api_sports', methods: ['GET'])]
-    public function catalogue(): JsonResponse
+    public function catalogue(SportRepository $sportRepo): JsonResponse
     {
-        return $this->json(SportNiveaux::CATALOGUE);
+        $sports = $sportRepo->findAllAvecNiveaux();
+
+        return $this->json($sports, 200, [], ['groups' => ['sport:read', 'sport:niveaux', 'niveau:read']]);
     }
 }

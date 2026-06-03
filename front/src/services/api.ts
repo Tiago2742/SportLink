@@ -58,7 +58,10 @@ export const inscrire = (donnees: Record<string, unknown>) =>
   requete('POST', '/register', donnees)
 
 // Sports (référentiel public)
-export const chargerSports = (): Promise<Record<string, string[]>> =>
+export interface NiveauRef { id: number; libelle: string; ordre: number }
+export interface SportRef  { id: number; nom: string; type: string; niveaux: NiveauRef[] }
+
+export const chargerSports = (): Promise<SportRef[]> =>
   fetch(`${API_URL}/sports`).then((r) => r.json())
 
 // Profil
@@ -68,6 +71,10 @@ export const chargerProfil = (token: string) =>
 // Matchs
 export const chargerMatchs = (token: string, filtres: Record<string, unknown> = {}) =>
   requete('GET', '/matchs' + construireParams(filtres), null, token)
+
+/** Matchs créés ou rejoints par l'utilisateur connecté */
+export const chargerMesMatchs = (token: string, filtres: Record<string, unknown> = {}) =>
+  chargerMatchs(token, { mesMatchs: 1, ...filtres })
 
 export const chargerMatch = (token: string, id: number) =>
   requete('GET', `/matchs/${id}`, null, token)
@@ -81,19 +88,18 @@ export const modifierMatch = (token: string, id: number, donnees: Record<string,
 export const supprimerMatch = (token: string, id: number) =>
   requete('DELETE', `/matchs/${id}`, null, token)
 
-// Participations
-export const participer = (token: string, matchId: number) =>
-  requete('POST', `/matchs/${matchId}/participations`, null, token)
-
-export const modifierStatutParticipation = (
+// Camps
+export const ajouterCamp = (
   token: string,
   matchId: number,
-  participationId: number,
-  statut: string,
-) => requete('PATCH', `/matchs/${matchId}/participations/${participationId}`, { statut }, token)
+  donnees: { equipeId?: number; joueurId?: number },
+) => requete('POST', `/matchs/${matchId}/camps`, donnees, token)
 
-export const annulerParticipation = (token: string, matchId: number, participationId: number) =>
-  requete('DELETE', `/matchs/${matchId}/participations/${participationId}`, null, token)
+export const repondreCamp = (token: string, matchId: number, campId: number, statut: string) =>
+  requete('PATCH', `/matchs/${matchId}/camps/${campId}`, { statut }, token)
+
+export const supprimerCamp = (token: string, matchId: number, campId: number) =>
+  requete('DELETE', `/matchs/${matchId}/camps/${campId}`, null, token)
 
 // Messages
 export const chargerMessages = (token: string, matchId: number) =>
@@ -109,9 +115,9 @@ export const chargerResultat = (token: string, matchId: number) =>
 export const saisirResultat = (
   token: string,
   matchId: number,
-  scoreEquipe1: number,
-  scoreEquipe2: number,
-) => requete('POST', `/matchs/${matchId}/resultat`, { scoreEquipe1, scoreEquipe2 }, token)
+  scoreCamp1: number,
+  scoreCamp2: number,
+) => requete('POST', `/matchs/${matchId}/resultat`, { scoreCamp1, scoreCamp2 }, token)
 
 // Équipes
 export const chargerEquipes = (token: string, filtres: Record<string, unknown> = {}) =>

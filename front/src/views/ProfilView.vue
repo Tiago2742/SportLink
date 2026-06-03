@@ -2,8 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs, chargerEquipes, chargerProfil } from '@/services/api'
-
+import { chargerMesMatchs, chargerEquipes, chargerProfil } from '@/services/api'
 const auth = useAuthStore()
 const router = useRouter()
 
@@ -13,7 +12,7 @@ const mesMatchs = ref<any[]>([])
 const chargement = ref(true)
 
 const modeEdition = ref(false)
-const formEdition = ref({ nom: '', prenom: '', niveau: '', localisation: '' })
+const formEdition = ref({ nom: '', prenom: '', localisation: '' })
 const erreurEdition = ref('')
 
 onMounted(async () => {
@@ -24,8 +23,8 @@ onMounted(async () => {
   }
   try {
     const [matchs, equipes] = await Promise.all([
-      chargerMatchs(auth.token!, { createurId: userId }),
-      chargerEquipes(auth.token!, { createurId: userId }),
+      chargerMesMatchs(auth.token!),
+      chargerEquipes(auth.token!, { clubId: userId }),
     ])
     mesMatchs.value = matchs
     mesEquipes.value = equipes
@@ -38,7 +37,6 @@ function ouvrirEdition() {
   formEdition.value = {
     nom: profil.value?.nom || '',
     prenom: profil.value?.prenom || '',
-    niveau: profil.value?.niveau || '',
     localisation: profil.value?.localisation || '',
   }
   modeEdition.value = true
@@ -65,6 +63,8 @@ const matchsAvenir = computed(() =>
 const matchsPasses = computed(() =>
   mesMatchs.value.filter((m) => new Date(m.dateMatch) < new Date()),
 )
+
+const estClub = computed(() => profil.value?.type === 'club')
 </script>
 
 <template>
@@ -87,11 +87,11 @@ const matchsPasses = computed(() =>
 
           <template v-if="!modeEdition">
             <div class="grille-2" style="margin-bottom: var(--espace-m)">
-              <div class="champ-affichage">
-                <label>Nom</label>
+              <div class="champ-affichage" :class="{ 'champ-affichage-pleine': estClub }">
+                <label>{{ estClub ? 'Nom du club' : 'Nom' }}</label>
                 <span>{{ profil?.nom || '—' }}</span>
               </div>
-              <div class="champ-affichage">
+              <div v-if="!estClub" class="champ-affichage">
                 <label>Prénom</label>
                 <span>{{ profil?.prenom || '—' }}</span>
               </div>
@@ -105,8 +105,8 @@ const matchsPasses = computed(() =>
               </div>
             </div>
             <div class="champ-affichage" style="margin-bottom: var(--espace-m)">
-              <label>Niveau</label>
-              <span>{{ profil?.niveau || 'Non précisé' }}</span>
+              <label>Membre depuis</label>
+              <span>{{ profil?.dateInscription ? formaterDate(profil.dateInscription) : '—' }}</span>
             </div>
             <button class="btn btn-primaire" @click="ouvrirEdition">✏️ Modifier profil</button>
           </template>
@@ -114,23 +114,14 @@ const matchsPasses = computed(() =>
           <template v-else>
             <div v-if="erreurEdition" class="alerte alerte-erreur">{{ erreurEdition }}</div>
             <div class="grille-2">
-              <div class="champ-groupe">
-                <label>Nom</label>
+              <div class="champ-groupe" :class="{ 'champ-groupe-pleine': estClub }">
+                <label>{{ estClub ? 'Nom du club' : 'Nom' }}</label>
                 <input v-model="formEdition.nom" type="text" class="champ" />
               </div>
-              <div class="champ-groupe">
+              <div v-if="!estClub" class="champ-groupe">
                 <label>Prénom</label>
                 <input v-model="formEdition.prenom" type="text" class="champ" />
               </div>
-            </div>
-            <div class="champ-groupe">
-              <label>Niveau</label>
-              <select v-model="formEdition.niveau" class="champ">
-                <option value="">Non précisé</option>
-                <option value="débutant">Débutant</option>
-                <option value="intermédiaire">Intermédiaire</option>
-                <option value="avancé">Avancé</option>
-              </select>
             </div>
             <div class="champ-groupe">
               <label>Localisation</label>
@@ -170,8 +161,8 @@ const matchsPasses = computed(() =>
               <div class="equipe-info">
                 <strong>{{ equipe.nom }}</strong>
                 <span>
-                  {{ equipe.sport }}
-                  <template v-if="equipe.niveau"> — {{ equipe.niveau }}</template>
+                  {{ equipe.sport?.nom ?? equipe.sport }}
+                  <template v-if="equipe.niveau"> — {{ equipe.niveau?.libelle ?? equipe.niveau }}</template>
                 </span>
               </div>
               <RouterLink :to="`/equipes/${equipe.id}`" class="btn btn-secondaire btn-petit">
@@ -200,7 +191,7 @@ const matchsPasses = computed(() =>
               @click="router.push(`/matchs/${match.id}`)"
             >
               <div class="match-info">
-                <strong>{{ match.sport.charAt(0).toUpperCase() + match.sport.slice(1) }}</strong>
+                <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
                 <span>{{ formaterDate(match.dateMatch) }}</span>
               </div>
               <span

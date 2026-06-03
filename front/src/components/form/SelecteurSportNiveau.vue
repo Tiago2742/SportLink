@@ -3,8 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useSports } from '@/composables/useSports'
 
 export interface EntreeSportNiveau {
-  sport: string
-  niveau: string
+  sportId: number
+  niveauId: number
 }
 
 const props = defineProps<{
@@ -16,34 +16,38 @@ const emit = defineEmits<{
   'update:modelValue': [valeur: EntreeSportNiveau[]]
 }>()
 
-const { listeSports, niveauxPour, chargerCatalogue } = useSports()
+const { listeSports, niveauxPour, nomSport, nomNiveau, chargerCatalogue } = useSports()
 
-const sportEnCours = ref('')
-const niveauEnCours = ref('')
+const sportEnCours  = ref<number | ''>('')
+const niveauEnCours = ref<number | ''>('')
 
 onMounted(chargerCatalogue)
 
-const niveauxDisponibles = computed(() => niveauxPour(sportEnCours.value))
+const niveauxDisponibles = computed(() =>
+  sportEnCours.value !== '' ? niveauxPour(sportEnCours.value as number) : [],
+)
 
 function onSportChange() {
   niveauEnCours.value = ''
 }
 
 function ajouter() {
-  if (!sportEnCours.value || !niveauEnCours.value) return
+  if (sportEnCours.value === '' || niveauEnCours.value === '') return
 
-  // Remplace si même sport déjà présent (pour le mode single)
-  const existant = props.modelValue.findIndex((e) => e.sport === sportEnCours.value)
-  const copie = [...props.modelValue]
+  const sportId  = sportEnCours.value as number
+  const niveauId = niveauEnCours.value as number
+
+  const existant = props.modelValue.findIndex((e) => e.sportId === sportId)
+  const copie    = [...props.modelValue]
 
   if (existant >= 0) {
-    copie[existant] = { sport: sportEnCours.value, niveau: niveauEnCours.value }
+    copie[existant] = { sportId, niveauId }
   } else {
-    copie.push({ sport: sportEnCours.value, niveau: niveauEnCours.value })
+    copie.push({ sportId, niveauId })
   }
 
   emit('update:modelValue', copie)
-  sportEnCours.value = ''
+  sportEnCours.value  = ''
   niveauEnCours.value = ''
 }
 
@@ -59,8 +63,8 @@ function retirer(index: number) {
     <!-- Sports déjà ajoutés -->
     <div v-if="modelValue.length > 0" class="sports-ajoutes">
       <div v-for="(entree, i) in modelValue" :key="i" class="sport-badge">
-        <span class="sport-nom">{{ entree.sport }}</span>
-        <span class="niveau-nom">{{ entree.niveau }}</span>
+        <span class="sport-nom">{{ nomSport(entree.sportId) }}</span>
+        <span class="niveau-nom">{{ nomNiveau(entree.niveauId) }}</span>
         <button type="button" class="btn-retirer" @click="retirer(i)" title="Retirer">×</button>
       </div>
     </div>
@@ -68,30 +72,26 @@ function retirer(index: number) {
 
     <!-- Ajout d'un sport -->
     <div class="ajout-sport">
-      <select
-        v-model="sportEnCours"
-        class="champ"
-        @change="onSportChange"
-      >
+      <select v-model="sportEnCours" class="champ" @change="onSportChange">
         <option value="">Choisir un sport</option>
-        <option v-for="sport in listeSports" :key="sport" :value="sport">{{ sport }}</option>
+        <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">
+          {{ sport.nom }}
+        </option>
       </select>
 
-      <select
-        v-model="niveauEnCours"
-        class="champ"
-        :disabled="!sportEnCours"
-      >
-        <option value="">{{ sportEnCours ? 'Choisir un niveau' : '— sélectionner un sport d\'abord —' }}</option>
-        <option v-for="niveau in niveauxDisponibles" :key="niveau" :value="niveau">
-          {{ niveau }}
+      <select v-model="niveauEnCours" class="champ" :disabled="sportEnCours === ''">
+        <option value="">
+          {{ sportEnCours !== '' ? 'Choisir un niveau' : '— sélectionner un sport d\'abord —' }}
+        </option>
+        <option v-for="niveau in niveauxDisponibles" :key="niveau.id" :value="niveau.id">
+          {{ niveau.libelle }}
         </option>
       </select>
 
       <button
         type="button"
         class="btn btn-primaire"
-        :disabled="!sportEnCours || !niveauEnCours"
+        :disabled="sportEnCours === '' || niveauEnCours === ''"
         @click="ajouter"
       >
         + Ajouter
