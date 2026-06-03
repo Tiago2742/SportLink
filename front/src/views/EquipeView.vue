@@ -4,8 +4,10 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   chargerEquipe,
+  demanderRejoindreEquipe,
   inviterMembre,
   rechercherJoueurs,
+  repondreAdhesionEquipe,
   retirerMembre,
 } from '@/services/api'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
@@ -29,6 +31,8 @@ const resultatsRecherche = ref<any[]>([])
 const rechercheEnCours = ref(false)
 const invitationEnCours = ref<number | null>(null)
 const annulationEnCours = ref<number | null>(null)
+const demandeEnCours = ref(false)
+const reponseDemandeEnCours = ref<number | null>(null)
 
 let debounceRecherche: ReturnType<typeof setTimeout> | null = null
 
@@ -39,6 +43,37 @@ const estProprietaire = computed(() => {
   const clubId = typeof club === 'object' ? club?.id : club
   return auth.utilisateur?.type === 'club' && clubId === auth.utilisateur?.id
 })
+
+const monMembre = computed(() =>
+  equipe.value?.membres?.find((m: any) => m.utilisateur?.id === auth.utilisateur?.id) ?? null,
+)
+
+const demandesEnAttente = computed(() =>
+  (equipe.value?.membres ?? []).filter(
+    (m: any) => m.origine === 'demande_joueur' && m.statut === 'en_attente',
+  ),
+)
+
+const membresAffichés = computed(() =>
+  (equipe.value?.membres ?? []).filter(
+    (m: any) =>
+      m.role === 'gestionnaire'
+      || m.statut === 'confirme'
+      || (m.statut === 'en_attente' && m.origine === 'invitation_club'),
+  ),
+)
+
+const peutDemanderRejoindre = computed(() => {
+  if (auth.utilisateur?.type !== 'joueur' || estProprietaire.value) return false
+  const m = monMembre.value
+  if (!m) return true
+  return m.statut === 'refuse'
+})
+
+const demandeJoueurEnAttente = computed(
+  () =>
+    monMembre.value?.origine === 'demande_joueur' && monMembre.value?.statut === 'en_attente',
+)
 
 onMounted(charger)
 
@@ -126,6 +161,50 @@ function dejaDansEquipe(joueurId: number): boolean {
       m.statut !== 'refuse',
   )
 }
+
+async function demanderRejoindre() {
+  demandeEnCours.value = true
+  erreur.value = ''
+  messageSucces.value = ''
+  try {
+    await demanderRejoindreEquipe(auth.token!, equipeId)
+    messageSucces.value = 'Demande envoyée au club.'
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Demande impossible.'
+  } finally {
+    demandeEnCours.value = false
+  }
+}
+
+async function annulerMaDemande() {
+  if (!monMembre.value) return
+  annulationEnCours.value = monMembre.value.id
+  erreur.value = ''
+  try {
+    await retirerMembre(auth.token!, equipeId, monMembre.value.id)
+    messageSucces.value = 'Demande annulée.'
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Annulation impossible.'
+  } finally {
+    annulationEnCours.value = null
+  }
+}
+
+async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') {
+  reponseDemandeEnCours.value = membreId
+  erreur.value = ''
+  try {
+    await repondreAdhesionEquipe(auth.token!, equipeId, membreId, statut)
+    messageSucces.value = statut === 'confirme' ? 'Joueur accepté.' : 'Demande refusée.'
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Action impossible.'
+  } finally {
+    reponseDemandeEnCours.value = null
+  }
+}
 </script>
 
 <template>
@@ -166,6 +245,83 @@ function dejaDansEquipe(joueurId: number): boolean {
         <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
         <div v-if="messageSucces" class="alerte alerte-succes">{{ messageSucces }}</div>
 
+        <section
+          v-if="auth.utilisateur?.type === 'joueur' && !estProprietaire"
+          class="carte section-demande-joueur"
+        >
+          <div class="section-titre-icone">
+            <span>🙋</span>
+            <h2>Rejoindre cette équipe</h2>
+          </div>
+          <p v-if="demandeJoueurEnAttente" class="demande-etat">
+            Votre demande est en attente de validation par le club.
+          </p>
+          <p v-else-if="monMembre?.statut === 'confirme'" class="demande-etat">
+            Vous êtes membre de cette équipe.
+          </p>
+          <div class="demande-actions">
+            <button
+              v-if="peutDemanderRejoindre"
+              class="btn btn-primaire"
+              :disabled="demandeEnCours"
+              @click="demanderRejoindre"
+            >
+              Demander à rejoindre
+            </button>
+            <button
+              v-if="demandeJoueurEnAttente"
+              class="btn btn-secondaire"
+              :disabled="annulationEnCours === monMembre?.id"
+              @click="annulerMaDemande"
+            >
+              Annuler ma demande
+            </button>
+          </div>
+          <p class="inviter-aide">
+            Une seule équipe par sport (confirmée ou en attente).
+            <RouterLink to="/mes-equipes-joueur?onglet=trouver" class="lien-espace">
+              Gérer dans Mes équipes
+            </RouterLink>
+          </p>
+        </section>
+
+        <section
+          v-if="estProprietaire && demandesEnAttente.length"
+          class="carte section-demandes"
+        >
+          <div class="section-titre-icone">
+            <span>📥</span>
+            <h2>Demandes en attente</h2>
+            <span class="membres-count">{{ demandesEnAttente.length }}</span>
+          </div>
+          <ul class="liste-demandes">
+            <li v-for="demande in demandesEnAttente" :key="demande.id" class="ligne-demande">
+              <div class="demande-joueur">
+                <span class="membre-avatar membre-avatar-sm">
+                  {{ initialesUtilisateur(demande.utilisateur) }}
+                </span>
+                <strong>{{ nomAffichage(demande.utilisateur) }}</strong>
+              </div>
+              <div class="demande-boutons">
+                <button
+                  class="btn btn-primaire btn-compact"
+                  :disabled="reponseDemandeEnCours === demande.id"
+                  @click="repondreDemande(demande.id, 'confirme')"
+                >
+                  Accepter
+                </button>
+                <button
+                  class="btn btn-secondaire btn-compact"
+                  :disabled="reponseDemandeEnCours === demande.id"
+                  @click="repondreDemande(demande.id, 'refuse')"
+                >
+                  Refuser
+                </button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <section v-if="estProprietaire" class="carte section-inviter">
           <div class="section-titre-icone">
             <span>✉️</span>
@@ -203,17 +359,17 @@ function dejaDansEquipe(joueurId: number): boolean {
             <span>👥</span>
             <h2>Membres de l'équipe</h2>
             <span class="membres-count">
-              {{ equipe.membres?.length ?? 0 }} membre{{ (equipe.membres?.length ?? 0) > 1 ? 's' : '' }}
+              {{ membresAffichés.length }} membre{{ membresAffichés.length > 1 ? 's' : '' }}
             </span>
           </div>
 
-          <div v-if="!equipe.membres?.length" class="vide-section">
+          <div v-if="!membresAffichés.length" class="vide-section">
             Aucun membre pour le moment.
           </div>
 
           <div v-else class="grille-membres">
             <div
-              v-for="membre in equipe.membres"
+              v-for="membre in membresAffichés"
               :key="membre.id"
               class="carte-membre"
             >
@@ -363,6 +519,8 @@ function dejaDansEquipe(joueurId: number): boolean {
   gap: var(--espace-l);
 }
 
+.section-demande-joueur,
+.section-demandes,
 .section-inviter,
 .section-membres,
 .section-calendrier,
@@ -370,10 +528,66 @@ function dejaDansEquipe(joueurId: number): boolean {
   padding: var(--espace-l);
 }
 
+.demande-etat {
+  font-size: 0.9rem;
+  margin-bottom: var(--espace-m);
+}
+
+.demande-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espace-s);
+  margin-bottom: var(--espace-s);
+}
+
+.liste-demandes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+}
+
+.ligne-demande {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--espace-m);
+  padding: var(--espace-m);
+  background: var(--couleur-fond);
+  border-radius: var(--rayon-carte);
+}
+
+.demande-joueur {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-s);
+}
+
+.demande-boutons {
+  display: flex;
+  gap: var(--espace-s);
+}
+
+.membre-avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 0.85rem;
+}
+
 .inviter-aide {
   font-size: 0.88rem;
   color: var(--couleur-texte-discret);
   margin-bottom: var(--espace-m);
+}
+
+.lien-espace {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--couleur-primaire);
+  font-size: 0.85rem;
 }
 
 .champ-recherche {

@@ -1,11 +1,28 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import BadgeCompteur from '@/components/ui/BadgeCompteur.vue'
+import { useEspaceEquipesJoueur } from '@/composables/useEspaceEquipesJoueur'
 
 const auth = useAuthStore()
 const router = useRouter()
 const menuOuvert = ref(false)
+const { nbInvitations, rafraichirCompteurInvitations } = useEspaceEquipesJoueur()
+
+onMounted(() => {
+  if (auth.estConnecte && auth.utilisateur?.type === 'joueur') {
+    rafraichirCompteurInvitations()
+  }
+})
+
+watch(
+  () => auth.estConnecte && auth.utilisateur?.type === 'joueur',
+  (ok) => {
+    if (ok) rafraichirCompteurInvitations()
+    else nbInvitations.value = 0
+  },
+)
 
 function deconnecter() {
   auth.seDeconnecter()
@@ -42,10 +59,11 @@ function deconnecter() {
         </RouterLink>
         <RouterLink
           v-if="auth.utilisateur?.type === 'joueur'"
-          to="/invitations-equipes"
+          to="/mes-equipes-joueur"
           @click="menuOuvert = false"
         >
-          Invitations équipe
+          Mes équipes
+          <BadgeCompteur :nombre="nbInvitations" />
         </RouterLink>
         <RouterLink to="/rechercher" @click="menuOuvert = false">Rechercher</RouterLink>
         <RouterLink to="/creer-match" @click="menuOuvert = false">Créer un match</RouterLink>
@@ -111,6 +129,8 @@ function deconnecter() {
 }
 
 .nav-liens a {
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
   color: #444;
   font-size: 0.9rem;

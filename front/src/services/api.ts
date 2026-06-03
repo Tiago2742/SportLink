@@ -138,21 +138,39 @@ export const supprimerEquipe = (token: string, id: number) =>
 export const inviterMembre = (token: string, equipeId: number, utilisateurId: number) =>
   requete('POST', `/equipes/${equipeId}/membres`, { utilisateur_id: utilisateurId }, token)
 
+/** Demande d'adhésion joueur → club (POST membres sans utilisateur_id). */
+export const demanderRejoindreEquipe = (token: string, equipeId: number) =>
+  requete('POST', `/equipes/${equipeId}/membres`, {}, token)
+
 /** @deprecated Utiliser inviterMembre */
 export const ajouterMembre = inviterMembre
 
-export const repondreInvitationEquipe = (
+/** Réponse à une invitation (joueur) ou à une demande (club). */
+export const repondreAdhesionEquipe = (
   token: string,
   equipeId: number,
   membreId: number,
   statut: 'confirme' | 'refuse',
 ) => requete('PATCH', `/equipes/${equipeId}/membres/${membreId}`, { statut }, token)
 
+/** @deprecated Utiliser repondreAdhesionEquipe */
+export const repondreInvitationEquipe = repondreAdhesionEquipe
+
 export const retirerMembre = (token: string, equipeId: number, membreId: number) =>
   requete('DELETE', `/equipes/${equipeId}/membres/${membreId}`, null, token)
 
 export const chargerInvitationsEquipes = (token: string) =>
   requete('GET', '/invitations-equipes', null, token)
+
+export interface EspaceEquipesJoueur {
+  mesEquipes: unknown[]
+  invitations: unknown[]
+  demandes: unknown[]
+  nbInvitations: number
+}
+
+export const chargerEspaceEquipesJoueur = (token: string): Promise<EspaceEquipesJoueur> =>
+  requete('GET', '/joueur/espace-equipes', null, token)
 
 export const rechercherJoueurs = (token: string, q: string) =>
   requete('GET', '/joueurs/recherche' + construireParams({ q }), null, token)

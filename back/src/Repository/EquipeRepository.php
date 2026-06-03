@@ -19,6 +19,7 @@ class EquipeRepository extends ServiceEntityRepository
         ?int    $niveauId     = null,
         ?string $localisation = null,
         ?int    $clubId       = null,
+        ?string $nom          = null,
     ): array {
         $qb = $this->createQueryBuilder('e')
             ->addSelect('s', 'n', 'c')
@@ -44,6 +45,11 @@ class EquipeRepository extends ServiceEntityRepository
         if ($clubId) {
             $qb->andWhere('c.id = :clubId')
                ->setParameter('clubId', $clubId);
+        }
+
+        if ($nom !== null && trim($nom) !== '') {
+            $qb->andWhere('LOWER(e.nom) LIKE LOWER(:nom)')
+               ->setParameter('nom', '%' . trim($nom) . '%');
         }
 
         return $qb->orderBy('e.id', 'DESC')->getQuery()->getResult();

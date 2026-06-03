@@ -72,4 +72,56 @@ class EquipeJoueurRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /** @return EquipeJoueur[] */
+    public function trouverAdhesionsConfirmeesPourJoueur(Utilisateur $joueur): array
+    {
+        return $this->createQueryBuilder('ej')
+            ->addSelect('eq', 's', 'n', 'c')
+            ->innerJoin('ej.equipe', 'eq')
+            ->innerJoin('eq.sport', 's')
+            ->leftJoin('eq.niveau', 'n')
+            ->innerJoin('eq.club', 'c')
+            ->andWhere('ej.utilisateur = :joueur')
+            ->andWhere('ej.statut = :statut')
+            ->andWhere('ej.role = :role')
+            ->setParameter('joueur', $joueur)
+            ->setParameter('statut', StatutMembreEquipe::Confirme->value)
+            ->setParameter('role', \App\Enum\RoleEquipe::Joueur->value)
+            ->orderBy('eq.nom', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /** @return EquipeJoueur[] */
+    public function trouverDemandesJoueurPourJoueur(Utilisateur $joueur): array
+    {
+        return $this->createQueryBuilder('ej')
+            ->addSelect('eq', 's', 'n', 'c')
+            ->innerJoin('ej.equipe', 'eq')
+            ->innerJoin('eq.sport', 's')
+            ->leftJoin('eq.niveau', 'n')
+            ->innerJoin('eq.club', 'c')
+            ->andWhere('ej.utilisateur = :joueur')
+            ->andWhere('ej.origine = :origine')
+            ->setParameter('joueur', $joueur)
+            ->setParameter('origine', \App\Enum\OrigineMembreEquipe::DemandeJoueur->value)
+            ->orderBy('ej.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function compterInvitationsEnAttentePourJoueur(Utilisateur $joueur): int
+    {
+        return (int) $this->createQueryBuilder('ej')
+            ->select('COUNT(ej.id)')
+            ->andWhere('ej.utilisateur = :joueur')
+            ->andWhere('ej.statut = :statut')
+            ->andWhere('ej.origine = :origine')
+            ->setParameter('joueur', $joueur)
+            ->setParameter('statut', StatutMembreEquipe::EnAttente->value)
+            ->setParameter('origine', \App\Enum\OrigineMembreEquipe::InvitationClub->value)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

@@ -1,42 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
+import { ref } from 'vue'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { chargerInvitationsEquipes, repondreInvitationEquipe } from '@/services/api'
+import { repondreAdhesionEquipe } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import { nomAffichage } from '@/utils/nomAffichage'
 
-const auth = useAuthStore()
+defineProps<{
+  invitations: any[]
+  chargement: boolean
+}>()
 
-const invitations = ref<any[]>([])
-const chargement = ref(true)
+const emit = defineEmits<{
+  actualiser: []
+}>()
+
+const auth = useAuthStore()
 const erreur = ref('')
 const actionEnCours = ref<number | null>(null)
-
-onMounted(charger)
-
-async function charger() {
-  chargement.value = true
-  erreur.value = ''
-  try {
-    invitations.value = await chargerInvitationsEquipes(auth.token!)
-  } catch {
-    erreur.value = 'Impossible de charger vos invitations.'
-  } finally {
-    chargement.value = false
-  }
-}
 
 async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
   actionEnCours.value = invitation.id
   erreur.value = ''
   try {
-    await repondreInvitationEquipe(
+    await repondreAdhesionEquipe(
       auth.token!,
       invitation.equipe.id,
       invitation.id,
       statut,
     )
-    invitations.value = invitations.value.filter((i) => i.id !== invitation.id)
+    emit('actualiser')
   } catch (e: any) {
     erreur.value = e.message || 'Action impossible.'
   } finally {
@@ -46,20 +38,12 @@ async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
 </script>
 
 <template>
-  <div class="page-invitations conteneur">
-    <div class="entete-page">
-      <h1>Invitations d'équipe</h1>
-      <p class="sous-titre">Les clubs qui vous invitent — une équipe par sport maximum</p>
-    </div>
-
+  <div class="onglet-invitations">
+    <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
     <div v-if="chargement" class="chargement">Chargement...</div>
-    <div v-else-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
-
-    <div v-else-if="invitations.length === 0" class="carte vide-centre">
+    <div v-else-if="!invitations.length" class="carte vide-centre">
       <p>Aucune invitation en attente.</p>
-      <RouterLink to="/" class="btn btn-secondaire">Retour à l'accueil</RouterLink>
     </div>
-
     <div v-else class="liste-invitations">
       <article v-for="inv in invitations" :key="inv.id" class="carte carte-invitation">
         <div class="invitation-haut">
@@ -100,25 +84,6 @@ async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
 </template>
 
 <style scoped>
-.page-invitations {
-  padding-top: var(--espace-xl);
-  padding-bottom: var(--espace-xxl);
-}
-
-.entete-page {
-  margin-bottom: var(--espace-xl);
-}
-
-.entete-page h1 {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.sous-titre {
-  color: var(--couleur-texte-discret);
-  font-size: 0.9rem;
-}
-
 .liste-invitations {
   display: flex;
   flex-direction: column;
@@ -160,9 +125,5 @@ async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
 .vide-centre {
   text-align: center;
   padding: var(--espace-xl);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--espace-m);
 }
 </style>

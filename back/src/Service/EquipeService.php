@@ -153,25 +153,95 @@ class EquipeService
         return $membreEquipe;
     }
 
+    /**
+     * Demande d'adhésion joueur → club (étape 3).
+     */
+    public function demanderAdhesion(Equipe $equipe, Utilisateur $joueur): EquipeJoueur
+    {
+        if ($joueur->getType() !== TypeUtilisateur::Joueur) {
+            throw new \InvalidArgumentException('Seul un compte joueur peut demander à rejoindre une équipe.');
+        }
+
+        if ($equipe->getClub() === $joueur) {
+            throw new \InvalidArgumentException('Vous ne pouvez pas demander à rejoindre une équipe que vous gérez.');
+        }
+
+        foreach ($equipe->getMembres() as $membre) {
+            if ($membre->getUtilisateur() !== $joueur) {
+                continue;
+            }
+
+            if ($membre->getStatut() === StatutMembreEquipe::Refuse) {
+                $this->verifierUneEquipeParSport($joueur, $equipe->getSport(), $equipe);
+
+                $membre->setStatut(StatutMembreEquipe::EnAttente);
+                $membre->setOrigine(OrigineMembreEquipe::DemandeJoueur);
+                $membre->setRole(RoleEquipe::Joueur);
+                $this->em->flush();
+
+                return $membre;
+            }
+
+            if ($membre->getStatut() === StatutMembreEquipe::EnAttente) {
+                throw new \InvalidArgumentException('Une demande est déjà en attente pour cette équipe.');
+            }
+
+            throw new \InvalidArgumentException('Vous faites déjà partie de cette équipe.');
+        }
+
+        $this->verifierUneEquipeParSport($joueur, $equipe->getSport(), $equipe);
+
+        $membreEquipe = new EquipeJoueur();
+        $membreEquipe->setUtilisateur($joueur);
+        $membreEquipe->setEquipe($equipe);
+        $membreEquipe->setRole(RoleEquipe::Joueur);
+        $membreEquipe->setStatut(StatutMembreEquipe::EnAttente);
+        $membreEquipe->setOrigine(OrigineMembreEquipe::DemandeJoueur);
+
+        $this->em->persist($membreEquipe);
+        $this->em->flush();
+
+        return $membreEquipe;
+    }
+
+    /**
+     * Réponse à une adhésion en attente (invitation club par le joueur, demande par le club).
+     */
+    public function repondreAdhesion(
+        EquipeJoueur $membre,
+        StatutMembreEquipe $nouveauStatut,
+        Utilisateur $acteur,
+    ): EquipeJoueur {
+        if ($membre->getStatut() !== StatutMembreEquipe::EnAttente) {
+            throw new \InvalidArgumentException('Cette adhésion n\'est plus en attente de réponse.');
+        }
+
+        if ($nouveauStatut === StatutMembreEquipe::EnAttente) {
+            throw new \InvalidArgumentException('Statut invalide. Valeurs acceptées : confirme, refuse.');
+        }
+
+        return match ($membre->getOrigine()) {
+            OrigineMembreEquipe::InvitationClub => $this->repondreInvitationClub($membre, $nouveauStatut, $acteur),
+            OrigineMembreEquipe::DemandeJoueur => $this->repondreDemandeJoueur($membre, $nouveauStatut, $acteur),
+        };
+    }
+
+    /** @deprecated Utiliser repondreAdhesion */
     public function repondreInvitation(
+        EquipeJoueur $membre,
+        StatutMembreEquipe $nouveauStatut,
+        Utilisateur $joueur,
+    ): EquipeJoueur {
+        return $this->repondreAdhesion($membre, $nouveauStatut, $joueur);
+    }
+
+    private function repondreInvitationClub(
         EquipeJoueur $membre,
         StatutMembreEquipe $nouveauStatut,
         Utilisateur $joueur,
     ): EquipeJoueur {
         if ($membre->getUtilisateur() !== $joueur) {
             throw new \InvalidArgumentException('Seul le joueur invité peut répondre à cette invitation.');
-        }
-
-        if ($membre->getStatut() !== StatutMembreEquipe::EnAttente) {
-            throw new \InvalidArgumentException('Cette invitation n\'est plus en attente de réponse.');
-        }
-
-        if ($membre->getOrigine() !== OrigineMembreEquipe::InvitationClub) {
-            throw new \InvalidArgumentException('Cette adhésion ne provient pas d\'une invitation de club.');
-        }
-
-        if ($nouveauStatut === StatutMembreEquipe::EnAttente) {
-            throw new \InvalidArgumentException('Statut invalide. Valeurs acceptées : confirme, refuse.');
         }
 
         if ($nouveauStatut === StatutMembreEquipe::Confirme) {
@@ -184,18 +254,69 @@ class EquipeService
         return $membre;
     }
 
-    public function annulerInvitation(EquipeJoueur $membre, Utilisateur $club): void
-    {
+    private function repondreDemandeJoueur(
+        EquipeJoueur $membre,
+        StatutMembreEquipe $nouveauStatut,
+        Utilisateur $club,
+    ): EquipeJoueur {
+        if ($club->getType() !== TypeUtilisateur::Club) {
+            throw new \InvalidArgumentException('Seul le club propriétaire peut répondre à cette demande.');
+        }
+
         if ($membre->getEquipe()->getClub() !== $club) {
             throw new \InvalidArgumentException('Accès refusé.');
+        }
+
+        if ($nouveauStatut === StatutMembreEquipe::Confirme) {
+            $this->verifierUneEquipeParSport(
+                $membre->getUtilisateur(),
+                $membre->getEquipe()->getSport(),
+                $membre->getEquipe(),
+            );
+        }
+
+        $membre->setStatut($nouveauStatut);
+        $this->em->flush();
+
+        return $membre;
+    }
+
+    /**
+     * Annule une adhésion en attente (invitation club ou demande joueur).
+     */
+    public function annulerAdhesionEnAttente(EquipeJoueur $membre, Utilisateur $acteur): void
+    {
+        if ($membre->getStatut() !== StatutMembreEquipe::EnAttente) {
+            throw new \InvalidArgumentException('Seule une adhésion en attente peut être annulée.');
         }
 
         if ($membre->getRole() === RoleEquipe::Gestionnaire) {
             throw new \InvalidArgumentException('Impossible de retirer le gestionnaire de l\'équipe.');
         }
 
+        $equipe = $membre->getEquipe();
+
+        $peutAnnuler = match ($membre->getOrigine()) {
+            OrigineMembreEquipe::InvitationClub =>
+                $acteur->getType() === TypeUtilisateur::Club && $equipe->getClub() === $acteur,
+            OrigineMembreEquipe::DemandeJoueur =>
+                ($acteur->getType() === TypeUtilisateur::Club && $equipe->getClub() === $acteur)
+                || $membre->getUtilisateur() === $acteur,
+            default => false,
+        };
+
+        if (!$peutAnnuler) {
+            throw new \InvalidArgumentException('Accès refusé.');
+        }
+
         $this->em->remove($membre);
         $this->em->flush();
+    }
+
+    /** @deprecated Utiliser annulerAdhesionEnAttente */
+    public function annulerInvitation(EquipeJoueur $membre, Utilisateur $club): void
+    {
+        $this->annulerAdhesionEnAttente($membre, $club);
     }
 
     /** @return EquipeJoueur[] */
@@ -206,6 +327,37 @@ class EquipeService
         }
 
         return $this->equipeJoueurRepository->trouverInvitationsEnAttentePourJoueur($joueur);
+    }
+
+    /**
+     * Espace équipe joueur (mes équipes, invitations, demandes).
+     *
+     * @return array{
+     *     mesEquipes: EquipeJoueur[],
+     *     invitations: EquipeJoueur[],
+     *     demandes: EquipeJoueur[],
+     *     nbInvitations: int,
+     * }
+     */
+    public function listerEspaceJoueur(Utilisateur $joueur): array
+    {
+        if ($joueur->getType() !== TypeUtilisateur::Joueur) {
+            return [
+                'mesEquipes'    => [],
+                'invitations'   => [],
+                'demandes'      => [],
+                'nbInvitations' => 0,
+            ];
+        }
+
+        $invitations = $this->equipeJoueurRepository->trouverInvitationsEnAttentePourJoueur($joueur);
+
+        return [
+            'mesEquipes'    => $this->equipeJoueurRepository->trouverAdhesionsConfirmeesPourJoueur($joueur),
+            'invitations'   => $invitations,
+            'demandes'      => $this->equipeJoueurRepository->trouverDemandesJoueurPourJoueur($joueur),
+            'nbInvitations' => count($invitations),
+        ];
     }
 
     private function verifierUneEquipeParSport(

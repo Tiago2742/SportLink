@@ -57,10 +57,17 @@ const router = createRouter({
       meta: { requiertAuth: true, requiertClub: true },
     },
     {
-      path: '/invitations-equipes',
-      name: 'invitations-equipes',
-      component: () => import('@/views/InvitationsEquipesView.vue'),
+      path: '/mes-equipes-joueur',
+      name: 'mes-equipes-joueur',
+      component: () => import('@/views/MesEquipesJoueurView.vue'),
       meta: { requiertAuth: true, requiertJoueur: true },
+    },
+    {
+      path: '/invitations-equipes',
+      redirect: (to) => ({
+        path: '/mes-equipes-joueur',
+        query: { ...to.query, onglet: 'invitations' },
+      }),
     },
     {
       path: '/equipes/:id',

@@ -6,6 +6,8 @@ use App\Entity\Equipe;
 use App\Entity\EquipeJoueur;
 use App\Entity\Sport;
 use App\Entity\Utilisateur;
+use App\Enum\OrigineMembreEquipe;
+use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeJoueurRepository;
@@ -68,6 +70,51 @@ class EquipeServiceTest extends TestCase
         $this->expectExceptionMessage('fait déjà partie');
 
         $this->service->inviterJoueur($equipe, 1, $club);
+    }
+
+    public function testDemanderAdhesionSucces(): void
+    {
+        $club = $this->creerClub();
+        $joueur = $this->creerJoueur();
+        $equipe = new Equipe();
+        $equipe->setClub($club);
+        $sport = new Sport();
+        $sport->setType(TypeSport::Collectif);
+        $equipe->setSport($sport);
+
+        $this->equipeJoueurRepository->method('aAdhesionActiveSurSport')->willReturn(false);
+        $this->em->expects($this->once())->method('persist')->with($this->isInstanceOf(EquipeJoueur::class));
+        $this->em->expects($this->once())->method('flush');
+
+        $membre = $this->service->demanderAdhesion($equipe, $joueur);
+
+        $this->assertSame($joueur, $membre->getUtilisateur());
+        $this->assertEquals(StatutMembreEquipe::EnAttente, $membre->getStatut());
+        $this->assertEquals(OrigineMembreEquipe::DemandeJoueur, $membre->getOrigine());
+    }
+
+    public function testRepondreDemandeJoueur_ParLeClub(): void
+    {
+        $club = $this->creerClub();
+        $joueur = $this->creerJoueur();
+        $sport = new Sport();
+        $sport->setType(TypeSport::Collectif);
+        $equipe = new Equipe();
+        $equipe->setClub($club);
+        $equipe->setSport($sport);
+
+        $membre = new EquipeJoueur();
+        $membre->setUtilisateur($joueur);
+        $membre->setEquipe($equipe);
+        $membre->setStatut(StatutMembreEquipe::EnAttente);
+        $membre->setOrigine(OrigineMembreEquipe::DemandeJoueur);
+
+        $this->equipeJoueurRepository->method('aAdhesionActiveSurSport')->willReturn(false);
+        $this->em->expects($this->once())->method('flush');
+
+        $resultat = $this->service->repondreAdhesion($membre, StatutMembreEquipe::Confirme, $club);
+
+        $this->assertEquals(StatutMembreEquipe::Confirme, $resultat->getStatut());
     }
 
     public function testRetirerMembre(): void

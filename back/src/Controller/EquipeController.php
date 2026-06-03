@@ -38,6 +38,7 @@ class EquipeController extends AbstractController
             $request->query->getInt('niveauId') ?: null,
             $request->query->get('localisation'),
             $request->query->getInt('clubId') ?: null,
+            $request->query->get('nom'),
         );
 
         return $this->json($equipes, 200, [], ['groups' => self::GROUPES_LIST]);
@@ -157,21 +158,26 @@ class EquipeController extends AbstractController
 
     // ---- Membres ------------------------------------------------------------
 
-    #[Route('/{id}/membres', name: 'api_equipes_inviter_membre', methods: ['POST'])]
-    public function inviterMembre(Request $request, Equipe $equipe): JsonResponse
+    #[Route('/{id}/membres', name: 'api_equipes_membre_ajouter', methods: ['POST'])]
+    public function ajouterMembre(Request $request, Equipe $equipe): JsonResponse
     {
         $moi = $this->getUser();
-        if ($moi->getType() !== TypeUtilisateur::Club || $equipe->getClub() !== $moi) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
-
-        $donnees = json_decode($request->getContent(), true);
-        if (!\is_array($donnees) || empty($donnees['utilisateur_id'])) {
-            return $this->json(['erreur' => 'Le champ "utilisateur_id" est requis.'], 400);
-        }
+        $donnees = json_decode($request->getContent(), true) ?? [];
 
         try {
-            $membre = $this->equipeService->inviterJoueur($equipe, (int) $donnees['utilisateur_id'], $moi);
+            if ($moi->getType() === TypeUtilisateur::Club && $equipe->getClub() === $moi) {
+                if (empty($donnees['utilisateur_id'])) {
+                    return $this->json(['erreur' => 'Le champ "utilisateur_id" est requis pour inviter un joueur.'], 400);
+                }
+                $membre = $this->equipeService->inviterJoueur($equipe, (int) $donnees['utilisateur_id'], $moi);
+            } elseif ($moi->getType() === TypeUtilisateur::Joueur) {
+                if (!empty($donnees['utilisateur_id']) && (int) $donnees['utilisateur_id'] !== $moi->getId()) {
+                    return $this->json(['erreur' => 'Accès refusé.'], 403);
+                }
+                $membre = $this->equipeService->demanderAdhesion($equipe, $moi);
+            } else {
+                return $this->json(['erreur' => 'Accès refusé.'], 403);
+            }
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
@@ -200,7 +206,7 @@ class EquipeController extends AbstractController
         }
 
         try {
-            $membre = $this->equipeService->repondreInvitation($membre, $nouveauStatut, $this->getUser());
+            $membre = $this->equipeService->repondreAdhesion($membre, $nouveauStatut, $this->getUser());
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
@@ -219,11 +225,7 @@ class EquipeController extends AbstractController
         }
 
         try {
-            if ($moi->getType() === TypeUtilisateur::Club && $equipe->getClub() === $moi) {
-                $this->equipeService->annulerInvitation($membre, $moi);
-            } else {
-                return $this->json(['erreur' => 'Accès refusé.'], 403);
-            }
+            $this->equipeService->annulerAdhesionEnAttente($membre, $moi);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
