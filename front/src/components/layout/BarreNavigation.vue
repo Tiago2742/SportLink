@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import LogoSportLink from '@/components/brand/LogoSportLink.vue'
 import BadgeCompteur from '@/components/ui/BadgeCompteur.vue'
 import { useEspaceEquipesJoueur } from '@/composables/useEspaceEquipesJoueur'
 
@@ -33,12 +34,8 @@ function deconnecter() {
 <template>
   <nav class="barre-nav">
     <div class="nav-interieur">
-      <RouterLink to="/" class="nav-logo">
-        <span class="logo-emoji">⚽</span>
-        <span class="logo-texte">
-          <strong>SportLink</strong>
-          <small>Connectez équipes &amp; joueurs</small>
-        </span>
+      <RouterLink to="/" class="nav-logo" aria-label="SportLink — accueil">
+        <LogoSportLink variant="complet" taille="nav" />
       </RouterLink>
 
       <button class="btn-menu-mobile" @click="menuOuvert = !menuOuvert" aria-label="Menu">
@@ -76,12 +73,12 @@ function deconnecter() {
 
 <style scoped>
 .barre-nav {
-  background: white;
+  background: var(--couleur-fond-blanc);
   border-bottom: 1px solid var(--couleur-bordure);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--ombre-carte);
 }
 
 .nav-interieur {
@@ -91,35 +88,16 @@ function deconnecter() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  min-height: 68px;
+  height: 68px;
 }
 
 .nav-logo {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
   text-decoration: none;
-  color: var(--couleur-texte);
-}
-
-.logo-emoji {
-  font-size: 1.6rem;
-}
-
-.logo-texte {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.1;
-}
-
-.logo-texte strong {
-  font-size: 1rem;
-  color: var(--couleur-primaire);
-}
-
-.logo-texte small {
-  font-size: 0.65rem;
-  color: var(--couleur-texte-discret);
+  flex-shrink: 0;
+  padding: 0.35rem 0;
 }
 
 .nav-liens {
@@ -132,8 +110,9 @@ function deconnecter() {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
-  color: #444;
+  color: var(--couleur-texte);
   font-size: 0.9rem;
+  font-weight: 500;
   padding: 0.2rem 0;
   border-bottom: 2px solid transparent;
   transition:
@@ -194,7 +173,7 @@ function deconnecter() {
   .nav-liens {
     display: none;
     position: absolute;
-    top: 64px;
+    top: 68px;
     left: 0;
     right: 0;
     background: white;

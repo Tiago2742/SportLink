@@ -1,4 +1,6 @@
 :root {
+  /* —— Charte vert / blanc (hiérarchie par nuances de vert) —— */
+  --couleur-titre: #1b5e20;
   --couleur-primaire: #2e7d32;
   --couleur-primaire-claire: #4caf50;
   --couleur-primaire-tres-claire: #e8f5e9;
@@ -6,11 +8,18 @@
   --couleur-bouton-survol: #2e7d32;
   --couleur-bouton-texte: #ffffff;
 
-  --couleur-fond: #f5f5f5;
+  /* Accent lime — call-to-action principaux */
+  --couleur-accent: #9ae600;
+  --couleur-accent-fonce: #7ccf00;
+  --couleur-accent-texte: #1a3300;
+  --couleur-accent-fond: #f4ffe0;
+
+  --couleur-fond: #ffffff;
   --couleur-fond-blanc: #ffffff;
+  --couleur-fond-section: #e8f5e9;
   --couleur-texte: #212121;
   --couleur-texte-discret: #757575;
-  --couleur-bordure: #e0e0e0;
+  --couleur-bordure: #e0e8e0;
 
   --couleur-confirme: #2e7d32;
   --couleur-confirme-fond: #e8f5e9;
@@ -21,19 +30,73 @@
   --couleur-info: #1565c0;
   --couleur-info-fond: #e3f2fd;
 
-  --ombre-carte: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --ombre-carte-survol: 0 4px 12px rgba(0, 0, 0, 0.15);
+  /* —— Dégradés verts —— */
+  --degrade-primaire: linear-gradient(
+    135deg,
+    var(--couleur-bouton) 0%,
+    var(--couleur-primaire-claire) 52%,
+    var(--couleur-accent-fonce) 100%
+  );
+  --degrade-primaire-survol: linear-gradient(
+    135deg,
+    var(--couleur-bouton-survol) 0%,
+    #43a047 48%,
+    var(--couleur-accent) 100%
+  );
+  --degrade-entete: linear-gradient(
+    118deg,
+    #1b5e20 0%,
+    var(--couleur-primaire) 42%,
+    var(--couleur-accent-fonce) 100%
+  );
+  --degrade-avatar: linear-gradient(
+    145deg,
+    var(--couleur-primaire-tres-claire) 0%,
+    #ffffff 45%,
+    var(--couleur-accent-fond) 100%
+  );
+  --degrade-surface: linear-gradient(180deg, #ffffff 0%, var(--couleur-fond) 100%);
 
-  --rayon-bouton: 6px;
-  --rayon-carte: 8px;
+  /* —— Ombres —— */
+  --ombre-carte: 0 2px 8px rgba(27, 94, 32, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --ombre-carte-survol: 0 14px 32px rgba(27, 94, 32, 0.14), 0 4px 10px rgba(0, 0, 0, 0.06);
+  --ombre-bouton: 0 4px 14px rgba(46, 125, 50, 0.28);
+  --ombre-bouton-survol: 0 8px 22px rgba(46, 125, 50, 0.38);
+  --ombre-focus: 0 0 0 3px rgba(154, 230, 0, 0.35);
+
+  /* —— Rayons —— */
+  --rayon-bouton: 8px;
+  --rayon-carte: 14px;
   --rayon-badge: 20px;
+  --rayon-champ: 8px;
 
+  /* —— Espacements —— */
   --espace-xs: 0.25rem;
   --espace-s: 0.5rem;
   --espace-m: 1rem;
   --espace-l: 1.5rem;
   --espace-xl: 2rem;
   --espace-xxl: 3rem;
+
+  /* —— Typographie titres —— */
+  --texte-h1-taille: 1.75rem;
+  --texte-h1-graisse: 800;
+  --texte-h1-interligne: 1.15;
+  --texte-h1-tracking: -0.025em;
+
+  --texte-h2-taille: 1.25rem;
+  --texte-h2-graisse: 700;
+  --texte-h2-interligne: 1.25;
+  --texte-h2-tracking: -0.02em;
+
+  --texte-h3-taille: 1.05rem;
+  --texte-h3-graisse: 700;
+  --texte-h3-interligne: 1.3;
+  --texte-h3-tracking: -0.01em;
+
+  /* —— Motion —— */
+  --transition-interaction: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-rapide: 0.15s ease;
 }
 
 *,
@@ -59,4 +122,28 @@ body {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  font-size: var(--texte-h1-taille);
+  font-weight: var(--texte-h1-graisse);
+  line-height: var(--texte-h1-interligne);
+  letter-spacing: var(--texte-h1-tracking);
+  color: var(--couleur-titre);
+}
+
+h2 {
+  font-size: var(--texte-h2-taille);
+  font-weight: var(--texte-h2-graisse);
+  line-height: var(--texte-h2-interligne);
+  letter-spacing: var(--texte-h2-tracking);
+  color: var(--couleur-titre);
+}
+
+h3 {
+  font-size: var(--texte-h3-taille);
+  font-weight: var(--texte-h3-graisse);
+  line-height: var(--texte-h3-interligne);
+  letter-spacing: var(--texte-h3-tracking);
+  color: var(--couleur-titre);
 }

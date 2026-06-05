@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerMesMatchs } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
+import { MapPin, Trophy } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -139,11 +141,21 @@ function formaterDate(dateStr: string) {
               @click="router.push(`/matchs/${match.id}`)"
             >
               <div class="ligne-gauche">
-                <div class="ligne-sport-icone">🏟️</div>
+                <div class="ligne-sport-icone" aria-hidden="true">
+                  <Trophy :size="20" stroke-width="2" />
+                </div>
                 <div class="ligne-info">
                   <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
                   <span>{{ formaterDate(match.dateMatch) }}</span>
-                  <span v-if="match.lieu" class="ligne-lieu">📍 {{ match.lieu }}</span>
+                  <IconeLigne
+                    v-if="match.lieu"
+                    :icone="MapPin"
+                    :taille="14"
+                    discret
+                    class="ligne-lieu"
+                  >
+                    {{ match.lieu }}
+                  </IconeLigne>
                 </div>
               </div>
               <div class="ligne-droite">
@@ -164,11 +176,21 @@ function formaterDate(dateStr: string) {
               @click="router.push(`/matchs/${match.id}`)"
             >
               <div class="ligne-gauche">
-                <div class="ligne-sport-icone passé">🏟️</div>
+                <div class="ligne-sport-icone passé" aria-hidden="true">
+                  <Trophy :size="20" stroke-width="2" />
+                </div>
                 <div class="ligne-info">
                   <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
                   <span>{{ formaterDate(match.dateMatch) }}</span>
-                  <span v-if="match.lieu" class="ligne-lieu">📍 {{ match.lieu }}</span>
+                  <IconeLigne
+                    v-if="match.lieu"
+                    :icone="MapPin"
+                    :taille="14"
+                    discret
+                    class="ligne-lieu"
+                  >
+                    {{ match.lieu }}
+                  </IconeLigne>
                 </div>
               </div>
               <div class="ligne-droite">
@@ -190,11 +212,21 @@ function formaterDate(dateStr: string) {
             @click="router.push(`/matchs/${match.id}`)"
           >
             <div class="ligne-gauche">
-              <div class="ligne-sport-icone" :class="{ passé: estPasse(match.dateMatch) }">🏟️</div>
+              <div class="ligne-sport-icone" :class="{ passé: estPasse(match.dateMatch) }" aria-hidden="true">
+                <Trophy :size="20" stroke-width="2" />
+              </div>
               <div class="ligne-info">
                 <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
                 <span>{{ formaterDate(match.dateMatch) }}</span>
-                <span v-if="match.lieu" class="ligne-lieu">📍 {{ match.lieu }}</span>
+                <IconeLigne
+                  v-if="match.lieu"
+                  :icone="MapPin"
+                  :taille="14"
+                  discret
+                  class="ligne-lieu"
+                >
+                  {{ match.lieu }}
+                </IconeLigne>
               </div>
             </div>
             <div class="ligne-droite">
@@ -321,12 +353,13 @@ function formaterDate(dateStr: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
   flex-shrink: 0;
+  color: var(--couleur-primaire);
 }
 
 .ligne-sport-icone.passé {
   background: #f5f5f5;
+  color: var(--couleur-texte-discret);
 }
 
 .ligne-info {

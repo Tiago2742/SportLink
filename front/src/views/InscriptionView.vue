@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import LogoSportLink from '@/components/brand/LogoSportLink.vue'
 import SelecteurSportNiveau, { type EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
 
 const auth = useAuthStore()
@@ -63,7 +64,7 @@ async function soumettre() {
   <div class="page-auth">
     <div class="boite-auth carte">
       <div class="auth-entete">
-        <span class="logo-emoji">⚽</span>
+        <LogoSportLink variant="complet" taille="auth" />
         <h1>Créer un compte</h1>
         <p>Rejoignez la communauté SportLink</p>
       </div>
@@ -193,16 +194,14 @@ async function soumettre() {
   margin-bottom: var(--espace-xl);
 }
 
-.auth-entete .logo-emoji {
-  font-size: 2.5rem;
-  display: block;
-  margin-bottom: var(--espace-s);
+.auth-entete :deep(.logo-sportlink--complet) {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--espace-l);
 }
 
 .auth-entete h1 {
   font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--couleur-texte);
   margin-bottom: 0.3rem;
 }
 

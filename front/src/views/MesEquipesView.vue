@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { chargerEquipes } from '@/services/api'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
+import { MapPin } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -61,7 +63,15 @@ async function charger() {
               {{ equipe.sport?.nom ?? 'Sport' }}
               <template v-if="equipe.niveau"> · {{ equipe.niveau.libelle }}</template>
             </p>
-            <p v-if="equipe.localisation" class="carte-equipe-lieu">📍 {{ equipe.localisation }}</p>
+            <IconeLigne
+              v-if="equipe.localisation"
+              :icone="MapPin"
+              :taille="14"
+              discret
+              class="carte-equipe-lieu"
+            >
+              {{ equipe.localisation }}
+            </IconeLigne>
           </div>
         </div>
         <RouterLink :to="`/equipes/${equipe.id}`" class="btn btn-secondaire btn-pleine-largeur">

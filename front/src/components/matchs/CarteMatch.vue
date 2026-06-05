@@ -8,6 +8,8 @@ import {
   type CampResume,
 } from '@/composables/useMatchCamps'
 import { nomAffichage } from '@/utils/nomAffichage'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
+import { Calendar, MapPin, User, Users } from 'lucide-vue-next'
 
 const props = defineProps<{
   match: {
@@ -77,29 +79,28 @@ const lienEquipeCollectif = computed(
 </script>
 
 <template>
-  <div class="carte-match carte">
+  <div class="carte-match carte carte-interactive">
     <div class="carte-corps">
       <h3 class="carte-titre">{{ titreMatch }}</h3>
 
       <ul class="carte-infos">
         <li>
-          <span class="icone">📅</span>
-          <span>{{ dateFormatee }}</span>
+          <IconeLigne :icone="Calendar" discret>{{ dateFormatee }}</IconeLigne>
         </li>
         <li v-if="match.lieu">
-          <span class="icone">📍</span>
-          <span>{{ match.lieu }}</span>
+          <IconeLigne :icone="MapPin" discret>{{ match.lieu }}</IconeLigne>
         </li>
         <li v-if="match.createur">
-          <span class="icone">👤</span>
-          <span>{{ nomAffichage(match.createur) }}</span>
+          <IconeLigne :icone="User" discret>{{ nomAffichage(match.createur) }}</IconeLigne>
         </li>
       </ul>
 
       <div class="carte-tags" v-if="match.niveauRequis || match.statut">
         <BadgeStatut :statut="match.statut" />
         <span v-if="match.niveauRequis" class="tag-niveau">{{ match.niveauRequis.libelle }}</span>
-        <span class="tag-joueurs">👥 {{ libellePlaces }}</span>
+        <span class="tag-joueurs">
+          <IconeLigne :icone="Users" :taille="14" discret>{{ libellePlaces }}</IconeLigne>
+        </span>
         <span v-if="dejaInscrit" class="tag-inscrit">Vous participez</span>
       </div>
     </div>
@@ -132,11 +133,6 @@ const lienEquipeCollectif = computed(
   flex-direction: column;
   gap: var(--espace-m);
   padding: var(--espace-l);
-  transition: box-shadow 0.2s;
-}
-
-.carte-match:hover {
-  box-shadow: var(--ombre-carte-survol);
 }
 
 .carte-corps {
@@ -164,11 +160,6 @@ const lienEquipeCollectif = computed(
   gap: 0.4rem;
   font-size: 0.88rem;
   color: var(--couleur-texte-discret);
-}
-
-.icone {
-  font-size: 0.85rem;
-  flex-shrink: 0;
 }
 
 .carte-tags {

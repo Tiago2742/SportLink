@@ -7,6 +7,7 @@ import { useSports } from '@/composables/useSports'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
+import { Search } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -167,7 +168,7 @@ async function rejoindreMatch(matchId: number) {
         <!-- Barre de recherche + chips -->
         <div class="recherche-barre">
           <div class="recherche-input-wrapper">
-            <span class="recherche-icone">🔍</span>
+            <span class="recherche-icone" aria-hidden="true"><Search :size="18" /></span>
             <input
               v-model="recherche"
               type="text"
@@ -196,8 +197,8 @@ async function rejoindreMatch(matchId: number) {
             <span class="resultats-count">({{ matchsFiltres.length }} résultats)</span>
           </h2>
           <select v-model="triParDate" class="champ champ-tri">
-            <option value="asc">Trier par date ↑</option>
-            <option value="desc">Trier par date ↓</option>
+            <option value="asc">Trier par date (plus ancien)</option>
+            <option value="desc">Trier par date (plus récent)</option>
           </select>
         </div>
 
@@ -350,7 +351,9 @@ async function rejoindreMatch(matchId: number) {
   left: 0.8rem;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 0.9rem;
+  display: flex;
+  color: var(--couleur-texte-discret);
+  pointer-events: none;
 }
 
 .recherche-input {

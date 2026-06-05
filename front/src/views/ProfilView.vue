@@ -3,6 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerMesMatchs, chargerEquipes, chargerProfil } from '@/services/api'
+import IconeSection from '@/components/ui/IconeSection.vue'
+import { Calendar, KeyRound, Lock, Pencil, User, Users } from 'lucide-vue-next'
 const auth = useAuthStore()
 const router = useRouter()
 
@@ -81,7 +83,7 @@ const estClub = computed(() => profil.value?.type === 'club')
         <!-- Informations personnelles -->
         <section class="carte section-profil">
           <div class="section-titre-icone">
-            <span class="titre-icone">👤</span>
+            <IconeSection :icone="User" label="Informations personnelles" />
             <h2>Informations personnelles</h2>
           </div>
 
@@ -108,7 +110,10 @@ const estClub = computed(() => profil.value?.type === 'club')
               <label>Membre depuis</label>
               <span>{{ profil?.dateInscription ? formaterDate(profil.dateInscription) : '—' }}</span>
             </div>
-            <button class="btn btn-primaire" @click="ouvrirEdition">✏️ Modifier profil</button>
+            <button class="btn btn-primaire" @click="ouvrirEdition">
+              <Pencil :size="16" aria-hidden="true" />
+              Modifier profil
+            </button>
           </template>
 
           <template v-else>
@@ -137,18 +142,21 @@ const estClub = computed(() => profil.value?.type === 'club')
         <!-- Sécurité -->
         <section class="carte section-profil">
           <div class="section-titre-icone">
-            <span class="titre-icone">🔒</span>
+            <IconeSection :icone="Lock" label="Sécurité" />
             <h2>Sécurité</h2>
           </div>
           <p class="section-desc">Modifiez votre mot de passe pour sécuriser votre compte</p>
-          <button class="btn btn-primaire" disabled>🔑 Changer mot de passe</button>
+          <button class="btn btn-primaire" disabled>
+            <KeyRound :size="16" aria-hidden="true" />
+            Changer mot de passe
+          </button>
           <p class="bientot">Fonctionnalité à venir</p>
         </section>
 
         <!-- Mes équipes (club) -->
         <section v-if="profil?.type === 'club'" class="carte section-profil">
           <div class="section-titre-icone">
-            <span class="titre-icone">👥</span>
+            <IconeSection :icone="Users" label="Mes équipes" />
             <h2>Mes équipes</h2>
           </div>
           <p class="section-desc">
@@ -162,7 +170,7 @@ const estClub = computed(() => profil.value?.type === 'club')
         <!-- Mes matchs -->
         <section class="carte section-profil">
           <div class="section-titre-icone">
-            <span class="titre-icone">📅</span>
+            <IconeSection :icone="Calendar" label="Mes matchs" />
             <h2>Mes matchs</h2>
           </div>
 
@@ -232,10 +240,6 @@ const estClub = computed(() => profil.value?.type === 'club')
   margin-bottom: var(--espace-l);
   padding-bottom: var(--espace-m);
   border-bottom: 1px solid var(--couleur-bordure);
-}
-
-.titre-icone {
-  font-size: 1.2rem;
 }
 
 .section-titre-icone h2 {

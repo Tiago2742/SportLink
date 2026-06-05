@@ -5,7 +5,9 @@ import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { retirerMembre } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { libelleRoleEquipe } from '@/utils/equipeAffichage'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { nomAffichage } from '@/utils/nomAffichage'
+import { MapPin } from 'lucide-vue-next'
 
 defineProps<{
   mesEquipes: any[]
@@ -65,7 +67,7 @@ async function quitter(adhesion: any) {
               {{ nomAffichage(adhesion.equipe?.club) }}
             </p>
             <p v-if="adhesion.equipe?.localisation" class="carte-equipe-lieu">
-              📍 {{ adhesion.equipe.localisation }}
+              <IconeLigne :icone="MapPin" :taille="14" discret>{{ adhesion.equipe.localisation }}</IconeLigne>
             </p>
             <span class="carte-equipe-role">{{ libelleRoleEquipe(adhesion.role) }}</span>
           </div>

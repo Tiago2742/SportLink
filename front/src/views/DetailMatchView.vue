@@ -18,6 +18,7 @@ import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
+import { ArrowLeft, Calendar, FileText, MapPin, Target, User } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -260,7 +261,10 @@ function formaterHeure(dateStr: string) {
       <!-- En-tête match -->
       <div class="detail-entete">
         <div class="entete-gauche">
-          <RouterLink to="/" class="lien-retour">← Retour</RouterLink>
+          <RouterLink to="/" class="lien-retour">
+            <ArrowLeft :size="16" aria-hidden="true" />
+            Retour
+          </RouterLink>
           <h1>Match de {{ match.sport?.nom ?? 'Sport' }}</h1>
           <BadgeStatut :statut="match.statut" />
         </div>
@@ -277,17 +281,24 @@ function formaterHeure(dateStr: string) {
           <section class="carte section-infos">
             <h2 class="section-h2">Informations</h2>
             <ul class="infos-liste">
-              <li><span class="info-icone">📅</span> {{ formaterDate(match.dateMatch) }}</li>
-              <li v-if="match.lieu"><span class="info-icone">📍</span> {{ match.lieu }}</li>
+              <li>
+                <span class="info-icone" aria-hidden="true"><Calendar :size="18" stroke-width="2.25" /></span>
+                {{ formaterDate(match.dateMatch) }}
+              </li>
+              <li v-if="match.lieu">
+                <span class="info-icone" aria-hidden="true"><MapPin :size="18" stroke-width="2.25" /></span>
+                {{ match.lieu }}
+              </li>
               <li v-if="match.niveauRequis">
-                <span class="info-icone">🎯</span> Niveau : {{ match.niveauRequis?.libelle }}
+                <span class="info-icone" aria-hidden="true"><Target :size="18" stroke-width="2.25" /></span>
+                Niveau : {{ match.niveauRequis?.libelle }}
               </li>
               <li>
-                <span class="info-icone">👤</span>
+                <span class="info-icone" aria-hidden="true"><User :size="18" stroke-width="2.25" /></span>
                 Créé par {{ nomAffichage(match.createur) }}
               </li>
               <li v-if="match.description" class="description-match">
-                <span class="info-icone">📝</span>
+                <span class="info-icone" aria-hidden="true"><FileText :size="18" stroke-width="2.25" /></span>
                 <span>{{ match.description }}</span>
               </li>
             </ul>
@@ -614,7 +625,16 @@ function formaterHeure(dateStr: string) {
 }
 
 .info-icone {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--couleur-primaire);
+}
+
+.lien-retour {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .score-affichage {

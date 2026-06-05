@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { creerEquipe } from '@/services/api'
 import { useSports } from '@/composables/useSports'
+import { ArrowLeft } from 'lucide-vue-next'
 import type { NiveauRef } from '@/services/api'
 
 const auth = useAuthStore()
@@ -65,7 +66,10 @@ async function soumettre() {
 
 <template>
   <div class="page-creer-equipe conteneur">
-    <RouterLink to="/mes-equipes" class="lien-retour">← Mes équipes</RouterLink>
+    <RouterLink to="/mes-equipes" class="lien-retour">
+      <ArrowLeft :size="16" aria-hidden="true" />
+      Mes équipes
+    </RouterLink>
 
     <h1>Créer une équipe</h1>
     <p class="sous-titre">
@@ -163,7 +167,9 @@ async function soumettre() {
 }
 
 .lien-retour {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-bottom: var(--espace-m);
   font-size: 0.9rem;
   color: var(--couleur-texte-discret);

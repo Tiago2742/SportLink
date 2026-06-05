@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { creerMatch, chargerEquipes } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import type { NiveauRef } from '@/services/api'
+import { CircleCheck, Users, Zap } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -124,15 +125,15 @@ function annuler() {
 
         <ul class="sidebar-infos">
           <li>
-            <span class="info-icone">✅</span>
+            <span class="info-icone" aria-hidden="true"><CircleCheck :size="18" stroke-width="2.25" /></span>
             Le match sera visible par tous les utilisateurs
           </li>
           <li>
-            <span class="info-icone">👥</span>
+            <span class="info-icone" aria-hidden="true"><Users :size="18" stroke-width="2.25" /></span>
             Vous serez automatiquement participant
           </li>
           <li>
-            <span class="info-icone">⚡</span>
+            <span class="info-icone" aria-hidden="true"><Zap :size="18" stroke-width="2.25" /></span>
             Création instantanée après validation
           </li>
         </ul>
@@ -323,8 +324,10 @@ function annuler() {
 }
 
 .info-icone {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  color: var(--couleur-primaire);
 }
 
 .formulaire-titre {

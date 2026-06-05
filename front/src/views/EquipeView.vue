@@ -17,6 +17,18 @@ import {
   libelleStatutMembre,
 } from '@/utils/equipeAffichage'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
+import IconeSection from '@/components/ui/IconeSection.vue'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
+import {
+  ArrowLeft,
+  BarChart3,
+  Calendar,
+  Inbox,
+  Mail,
+  MapPin,
+  UserPlus,
+  Users,
+} from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -285,7 +297,8 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           to="/mes-equipes"
           class="lien-retour"
         >
-          ← Mes équipes
+          <ArrowLeft :size="16" aria-hidden="true" />
+          Mes équipes
         </RouterLink>
       </div>
 
@@ -298,7 +311,10 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
               <div class="equipe-meta">
                 <span>{{ equipe.sport?.nom ?? equipe.sport }}</span>
                 <span v-if="equipe.niveau">· {{ equipe.niveau?.libelle ?? equipe.niveau }}</span>
-                <span v-if="equipe.localisation">· 📍 {{ equipe.localisation }}</span>
+                <span v-if="equipe.localisation" class="equipe-meta-lieu">
+                  ·
+                  <IconeLigne :icone="MapPin" :taille="14" discret>{{ equipe.localisation }}</IconeLigne>
+                </span>
               </div>
             </div>
           </div>
@@ -314,7 +330,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           class="carte section-demande-joueur"
         >
           <div class="section-titre-icone">
-            <span>🙋</span>
+            <IconeSection :icone="UserPlus" label="Rejoindre cette équipe" />
             <h2>Rejoindre cette équipe</h2>
           </div>
           <p v-if="demandeJoueurEnAttente" class="demande-etat">
@@ -362,7 +378,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           class="carte section-demandes"
         >
           <div class="section-titre-icone">
-            <span>📥</span>
+            <IconeSection :icone="Inbox" label="Demandes en attente" />
             <h2>Demandes en attente</h2>
             <span class="membres-count">{{ demandesEnAttente.length }}</span>
           </div>
@@ -396,7 +412,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
         <section v-if="estProprietaire" class="carte section-inviter">
           <div class="section-titre-icone">
-            <span>✉️</span>
+            <IconeSection :icone="Mail" label="Inviter un joueur" />
             <h2>Inviter un joueur</h2>
           </div>
           <p class="inviter-aide">
@@ -428,7 +444,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
         <section class="carte section-membres">
           <div class="section-titre-icone">
-            <span>👥</span>
+            <IconeSection :icone="Users" label="Membres de l'équipe" />
             <h2>Membres de l'équipe</h2>
             <span class="membres-count">
               {{ membresAffichés.length }} membre{{ membresAffichés.length > 1 ? 's' : '' }}
@@ -482,7 +498,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
         <div class="bas-contenu">
           <section class="carte section-calendrier">
             <div class="section-titre-icone">
-              <span>📅</span>
+              <IconeSection :icone="Calendar" label="Calendrier" />
               <h2>Calendrier</h2>
             </div>
             <div class="vide-section">
@@ -495,7 +511,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
           <section class="carte section-stats">
             <div class="section-titre-icone">
-              <span>📊</span>
+              <IconeSection :icone="BarChart3" label="Statistiques de l'équipe" />
               <h2>Statistiques de l'équipe</h2>
             </div>
             <div class="stats-grille">
@@ -550,9 +566,18 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 }
 
 .lien-retour {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-size: 0.9rem;
   color: var(--couleur-texte-discret);
   text-decoration: none;
+}
+
+.equipe-meta-lieu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
 }
 
 .lien-retour:hover {
