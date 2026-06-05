@@ -3,10 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\Game;
-use App\Repository\DisputerRepository;
+use App\Enum\StatutMatchCamp;
+use App\Repository\EquipeRepository;
 use App\Repository\GameRepository;
+use App\Repository\MatchCampRepository;
 use App\Repository\MessageRepository;
-use App\Repository\ParticipationRepository;
+use App\Repository\NiveauRepository;
+use App\Repository\SportRepository;
 use App\Service\MatchService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,24 +20,50 @@ use Symfony\Component\Routing\Attribute\Route;
 class MatchController extends AbstractController
 {
     public function __construct(
-        private MatchService $matchService,
-        private GameRepository $gameRepository,
-        private ParticipationRepository $participationRepository,
-        private DisputerRepository $disputerRepository,
-        private MessageRepository $messageRepository,
+        private MatchService        $matchService,
+        private EquipeRepository    $equipeRepository,
+        private GameRepository      $gameRepository,
+        private MatchCampRepository $matchCampRepository,
+        private MessageRepository   $messageRepository,
+        private SportRepository     $sportRepository,
+        private NiveauRepository    $niveauRepository,
     ) {}
+
+    // ---- Groupes de sérialisation réutilisés --------------------------------
+
+    private const GROUPES_LIST = [
+        'game:list', 'utilisateur:read', 'sport:read', 'niveau:read',
+        'match_camp:read', 'equipe:list',
+    ];
+    private const GROUPES_READ = ['game:read', 'utilisateur:read', 'sport:read', 'niveau:read',
+                                  'match_camp:read', 'equipe:list', 'resultat:read'];
+
+    // ---- CRUD match ---------------------------------------------------------
 
     #[Route('', name: 'api_matchs_lister', methods: ['GET'])]
     public function lister(Request $request): JsonResponse
     {
-        $matchs = $this->gameRepository->trouverAvecFiltres(
-            $request->query->get('sport'),
-            $request->query->get('lieu'),
-            $request->query->get('statut'),
-            $request->query->get('niveauRequis'),
-        );
+        $statut              = $request->query->get('statut');
+        $disponibleSeulement = $statut === 'disponible';
+        $mesMatchs             = $request->query->getBoolean('mesMatchs');
 
-        return $this->json($matchs, 200, [], ['groups' => ['game:list', 'utilisateur:read']]);
+        if ($mesMatchs) {
+            $matchs = $this->gameRepository->trouverPourParticipant(
+                $this->getUser()->getId(),
+                $disponibleSeulement ? null : ($statut ?: null),
+            );
+        } else {
+            $matchs = $this->gameRepository->trouverAvecFiltres(
+                $request->query->getInt('sportId') ?: null,
+                $request->query->get('lieu'),
+                $disponibleSeulement ? null : $statut,
+                $request->query->getInt('niveauId') ?: null,
+                $request->query->getInt('createurId') ?: null,
+                $disponibleSeulement,
+            );
+        }
+
+        return $this->json($matchs, 200, [], ['groups' => self::GROUPES_LIST]);
     }
 
     #[Route('', name: 'api_matchs_creer', methods: ['POST'])]
@@ -42,23 +71,48 @@ class MatchController extends AbstractController
     {
         $donnees = json_decode($request->getContent(), true);
 
-        if (empty($donnees['sport']) || empty($donnees['dateMatch'])) {
-            return $this->json(['erreur' => 'Les champs "sport" et "dateMatch" sont requis.'], 400);
+        if (empty($donnees['sportId']) || empty($donnees['dateMatch'])) {
+            return $this->json(['erreur' => 'Les champs "sportId" et "dateMatch" sont requis.'], 400);
         }
 
+        $sport = $this->sportRepository->find((int) $donnees['sportId']);
+        if (!$sport) {
+            return $this->json(['erreur' => 'Sport introuvable.'], 404);
+        }
+
+        $niveauRequis = null;
+        if (!empty($donnees['niveauRequisId'])) {
+            $niveauRequis = $this->niveauRepository->find((int) $donnees['niveauRequisId']);
+            if (!$niveauRequis || $niveauRequis->getSport() !== $sport) {
+                return $this->json(['erreur' => 'Niveau invalide ou non rattaché à ce sport.'], 422);
+            }
+        }
+
+        $equipeId = !empty($donnees['equipeId']) ? (int) $donnees['equipeId'] : null;
+
         try {
-            $match = $this->matchService->creer($donnees, $this->getUser());
-        } catch (\Exception $e) {
+            $match = $this->matchService->creer(
+                $sport,
+                $niveauRequis,
+                $donnees['dateMatch'],
+                $donnees['lieu'] ?? null,
+                $this->getUser(),
+                $donnees['description'] ?? null,
+                $equipeId,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        } catch (\Exception) {
             return $this->json(['erreur' => 'Format de date invalide. Utilisez : YYYY-MM-DD HH:MM'], 400);
         }
 
-        return $this->json($match, 201, [], ['groups' => ['game:read', 'utilisateur:read', 'participation:read']]);
+        return $this->json($match, 201, [], ['groups' => self::GROUPES_READ]);
     }
 
     #[Route('/{id}', name: 'api_matchs_afficher', methods: ['GET'])]
     public function afficher(Game $match): JsonResponse
     {
-        return $this->json($match, 200, [], ['groups' => ['game:read', 'utilisateur:read', 'participation:read']]);
+        return $this->json($match, 200, [], ['groups' => self::GROUPES_READ]);
     }
 
     #[Route('/{id}', name: 'api_matchs_modifier', methods: ['PUT'])]
@@ -70,13 +124,50 @@ class MatchController extends AbstractController
 
         $donnees = json_decode($request->getContent(), true);
 
+        $sport = null;
+        if (!empty($donnees['sportId'])) {
+            $sport = $this->sportRepository->find((int) $donnees['sportId']);
+            if (!$sport) {
+                return $this->json(['erreur' => 'Sport introuvable.'], 404);
+            }
+        }
+
+        $niveauRequis   = null;
+        $effacerNiveau  = false;
+        if (array_key_exists('niveauRequisId', $donnees)) {
+            if ($donnees['niveauRequisId'] !== null) {
+                $niveauRequis = $this->niveauRepository->find((int) $donnees['niveauRequisId']);
+                if (!$niveauRequis) {
+                    return $this->json(['erreur' => 'Niveau introuvable.'], 404);
+                }
+            } else {
+                $effacerNiveau = true;
+            }
+        }
+
+        $description        = null;
+        $effacerDescription = false;
+        if (array_key_exists('description', $donnees)) {
+            $description        = $donnees['description'] !== null ? (string) $donnees['description'] : null;
+            $effacerDescription = $donnees['description'] === null;
+        }
+
         try {
-            $match = $this->matchService->modifier($match, $donnees);
-        } catch (\Exception $e) {
+            $match = $this->matchService->modifier(
+                $match,
+                $sport,
+                $niveauRequis,
+                $effacerNiveau,
+                $donnees['dateMatch'] ?? null,
+                $donnees['lieu'] ?? null,
+                $description,
+                $effacerDescription,
+            );
+        } catch (\Exception) {
             return $this->json(['erreur' => 'Format de date invalide. Utilisez : YYYY-MM-DD HH:MM'], 400);
         }
 
-        return $this->json($match, 200, [], ['groups' => ['game:read', 'utilisateur:read', 'participation:read']]);
+        return $this->json($match, 200, [], ['groups' => self::GROUPES_READ]);
     }
 
     #[Route('/{id}', name: 'api_matchs_supprimer', methods: ['DELETE'])]
@@ -91,34 +182,48 @@ class MatchController extends AbstractController
         return $this->json(null, 204);
     }
 
-    // --- Participations ---
+    // ---- Camps (R5) ---------------------------------------------------------
 
-    #[Route('/{id}/participations', name: 'api_matchs_participer', methods: ['POST'])]
-    public function participer(Game $match): JsonResponse
+    #[Route('/{id}/camps', name: 'api_matchs_ajouter_camp', methods: ['POST'])]
+    public function ajouterCamp(Request $request, Game $match): JsonResponse
     {
+        $donnees  = json_decode($request->getContent(), true);
+        $equipeId = isset($donnees['equipeId']) ? (int) $donnees['equipeId'] : null;
+        $joueurId = isset($donnees['joueurId']) ? (int) $donnees['joueurId'] : null;
+
+        $moi = $this->getUser();
+        // Invité = réservé à une invitation lancée par un tiers (autre joueur / autre club)
+        $confirmerInscription = true;
+        if ($joueurId !== null && (int) $joueurId !== $moi->getId()) {
+            $confirmerInscription = false;
+        }
+
         try {
-            $participation = $this->matchService->participer($match, $this->getUser());
+            $camp = $this->matchService->creerCamp($match, $equipeId, $joueurId, $moi, $confirmerInscription);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
 
-        return $this->json($participation, 201, [], ['groups' => ['participation:read', 'utilisateur:read']]);
+        return $this->json($camp, 201, [], [
+            'groups' => ['match_camp:read', 'equipe:list', 'utilisateur:read', 'sport:read', 'niveau:read'],
+        ]);
     }
 
-    #[Route('/{id}/participations/{participationId}', name: 'api_matchs_modifier_statut', methods: ['PATCH'])]
-    public function modifierStatut(Request $request, Game $match, int $participationId): JsonResponse
+    #[Route('/{id}/camps/{campId}', name: 'api_matchs_repondre_camp', methods: ['PATCH'])]
+    public function repondreCamp(Request $request, Game $match, int $campId): JsonResponse
     {
-        $participation = $this->participationRepository->find($participationId);
+        $camp = $this->matchCampRepository->find($campId);
 
-        if (!$participation || $participation->getGame() !== $match) {
-            return $this->json(['erreur' => 'Participation introuvable.'], 404);
+        if (!$camp || $camp->getGame() !== $match) {
+            return $this->json(['erreur' => 'Camp introuvable pour ce match.'], 404);
         }
 
-        $utilisateurConnecte = $this->getUser();
-        $estCreateur = $match->getCreateur() === $utilisateurConnecte;
-        $estParticipant = $participation->getUtilisateur() === $utilisateurConnecte;
+        // Autorisation : seul le concerné peut répondre
+        $moi = $this->getUser();
+        $peutRepondre = ($camp->getJoueur() === $moi)
+            || ($camp->getEquipe()?->getClub() === $moi);
 
-        if (!$estCreateur && !$estParticipant) {
+        if (!$peutRepondre) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
@@ -129,79 +234,44 @@ class MatchController extends AbstractController
         }
 
         try {
-            $participation = $this->matchService->modifierStatut($participation, $donnees['statut']);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json(['erreur' => $e->getMessage()], 422);
-        }
-
-        return $this->json($participation, 200, [], ['groups' => ['participation:read', 'utilisateur:read']]);
-    }
-
-    #[Route('/{id}/participations/{participationId}', name: 'api_matchs_annuler_participation', methods: ['DELETE'])]
-    public function annulerParticipation(Game $match, int $participationId): JsonResponse
-    {
-        $participation = $this->participationRepository->find($participationId);
-
-        if (!$participation || $participation->getGame() !== $match) {
-            return $this->json(['erreur' => 'Participation introuvable.'], 404);
-        }
-
-        $utilisateurConnecte = $this->getUser();
-        $estCreateur = $match->getCreateur() === $utilisateurConnecte;
-        $estParticipant = $participation->getUtilisateur() === $utilisateurConnecte;
-
-        if (!$estCreateur && !$estParticipant) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
-
-        $this->matchService->annulerParticipation($participation);
-
-        return $this->json(null, 204);
-    }
-
-    // --- Équipes disputant ---
-
-    #[Route('/{id}/equipes', name: 'api_matchs_inscrire_equipe', methods: ['POST'])]
-    public function inscrireEquipe(Request $request, Game $match): JsonResponse
-    {
-        if ($match->getCreateur() !== $this->getUser()) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
-
-        $donnees = json_decode($request->getContent(), true);
-
-        if (empty($donnees['equipe_id'])) {
-            return $this->json(['erreur' => 'Le champ "equipe_id" est requis.'], 400);
+            $nouveauStatut = StatutMatchCamp::from($donnees['statut']);
+        } catch (\ValueError) {
+            return $this->json(['erreur' => 'Statut invalide. Valeurs acceptées : confirme, refuse.'], 400);
         }
 
         try {
-            $disputer = $this->matchService->inscrireEquipe($match, (int) $donnees['equipe_id'], $donnees['role'] ?? null);
+            $camp = $this->matchService->repondreInvitation($camp, $nouveauStatut);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }
 
-        return $this->json($disputer, 201, [], ['groups' => ['disputer:read', 'equipe:list', 'utilisateur:read']]);
+        return $this->json($camp, 200, [], [
+            'groups' => ['match_camp:read', 'equipe:list', 'utilisateur:read', 'sport:read', 'niveau:read'],
+        ]);
     }
 
-    #[Route('/{id}/equipes/{disputeId}', name: 'api_matchs_retirer_equipe', methods: ['DELETE'])]
-    public function retirerEquipe(Game $match, int $disputeId): JsonResponse
+    #[Route('/{id}/camps/{campId}', name: 'api_matchs_supprimer_camp', methods: ['DELETE'])]
+    public function supprimerCamp(Game $match, int $campId): JsonResponse
     {
-        if ($match->getCreateur() !== $this->getUser()) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
+        $camp = $this->matchCampRepository->find($campId);
 
-        $disputer = $this->disputerRepository->find($disputeId);
-
-        if (!$disputer || $disputer->getGame() !== $match) {
+        if (!$camp || $camp->getGame() !== $match) {
             return $this->json(['erreur' => 'Inscription introuvable pour ce match.'], 404);
         }
 
-        $this->matchService->retirerEquipe($disputer);
+        $moi = $this->getUser();
+        $estOrganisateur = $match->getCreateur() === $moi;
+
+        if (!$estOrganisateur && !$this->matchService->peutQuitterCamp($camp, $moi)) {
+            return $this->json(['erreur' => 'Accès refusé.'], 403);
+        }
+
+        $this->matchService->supprimerCamp($camp);
 
         return $this->json(null, 204);
     }
 
-    // --- Messages ---
+    // ---- Messages -----------------------------------------------------------
 
     #[Route('/{id}/messages', name: 'api_matchs_lister_messages', methods: ['GET'])]
     public function listerMessages(Game $match): JsonResponse
@@ -236,7 +306,7 @@ class MatchController extends AbstractController
         return $this->json($message, 201, [], ['groups' => ['message:read', 'utilisateur:read']]);
     }
 
-    // --- Résultat ---
+    // ---- Résultat -----------------------------------------------------------
 
     #[Route('/{id}/resultat', name: 'api_matchs_afficher_resultat', methods: ['GET'])]
     public function afficherResultat(Game $match): JsonResponse
@@ -259,15 +329,15 @@ class MatchController extends AbstractController
 
         $donnees = json_decode($request->getContent(), true);
 
-        if (!isset($donnees['scoreEquipe1'], $donnees['scoreEquipe2'])) {
-            return $this->json(['erreur' => 'Les champs "scoreEquipe1" et "scoreEquipe2" sont requis.'], 400);
+        if (!isset($donnees['scoreCamp1'], $donnees['scoreCamp2'])) {
+            return $this->json(['erreur' => 'Les champs "scoreCamp1" et "scoreCamp2" sont requis.'], 400);
         }
 
         try {
             $resultat = $this->matchService->saisirResultat(
                 $match,
-                (int) $donnees['scoreEquipe1'],
-                (int) $donnees['scoreEquipe2'],
+                (int) $donnees['scoreCamp1'],
+                (int) $donnees['scoreCamp2'],
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
@@ -285,15 +355,15 @@ class MatchController extends AbstractController
 
         $donnees = json_decode($request->getContent(), true);
 
-        if (!isset($donnees['scoreEquipe1'], $donnees['scoreEquipe2'])) {
-            return $this->json(['erreur' => 'Les champs "scoreEquipe1" et "scoreEquipe2" sont requis.'], 400);
+        if (!isset($donnees['scoreCamp1'], $donnees['scoreCamp2'])) {
+            return $this->json(['erreur' => 'Les champs "scoreCamp1" et "scoreCamp2" sont requis.'], 400);
         }
 
         try {
             $resultat = $this->matchService->modifierResultat(
                 $match,
-                (int) $donnees['scoreEquipe1'],
-                (int) $donnees['scoreEquipe2'],
+                (int) $donnees['scoreCamp1'],
+                (int) $donnees['scoreCamp2'],
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);

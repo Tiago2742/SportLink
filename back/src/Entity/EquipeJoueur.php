@@ -2,9 +2,12 @@
 
 namespace App\Entity;
 
+use App\Enum\OrigineMembreEquipe;
+use App\Enum\RoleEquipe;
+use App\Enum\StatutMembreEquipe;
 use App\Repository\EquipeJoueurRepository;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: EquipeJoueurRepository::class)]
 class EquipeJoueur
@@ -20,13 +23,23 @@ class EquipeJoueur
     #[Groups(['equipe_joueur:read'])]
     private ?Utilisateur $utilisateur = null;
 
+    /** Exposé uniquement pour la liste d'invitations joueur (pas dans equipe:read → membres). */
     #[ORM\ManyToOne(inversedBy: 'membres')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['equipe_joueur:invitation'])]
     private ?Equipe $equipe = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(enumType: RoleEquipe::class)]
     #[Groups(['equipe_joueur:read'])]
-    private ?string $role = null;
+    private ?RoleEquipe $role = null;
+
+    #[ORM\Column(enumType: StatutMembreEquipe::class)]
+    #[Groups(['equipe_joueur:read'])]
+    private ?StatutMembreEquipe $statut = null;
+
+    #[ORM\Column(enumType: OrigineMembreEquipe::class)]
+    #[Groups(['equipe_joueur:read'])]
+    private ?OrigineMembreEquipe $origine = null;
 
     public function getId(): ?int
     {
@@ -41,7 +54,6 @@ class EquipeJoueur
     public function setUtilisateur(?Utilisateur $utilisateur): static
     {
         $this->utilisateur = $utilisateur;
-
         return $this;
     }
 
@@ -53,19 +65,39 @@ class EquipeJoueur
     public function setEquipe(?Equipe $equipe): static
     {
         $this->equipe = $equipe;
-
         return $this;
     }
 
-    public function getRole(): ?string
+    public function getRole(): ?RoleEquipe
     {
         return $this->role;
     }
 
-    public function setRole(?string $role): static
+    public function setRole(RoleEquipe $role): static
     {
         $this->role = $role;
+        return $this;
+    }
 
+    public function getStatut(): ?StatutMembreEquipe
+    {
+        return $this->statut;
+    }
+
+    public function setStatut(StatutMembreEquipe $statut): static
+    {
+        $this->statut = $statut;
+        return $this;
+    }
+
+    public function getOrigine(): ?OrigineMembreEquipe
+    {
+        return $this->origine;
+    }
+
+    public function setOrigine(OrigineMembreEquipe $origine): static
+    {
+        $this->origine = $origine;
         return $this;
     }
 }

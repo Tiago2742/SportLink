@@ -6,9 +6,6 @@ use App\Entity\Game;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-/**
- * @extends ServiceEntityRepository<Game>
- */
 class GameRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -16,14 +13,47 @@ class GameRepository extends ServiceEntityRepository
         parent::__construct($registry, Game::class);
     }
 
-    /** @return Game[] */
-    public function trouverAvecFiltres(?string $sport, ?string $lieu, ?string $statut, ?string $niveauRequis): array
+    /**
+     * Matchs rejoignables : statut en_attente ET date dans le futur.
+     * Utilisé par l'accueil et la recherche par défaut.
+     */
+    public function estDisponible(): string
     {
-        $qb = $this->createQueryBuilder('g');
+        return "g.statut = 'en_attente' AND g.dateMatch > :maintenant";
+    }
 
-        if ($sport) {
-            $qb->andWhere('LOWER(g.sport) = LOWER(:sport)')
-               ->setParameter('sport', $sport);
+    /** @return Game[] */
+    public function trouverAvecFiltres(
+        ?int    $sportId          = null,
+        ?string $lieu             = null,
+        ?string $statut           = null,
+        ?int    $niveauId         = null,
+        ?int    $createurId       = null,
+        bool    $disponibleSeulement = false,
+    ): array {
+        $qb = $this->createQueryBuilder('g')
+            ->addSelect('s', 'n', 'c', 'camps')
+            ->leftJoin('g.sport', 's')
+            ->leftJoin('g.niveauRequis', 'n')
+            ->leftJoin('g.createur', 'c')
+            ->leftJoin('g.camps', 'camps');
+
+        if ($disponibleSeulement) {
+            // en_attente, date future, et moins de 2 camps (place libre)
+            $qb->andWhere("g.statut = 'en_attente'")
+               ->andWhere('g.dateMatch > :maintenant')
+               ->andWhere(
+                   '(SELECT COUNT(mc.id) FROM App\Entity\MatchCamp mc WHERE mc.game = g) < 2'
+               )
+               ->setParameter('maintenant', new \DateTime());
+        } elseif ($statut) {
+            $qb->andWhere('g.statut = :statut')
+               ->setParameter('statut', $statut);
+        }
+
+        if ($sportId) {
+            $qb->andWhere('s.id = :sportId')
+               ->setParameter('sportId', $sportId);
         }
 
         if ($lieu) {
@@ -31,14 +61,44 @@ class GameRepository extends ServiceEntityRepository
                ->setParameter('lieu', '%' . $lieu . '%');
         }
 
-        if ($statut) {
-            $qb->andWhere('LOWER(g.statut) = LOWER(:statut)')
-               ->setParameter('statut', $statut);
+        if ($niveauId) {
+            $qb->andWhere('n.id = :niveauId')
+               ->setParameter('niveauId', $niveauId);
         }
 
-        if ($niveauRequis) {
-            $qb->andWhere('LOWER(g.niveauRequis) = LOWER(:niveauRequis)')
-               ->setParameter('niveauRequis', $niveauRequis);
+        if ($createurId) {
+            $qb->andWhere('c.id = :createurId')
+               ->setParameter('createurId', $createurId);
+        }
+
+        return $qb->orderBy('g.dateMatch', 'ASC')->getQuery()->getResult();
+    }
+
+    /**
+     * Matchs du compte connecté : créés par lui ou où il est inscrit (joueur / club d'une équipe).
+     *
+     * @return Game[]
+     */
+    public function trouverPourParticipant(int $utilisateurId, ?string $statut = null): array
+    {
+        $qb = $this->createQueryBuilder('g')
+            ->distinct()
+            ->addSelect('s', 'n', 'c', 'camps')
+            ->leftJoin('g.sport', 's')
+            ->leftJoin('g.niveauRequis', 'n')
+            ->leftJoin('g.createur', 'c')
+            ->leftJoin('g.camps', 'camps');
+
+        $qb->andWhere($qb->expr()->orX(
+            'c.id = :utilisateurId',
+            'EXISTS (SELECT 1 FROM App\Entity\MatchCamp mcj JOIN mcj.joueur u WHERE mcj.game = g AND u.id = :utilisateurId)',
+            'EXISTS (SELECT 1 FROM App\Entity\MatchCamp mce JOIN mce.equipe eq JOIN eq.club cl WHERE mce.game = g AND cl.id = :utilisateurId)',
+        ))
+            ->setParameter('utilisateurId', $utilisateurId);
+
+        if ($statut) {
+            $qb->andWhere('g.statut = :statut')
+               ->setParameter('statut', $statut);
         }
 
         return $qb->orderBy('g.dateMatch', 'ASC')->getQuery()->getResult();

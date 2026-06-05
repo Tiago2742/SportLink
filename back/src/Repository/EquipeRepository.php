@@ -6,9 +6,6 @@ use App\Entity\Equipe;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-/**
- * @extends ServiceEntityRepository<Equipe>
- */
 class EquipeRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -17,23 +14,42 @@ class EquipeRepository extends ServiceEntityRepository
     }
 
     /** @return Equipe[] */
-    public function trouverAvecFiltres(?string $sport, ?string $niveau, ?string $localisation): array
-    {
-        $qb = $this->createQueryBuilder('e');
+    public function trouverAvecFiltres(
+        ?int    $sportId      = null,
+        ?int    $niveauId     = null,
+        ?string $localisation = null,
+        ?int    $clubId       = null,
+        ?string $nom          = null,
+    ): array {
+        $qb = $this->createQueryBuilder('e')
+            ->addSelect('s', 'n', 'c')
+            ->leftJoin('e.sport', 's')
+            ->leftJoin('e.niveau', 'n')
+            ->leftJoin('e.club', 'c');
 
-        if ($sport) {
-            $qb->andWhere('LOWER(e.sport) = LOWER(:sport)')
-               ->setParameter('sport', $sport);
+        if ($sportId) {
+            $qb->andWhere('s.id = :sportId')
+               ->setParameter('sportId', $sportId);
         }
 
-        if ($niveau) {
-            $qb->andWhere('LOWER(e.niveau) = LOWER(:niveau)')
-               ->setParameter('niveau', $niveau);
+        if ($niveauId) {
+            $qb->andWhere('n.id = :niveauId')
+               ->setParameter('niveauId', $niveauId);
         }
 
         if ($localisation) {
             $qb->andWhere('LOWER(e.localisation) LIKE LOWER(:localisation)')
                ->setParameter('localisation', '%' . $localisation . '%');
+        }
+
+        if ($clubId) {
+            $qb->andWhere('c.id = :clubId')
+               ->setParameter('clubId', $clubId);
+        }
+
+        if ($nom !== null && trim($nom) !== '') {
+            $qb->andWhere('LOWER(e.nom) LIKE LOWER(:nom)')
+               ->setParameter('nom', '%' . trim($nom) . '%');
         }
 
         return $qb->orderBy('e.id', 'DESC')->getQuery()->getResult();

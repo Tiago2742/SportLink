@@ -6,7 +6,7 @@ use App\Repository\EquipeRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: EquipeRepository::class)]
 class Equipe
@@ -21,13 +21,15 @@ class Equipe
     #[Groups(['equipe:list', 'equipe:read'])]
     private ?string $nom = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: false)]
     #[Groups(['equipe:list', 'equipe:read'])]
-    private ?string $sport = null;
+    private ?Sport $sport = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true)]
     #[Groups(['equipe:list', 'equipe:read'])]
-    private ?string $niveau = null;
+    private ?Niveau $niveau = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['equipe:list', 'equipe:read'])]
@@ -37,28 +39,19 @@ class Equipe
     #[Groups(['equipe:list', 'equipe:read'])]
     private ?string $logo = null;
 
-    #[ORM\ManyToOne(inversedBy: 'equipesCreees')]
+    #[ORM\ManyToOne(inversedBy: 'equipesGerees')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['equipe:list', 'equipe:read'])]
-    private ?utilisateur $createur = null;
+    private ?Utilisateur $club = null;
 
-    /**
-     * @var Collection<int, EquipeJoueur>
-     */
-    #[ORM\OneToMany(targetEntity: EquipeJoueur::class, mappedBy: 'equipe', orphanRemoval: true, cascade: ['persist', 'remove'])]
+    /** @var Collection<int, EquipeJoueur> */
+    #[ORM\OneToMany(mappedBy: 'equipe', targetEntity: EquipeJoueur::class, orphanRemoval: true, cascade: ['persist', 'remove'])]
     #[Groups(['equipe:read'])]
     private Collection $membres;
-
-    /**
-     * @var Collection<int, Disputer>
-     */
-    #[ORM\OneToMany(targetEntity: Disputer::class, mappedBy: 'equipe', orphanRemoval: true)]
-    private Collection $matchsDisputes;
 
     public function __construct()
     {
         $this->membres = new ArrayCollection();
-        $this->matchsDisputes = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -74,31 +67,28 @@ class Equipe
     public function setNom(string $nom): static
     {
         $this->nom = $nom;
-
         return $this;
     }
 
-    public function getSport(): ?string
+    public function getSport(): ?Sport
     {
         return $this->sport;
     }
 
-    public function setSport(string $sport): static
+    public function setSport(?Sport $sport): static
     {
         $this->sport = $sport;
-
         return $this;
     }
 
-    public function getNiveau(): ?string
+    public function getNiveau(): ?Niveau
     {
         return $this->niveau;
     }
 
-    public function setNiveau(?string $niveau): static
+    public function setNiveau(?Niveau $niveau): static
     {
         $this->niveau = $niveau;
-
         return $this;
     }
 
@@ -110,7 +100,6 @@ class Equipe
     public function setLocalisation(?string $localisation): static
     {
         $this->localisation = $localisation;
-
         return $this;
     }
 
@@ -122,25 +111,21 @@ class Equipe
     public function setLogo(?string $logo): static
     {
         $this->logo = $logo;
-
         return $this;
     }
 
-    public function getCreateur(): ?utilisateur
+    public function getClub(): ?Utilisateur
     {
-        return $this->createur;
+        return $this->club;
     }
 
-    public function setCreateur(?utilisateur $createur): static
+    public function setClub(?Utilisateur $club): static
     {
-        $this->createur = $createur;
-
+        $this->club = $club;
         return $this;
     }
 
-    /**
-     * @return Collection<int, EquipeJoueur>
-     */
+    /** @return Collection<int, EquipeJoueur> */
     public function getMembres(): Collection
     {
         return $this->membres;
@@ -152,49 +137,16 @@ class Equipe
             $this->membres->add($membre);
             $membre->setEquipe($this);
         }
-
         return $this;
     }
 
     public function removeMembre(EquipeJoueur $membre): static
     {
         if ($this->membres->removeElement($membre)) {
-            // set the owning side to null (unless already changed)
             if ($membre->getEquipe() === $this) {
                 $membre->setEquipe(null);
             }
         }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Disputer>
-     */
-    public function getMatchsDisputes(): Collection
-    {
-        return $this->matchsDisputes;
-    }
-
-    public function addMatchsDispute(Disputer $matchsDispute): static
-    {
-        if (!$this->matchsDisputes->contains($matchsDispute)) {
-            $this->matchsDisputes->add($matchsDispute);
-            $matchsDispute->setEquipe($this);
-        }
-
-        return $this;
-    }
-
-    public function removeMatchsDispute(Disputer $matchsDispute): static
-    {
-        if ($this->matchsDisputes->removeElement($matchsDispute)) {
-            // set the owning side to null (unless already changed)
-            if ($matchsDispute->getEquipe() === $this) {
-                $matchsDispute->setEquipe(null);
-            }
-        }
-
         return $this;
     }
 }

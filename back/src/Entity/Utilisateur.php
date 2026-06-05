@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\TypeUtilisateur;
 use App\Repository\UtilisateurRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -9,19 +10,22 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: UtilisateurRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[Assert\Callback('validerPrenomSelonType')]
 class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?string $email = null;
 
     /**
@@ -37,33 +41,34 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['utilisateur:read'])]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?string $nom = null;
 
-    #[ORM\Column(length: 255)]
-    #[Groups(['utilisateur:read'])]
+    /** Null pour un compte club (raison sociale dans nom uniquement). */
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
     private ?string $prenom = null;
 
-    #[ORM\Column(length: 255)]
-    #[Groups(['utilisateur:read'])]
-    private ?string $type = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['utilisateur:read'])]
-    private ?string $niveau = null;
+    #[ORM\Column(enumType: TypeUtilisateur::class)]
+    #[Groups(['utilisateur:read', 'utilisateur:embed'])]
+    private ?TypeUtilisateur $type = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['utilisateur:read'])]
     private ?string $localisation = null;
 
+    /** @var Collection<int, UtilisateurNiveau> */
+    #[ORM\OneToMany(targetEntity: UtilisateurNiveau::class, mappedBy: 'utilisateur', orphanRemoval: true, cascade: ['persist'])]
+    #[Groups(['utilisateur:detail'])]
+    private Collection $niveaux;
+
     #[ORM\Column]
+    #[Groups(['utilisateur:read'])]
     private ?\DateTime $dateInscription = null;
 
-    /**
-     * @var Collection<int, Equipe>
-     */
-    #[ORM\OneToMany(targetEntity: Equipe::class, mappedBy: 'createur')]
-    private Collection $equipesCreees;
+    /** @var Collection<int, Equipe> */
+    #[ORM\OneToMany(targetEntity: Equipe::class, mappedBy: 'club')]
+    private Collection $equipesGerees;
 
     /**
      * @var Collection<int, Game>
@@ -77,11 +82,6 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: EquipeJoueur::class, mappedBy: 'utilisateur')]
     private Collection $equipesJoueur;
 
-    /**
-     * @var Collection<int, Participation>
-     */
-    #[ORM\OneToMany(targetEntity: Participation::class, mappedBy: 'utilisateur', orphanRemoval: true)]
-    private Collection $participations;
 
     /**
      * @var Collection<int, Message>
@@ -91,11 +91,11 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->equipesCreees = new ArrayCollection();
+        $this->equipesGerees = new ArrayCollection();
         $this->matchsCrees = new ArrayCollection();
         $this->equipesJoueur = new ArrayCollection();
-        $this->participations = new ArrayCollection();
-        $this->messages = new ArrayCollection();
+$this->messages = new ArrayCollection();
+        $this->niveaux = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -196,34 +196,34 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->prenom;
     }
 
-    public function setPrenom(string $prenom): static
+    public function setPrenom(?string $prenom): static
     {
-        $this->prenom = $prenom;
+        $this->prenom = $prenom !== null && $prenom !== '' ? $prenom : null;
 
         return $this;
     }
 
-    public function getType(): ?string
+    public function validerPrenomSelonType(ExecutionContextInterface $context): void
+    {
+        if ($this->type !== TypeUtilisateur::Joueur) {
+            return;
+        }
+
+        if ($this->prenom === null || trim($this->prenom) === '') {
+            $context->buildViolation('Le prénom est requis pour un compte joueur.')
+                ->atPath('prenom')
+                ->addViolation();
+        }
+    }
+
+    public function getType(): ?TypeUtilisateur
     {
         return $this->type;
     }
 
-    public function setType(string $type): static
+    public function setType(TypeUtilisateur $type): static
     {
         $this->type = $type;
-
-        return $this;
-    }
-
-    public function getNiveau(): ?string
-    {
-        return $this->niveau;
-    }
-
-    public function setNiveau(?string $niveau): static
-    {
-        $this->niveau = $niveau;
-
         return $this;
     }
 
@@ -251,34 +251,10 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * @return Collection<int, Equipe>
-     */
-    public function getEquipesCreees(): Collection
+    /** @return Collection<int, Equipe> */
+    public function getEquipesGerees(): Collection
     {
-        return $this->equipesCreees;
-    }
-
-    public function addEquipesCreee(Equipe $equipesCreee): static
-    {
-        if (!$this->equipesCreees->contains($equipesCreee)) {
-            $this->equipesCreees->add($equipesCreee);
-            $equipesCreee->setCreateur($this);
-        }
-
-        return $this;
-    }
-
-    public function removeEquipesCreee(Equipe $equipesCreee): static
-    {
-        if ($this->equipesCreees->removeElement($equipesCreee)) {
-            // set the owning side to null (unless already changed)
-            if ($equipesCreee->getCreateur() === $this) {
-                $equipesCreee->setCreateur(null);
-            }
-        }
-
-        return $this;
+        return $this->equipesGerees;
     }
 
     /**
@@ -341,33 +317,25 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * @return Collection<int, Participation>
-     */
-    public function getParticipations(): Collection
+
+    /** @return Collection<int, UtilisateurNiveau> */
+    public function getNiveaux(): Collection
     {
-        return $this->participations;
+        return $this->niveaux;
     }
 
-    public function addParticipation(Participation $participation): static
+    public function addNiveau(UtilisateurNiveau $niveauSport): static
     {
-        if (!$this->participations->contains($participation)) {
-            $this->participations->add($participation);
-            $participation->setUtilisateur($this);
+        if (!$this->niveaux->contains($niveauSport)) {
+            $this->niveaux->add($niveauSport);
+            $niveauSport->setUtilisateur($this);
         }
-
         return $this;
     }
 
-    public function removeParticipation(Participation $participation): static
+    public function removeNiveau(UtilisateurNiveau $niveauSport): static
     {
-        if ($this->participations->removeElement($participation)) {
-            // set the owning side to null (unless already changed)
-            if ($participation->getUtilisateur() === $this) {
-                $participation->setUtilisateur(null);
-            }
-        }
-
+        $this->niveaux->removeElement($niveauSport);
         return $this;
     }
 
