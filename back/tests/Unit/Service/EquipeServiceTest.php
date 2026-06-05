@@ -117,6 +117,66 @@ class EquipeServiceTest extends TestCase
         $this->assertEquals(StatutMembreEquipe::Confirme, $resultat->getStatut());
     }
 
+    public function testSupprimerAdhesion_JoueurQuitteConfirme(): void
+    {
+        $joueur = $this->creerJoueur();
+        $membre = new EquipeJoueur();
+        $membre->setUtilisateur($joueur);
+        $membre->setRole(\App\Enum\RoleEquipe::Joueur);
+        $membre->setStatut(StatutMembreEquipe::Confirme);
+
+        $this->em->expects($this->once())->method('remove')->with($membre);
+        $this->em->expects($this->once())->method('flush');
+
+        $this->service->supprimerAdhesion($membre, $joueur);
+    }
+
+    public function testSupprimerAdhesion_Gestionnaire_LeveException(): void
+    {
+        $club = $this->creerClub();
+        $membre = new EquipeJoueur();
+        $membre->setUtilisateur($club);
+        $membre->setRole(\App\Enum\RoleEquipe::Gestionnaire);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('gestionnaire');
+
+        $this->service->supprimerAdhesion($membre, $club);
+    }
+
+    public function testSupprimerAdhesion_ClubRetireJoueur(): void
+    {
+        $club = $this->creerClub();
+        $joueur = $this->creerJoueur();
+        $equipe = new Equipe();
+        $equipe->setClub($club);
+
+        $membre = new EquipeJoueur();
+        $membre->setUtilisateur($joueur);
+        $membre->setEquipe($equipe);
+        $membre->setRole(\App\Enum\RoleEquipe::Joueur);
+        $membre->setStatut(StatutMembreEquipe::Confirme);
+
+        $this->em->expects($this->once())->method('remove')->with($membre);
+        $this->em->expects($this->once())->method('flush');
+
+        $this->service->supprimerAdhesion($membre, $club);
+    }
+
+    public function testSupprimerAdhesion_Intrus_LeveException(): void
+    {
+        $joueur = $this->creerJoueur();
+        $autre = $this->creerJoueur();
+        $membre = new EquipeJoueur();
+        $membre->setUtilisateur($joueur);
+        $membre->setRole(\App\Enum\RoleEquipe::Joueur);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Accès refusé');
+
+        $this->service->supprimerAdhesion($membre, $autre);
+    }
+
     public function testRetirerMembre(): void
     {
         $membre = new EquipeJoueur();

@@ -31,6 +31,7 @@ const resultatsRecherche = ref<any[]>([])
 const rechercheEnCours = ref(false)
 const invitationEnCours = ref<number | null>(null)
 const annulationEnCours = ref<number | null>(null)
+const retraitEnCours = ref<number | null>(null)
 const demandeEnCours = ref(false)
 const reponseDemandeEnCours = ref<number | null>(null)
 
@@ -73,6 +74,14 @@ const peutDemanderRejoindre = computed(() => {
 const demandeJoueurEnAttente = computed(
   () =>
     monMembre.value?.origine === 'demande_joueur' && monMembre.value?.statut === 'en_attente',
+)
+
+const peutQuitterEquipe = computed(
+  () =>
+    auth.utilisateur?.type === 'joueur'
+    && !estProprietaire.value
+    && monMembre.value?.statut === 'confirme'
+    && monMembre.value?.role === 'joueur',
 )
 
 onMounted(charger)
@@ -152,6 +161,61 @@ function peutAnnulerInvitation(membre: any): boolean {
     membre.origine === 'invitation_club' &&
     membre.role !== 'gestionnaire'
   )
+}
+
+function peutRetirerMembre(membre: any): boolean {
+  return (
+    estProprietaire.value
+    && membre.role === 'joueur'
+    && membre.statut === 'confirme'
+  )
+}
+
+async function retirerMembreEquipe(membre: any) {
+  const nom = nomAffichage(membre.utilisateur)
+  if (
+    !confirm(
+      `Retirer ${nom} de l'équipe ? Cette personne ne sera plus membre de l'équipe.`,
+    )
+  ) {
+    return
+  }
+
+  retraitEnCours.value = membre.id
+  erreur.value = ''
+  try {
+    await retirerMembre(auth.token!, equipeId, membre.id)
+    messageSucces.value = 'Membre retiré.'
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Retrait impossible.'
+  } finally {
+    retraitEnCours.value = null
+  }
+}
+
+async function quitterEquipe() {
+  if (!monMembre.value) return
+  const nom = equipe.value?.nom ?? 'cette équipe'
+  if (
+    !confirm(
+      `Quitter l'équipe « ${nom} » ? Vous ne pourrez plus participer aux matchs de cette équipe.`,
+    )
+  ) {
+    return
+  }
+
+  annulationEnCours.value = monMembre.value.id
+  erreur.value = ''
+  try {
+    await retirerMembre(auth.token!, equipeId, monMembre.value.id)
+    messageSucces.value = 'Vous avez quitté l\'équipe.'
+    await charger()
+  } catch (e: any) {
+    erreur.value = e.message || 'Impossible de quitter l\'équipe.'
+  } finally {
+    annulationEnCours.value = null
+  }
 }
 
 function dejaDansEquipe(joueurId: number): boolean {
@@ -276,6 +340,14 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
             >
               Annuler ma demande
             </button>
+            <button
+              v-if="peutQuitterEquipe"
+              class="btn btn-secondaire btn-quitter"
+              :disabled="annulationEnCours === monMembre?.id"
+              @click="quitterEquipe"
+            >
+              Quitter l'équipe
+            </button>
           </div>
           <p class="inviter-aide">
             Une seule équipe par sport (confirmée ou en attente).
@@ -389,11 +461,19 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
               </div>
               <button
                 v-if="estProprietaire && peutAnnulerInvitation(membre)"
-                class="btn-annuler-invitation"
+                class="btn-membre-action btn-annuler-invitation"
                 :disabled="annulationEnCours === membre.id"
                 @click="annulerInvitation(membre.id)"
               >
                 Annuler l'invitation
+              </button>
+              <button
+                v-if="peutRetirerMembre(membre)"
+                class="btn-membre-action btn-retirer-membre"
+                :disabled="retraitEnCours === membre.id"
+                @click="retirerMembreEquipe(membre)"
+              >
+                Retirer
               </button>
             </div>
           </div>
@@ -729,19 +809,31 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   color: var(--couleur-refuse);
 }
 
-.btn-annuler-invitation {
+.btn-membre-action {
   margin-top: 0.25rem;
   background: none;
   border: none;
-  color: var(--couleur-refuse);
   font-size: 0.78rem;
   cursor: pointer;
   text-decoration: underline;
 }
 
-.btn-annuler-invitation:disabled {
+.btn-annuler-invitation {
+  color: var(--couleur-texte-discret);
+}
+
+.btn-retirer-membre,
+.btn-quitter {
+  color: var(--couleur-refuse);
+}
+
+.btn-membre-action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.demande-actions .btn-quitter {
+  border: 1px solid var(--couleur-refuse);
 }
 
 .bas-contenu {

@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
+import { retirerMembre } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import { libelleRoleEquipe } from '@/utils/equipeAffichage'
 import { nomAffichage } from '@/utils/nomAffichage'
 
@@ -8,10 +11,41 @@ defineProps<{
   mesEquipes: any[]
   chargement: boolean
 }>()
+
+const emit = defineEmits<{
+  actualiser: []
+}>()
+
+const auth = useAuthStore()
+const erreur = ref('')
+const quitterEnCours = ref<number | null>(null)
+
+async function quitter(adhesion: any) {
+  const nom = adhesion.equipe?.nom ?? 'cette équipe'
+  if (
+    !confirm(
+      `Quitter l'équipe « ${nom} » ? Vous ne pourrez plus participer aux matchs de cette équipe.`,
+    )
+  ) {
+    return
+  }
+
+  quitterEnCours.value = adhesion.id
+  erreur.value = ''
+  try {
+    await retirerMembre(auth.token!, adhesion.equipe.id, adhesion.id)
+    emit('actualiser')
+  } catch (e: any) {
+    erreur.value = e.message || 'Impossible de quitter cette équipe.'
+  } finally {
+    quitterEnCours.value = null
+  }
+}
 </script>
 
 <template>
   <div class="onglet-mes-equipes">
+    <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
     <div v-if="chargement" class="chargement">Chargement...</div>
     <div v-else-if="!mesEquipes.length" class="carte vide-centre">
       <p>Vous n'êtes membre d'aucune équipe pour le moment.</p>
@@ -36,12 +70,21 @@ defineProps<{
             <span class="carte-equipe-role">{{ libelleRoleEquipe(adhesion.role) }}</span>
           </div>
         </div>
-        <RouterLink
-          :to="`/equipes/${adhesion.equipe?.id}`"
-          class="btn btn-secondaire btn-pleine-largeur"
-        >
-          Voir l'équipe
-        </RouterLink>
+        <div class="carte-equipe-actions">
+          <RouterLink
+            :to="`/equipes/${adhesion.equipe?.id}`"
+            class="btn btn-secondaire btn-pleine-largeur"
+          >
+            Voir l'équipe
+          </RouterLink>
+          <button
+            class="btn btn-secondaire btn-pleine-largeur btn-quitter"
+            :disabled="quitterEnCours === adhesion.id"
+            @click="quitter(adhesion)"
+          >
+            Quitter l'équipe
+          </button>
+        </div>
       </article>
     </div>
   </div>
@@ -64,6 +107,21 @@ defineProps<{
 .carte-equipe-haut {
   display: flex;
   gap: var(--espace-m);
+}
+
+.carte-equipe-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-s);
+}
+
+.btn-quitter {
+  color: var(--couleur-refuse);
+  border-color: var(--couleur-refuse);
+}
+
+.btn-quitter:hover {
+  background: var(--couleur-refuse-fond);
 }
 
 .carte-equipe-titre {

@@ -225,9 +225,12 @@ class EquipeController extends AbstractController
         }
 
         try {
-            $this->equipeService->annulerAdhesionEnAttente($membre, $moi);
+            $this->equipeService->supprimerAdhesion($membre, $moi);
         } catch (\InvalidArgumentException $e) {
-            return $this->json(['erreur' => $e->getMessage()], 422);
+            $message = $e->getMessage();
+            $statut  = str_contains($message, 'Accès refusé') ? 403 : 422;
+
+            return $this->json(['erreur' => $message], $statut);
         }
 
         return $this->json(null, 204);

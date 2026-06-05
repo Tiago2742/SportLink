@@ -93,6 +93,7 @@ async function charger() {
       v-show="ongletActif === 'mes-equipes'"
       :mes-equipes="espace?.mesEquipes ?? []"
       :chargement="chargement"
+      @actualiser="charger"
     />
     <OngletInvitations
       v-show="ongletActif === 'invitations'"

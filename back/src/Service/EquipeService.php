@@ -282,41 +282,48 @@ class EquipeService
     }
 
     /**
-     * Annule une adhésion en attente (invitation club ou demande joueur).
+     * Supprime une adhésion (quitter / retirer / annuler en attente).
+     * Le gestionnaire ne peut pas être retiré (suppression de l'équipe uniquement).
      */
-    public function annulerAdhesionEnAttente(EquipeJoueur $membre, Utilisateur $acteur): void
+    public function supprimerAdhesion(EquipeJoueur $membre, Utilisateur $acteur): void
     {
-        if ($membre->getStatut() !== StatutMembreEquipe::EnAttente) {
-            throw new \InvalidArgumentException('Seule une adhésion en attente peut être annulée.');
-        }
-
         if ($membre->getRole() === RoleEquipe::Gestionnaire) {
-            throw new \InvalidArgumentException('Impossible de retirer le gestionnaire de l\'équipe.');
+            throw new \InvalidArgumentException(
+                'Le gestionnaire ne peut pas quitter ou être retiré de l\'équipe. Supprimez l\'équipe si nécessaire.',
+            );
         }
 
         $equipe = $membre->getEquipe();
 
-        $peutAnnuler = match ($membre->getOrigine()) {
-            OrigineMembreEquipe::InvitationClub =>
-                $acteur->getType() === TypeUtilisateur::Club && $equipe->getClub() === $acteur,
-            OrigineMembreEquipe::DemandeJoueur =>
-                ($acteur->getType() === TypeUtilisateur::Club && $equipe->getClub() === $acteur)
-                || $membre->getUtilisateur() === $acteur,
-            default => false,
-        };
+        if ($membre->getUtilisateur() === $acteur) {
+            if ($acteur->getType() !== TypeUtilisateur::Joueur) {
+                throw new \InvalidArgumentException('Accès refusé.');
+            }
 
-        if (!$peutAnnuler) {
-            throw new \InvalidArgumentException('Accès refusé.');
+            $this->retirerMembre($membre);
+
+            return;
         }
 
-        $this->em->remove($membre);
-        $this->em->flush();
+        if ($acteur->getType() === TypeUtilisateur::Club && $equipe->getClub() === $acteur) {
+            $this->retirerMembre($membre);
+
+            return;
+        }
+
+        throw new \InvalidArgumentException('Accès refusé.');
     }
 
-    /** @deprecated Utiliser annulerAdhesionEnAttente */
+    /** @deprecated Utiliser supprimerAdhesion */
+    public function annulerAdhesionEnAttente(EquipeJoueur $membre, Utilisateur $acteur): void
+    {
+        $this->supprimerAdhesion($membre, $acteur);
+    }
+
+    /** @deprecated Utiliser supprimerAdhesion */
     public function annulerInvitation(EquipeJoueur $membre, Utilisateur $club): void
     {
-        $this->annulerAdhesionEnAttente($membre, $club);
+        $this->supprimerAdhesion($membre, $club);
     }
 
     /** @return EquipeJoueur[] */
