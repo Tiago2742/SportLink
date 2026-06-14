@@ -79,8 +79,11 @@ const lienEquipeCollectif = computed(
 </script>
 
 <template>
-  <div class="carte-match carte carte-interactive">
+  <div class="carte-match carte carte-interactive" :class="{ 'carte-match--inscrit': dejaInscrit }">
     <div class="carte-corps">
+      <span v-if="match.sport?.type" class="chip-type-sport">
+        {{ match.sport.type === 'collectif' ? 'Collectif' : 'Individuel' }}
+      </span>
       <h3 class="carte-titre">{{ titreMatch }}</h3>
 
       <ul class="carte-infos">
@@ -133,16 +136,50 @@ const lienEquipeCollectif = computed(
   flex-direction: column;
   gap: var(--espace-m);
   padding: var(--espace-l);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Filet gradient en haut de chaque carte */
+.carte-match::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+/* État "je participe" : bordure gauche verte */
+.carte-match--inscrit {
+  border-left-width: 3px;
+  border-left-color: var(--couleur-primaire);
 }
 
 .carte-corps {
   flex: 1;
 }
 
+.chip-type-sport {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--couleur-accent-texte);
+  background: var(--couleur-accent-fond);
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--rayon-badge);
+  margin-bottom: var(--espace-xs);
+}
+
 .carte-titre {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--couleur-texte);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--couleur-titre);
   margin-bottom: var(--espace-s);
 }
 
@@ -198,6 +235,8 @@ const lienEquipeCollectif = computed(
   display: flex;
   gap: var(--espace-s);
   flex-wrap: wrap;
+  border-top: 1px solid var(--couleur-bordure);
+  padding-top: var(--espace-s);
 }
 
 .carte-actions .btn {

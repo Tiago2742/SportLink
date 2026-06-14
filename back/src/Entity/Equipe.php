@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\StatutMembreEquipe;
 use App\Repository\EquipeRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -129,6 +130,12 @@ class Equipe
     public function getMembres(): Collection
     {
         return $this->membres;
+    }
+
+    #[Groups(['equipe:list'])]
+    public function getMembresConfirmesCount(): int
+    {
+        return $this->membres->filter(fn(EquipeJoueur $m) => $m->getStatut() === StatutMembreEquipe::Confirme)->count();
     }
 
     public function addMembre(EquipeJoueur $membre): static

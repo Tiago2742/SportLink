@@ -8,6 +8,8 @@
 
 <style scoped>
 .pied-de-page {
+  width: 100%;
+  align-self: stretch;
   background: white;
   border-top: 1px solid var(--couleur-bordure);
   margin-top: auto;
@@ -15,7 +17,7 @@
 }
 
 .pied-interieur {
-  max-width: 1200px;
+  max-width: var(--largeur-conteneur);
   margin: 0 auto;
   padding: 0 var(--espace-l);
   text-align: center;

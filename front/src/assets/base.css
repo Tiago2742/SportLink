@@ -70,6 +70,9 @@
   --rayon-badge: 20px;
   --rayon-champ: 8px;
 
+  /* —— Mise en page —— */
+  --largeur-conteneur: 1280px;
+
   /* —— Espacements —— */
   --espace-xs: 0.25rem;
   --espace-s: 0.5rem;
@@ -109,6 +112,7 @@
 
 body {
   min-height: 100vh;
+  overflow-x: clip;
   background: var(--couleur-fond);
   color: var(--couleur-texte);
   font-family:

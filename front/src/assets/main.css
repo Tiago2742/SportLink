@@ -1,13 +1,27 @@
 @import './base.css';
 
+html,
+body {
+  width: 100%;
+  max-width: none;
+}
+
 #app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: none;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .conteneur {
-  max-width: 1200px;
+  max-width: var(--largeur-conteneur);
   margin: 0 auto;
   padding: 0 var(--espace-l);
   width: 100%;
