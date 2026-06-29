@@ -36,7 +36,8 @@ async function charger() {
       userId ? chargerMesMatchs(auth.token!) : Promise.resolve([]),
     ])
     matchsDisponibles.value = disponibles.slice(0, 3)
-    mesMatchs.value = miens
+    const maintenant = new Date()
+    mesMatchs.value = miens.filter((m: any) => new Date(m.dateMatch) > maintenant)
   } catch {
     erreur.value = 'Impossible de charger les matchs.'
   } finally {
