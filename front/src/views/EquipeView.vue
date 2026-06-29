@@ -17,6 +17,18 @@ import {
   libelleStatutMembre,
 } from '@/utils/equipeAffichage'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
+import IconeSection from '@/components/ui/IconeSection.vue'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
+import {
+  ArrowLeft,
+  BarChart3,
+  Calendar,
+  Inbox,
+  Mail,
+  MapPin,
+  UserPlus,
+  Users,
+} from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -285,7 +297,8 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           to="/mes-equipes"
           class="lien-retour"
         >
-          ← Mes équipes
+          <ArrowLeft :size="16" aria-hidden="true" />
+          Mes équipes
         </RouterLink>
       </div>
 
@@ -294,11 +307,15 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           <div class="equipe-identite">
             <AvatarEquipe :equipe="equipe" taille="lg" />
             <div>
+              <span class="equipe-eyebrow">Fiche équipe</span>
               <h1 class="equipe-nom">{{ equipe.nom }}</h1>
               <div class="equipe-meta">
                 <span>{{ equipe.sport?.nom ?? equipe.sport }}</span>
                 <span v-if="equipe.niveau">· {{ equipe.niveau?.libelle ?? equipe.niveau }}</span>
-                <span v-if="equipe.localisation">· 📍 {{ equipe.localisation }}</span>
+                <span v-if="equipe.localisation" class="equipe-meta-lieu">
+                  ·
+                  <IconeLigne :icone="MapPin" :taille="14" discret>{{ equipe.localisation }}</IconeLigne>
+                </span>
               </div>
             </div>
           </div>
@@ -314,7 +331,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           class="carte section-demande-joueur"
         >
           <div class="section-titre-icone">
-            <span>🙋</span>
+            <IconeSection :icone="UserPlus" label="Rejoindre cette équipe" />
             <h2>Rejoindre cette équipe</h2>
           </div>
           <p v-if="demandeJoueurEnAttente" class="demande-etat">
@@ -362,7 +379,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           class="carte section-demandes"
         >
           <div class="section-titre-icone">
-            <span>📥</span>
+            <IconeSection :icone="Inbox" label="Demandes en attente" />
             <h2>Demandes en attente</h2>
             <span class="membres-count">{{ demandesEnAttente.length }}</span>
           </div>
@@ -396,7 +413,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
         <section v-if="estProprietaire" class="carte section-inviter">
           <div class="section-titre-icone">
-            <span>✉️</span>
+            <IconeSection :icone="Mail" label="Inviter un joueur" />
             <h2>Inviter un joueur</h2>
           </div>
           <p class="inviter-aide">
@@ -428,7 +445,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
         <section class="carte section-membres">
           <div class="section-titre-icone">
-            <span>👥</span>
+            <IconeSection :icone="Users" label="Membres de l'équipe" />
             <h2>Membres de l'équipe</h2>
             <span class="membres-count">
               {{ membresAffichés.length }} membre{{ membresAffichés.length > 1 ? 's' : '' }}
@@ -482,7 +499,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
         <div class="bas-contenu">
           <section class="carte section-calendrier">
             <div class="section-titre-icone">
-              <span>📅</span>
+              <IconeSection :icone="Calendar" label="Calendrier" />
               <h2>Calendrier</h2>
             </div>
             <div class="vide-section">
@@ -495,7 +512,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
           <section class="carte section-stats">
             <div class="section-titre-icone">
-              <span>📊</span>
+              <IconeSection :icone="BarChart3" label="Statistiques de l'équipe" />
               <h2>Statistiques de l'équipe</h2>
             </div>
             <div class="stats-grille">
@@ -541,29 +558,79 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════
+   FOND PLEIN-LARGEUR
+══════════════════════════════════════ */
 .page-equipe {
+  background: #f5f9f5;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
   padding-bottom: var(--espace-xxl);
 }
 
+.page-equipe::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -80px;
+  width: 340px; height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154, 230, 0, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-equipe::after {
+  content: '';
+  position: absolute;
+  bottom: -80px; left: -80px;
+  width: 280px; height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════
+   LIEN RETOUR
+══════════════════════════════════════ */
 .lien-equipe-haut {
   padding-top: var(--espace-m);
+  position: relative;
+  z-index: 1;
 }
 
 .lien-retour {
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 500;
   color: var(--couleur-texte-discret);
   text-decoration: none;
+  transition: color 0.18s ease;
 }
 
 .lien-retour:hover {
   color: var(--couleur-primaire);
 }
 
+/* ══════════════════════════════════════
+   EN-TÊTE ÉQUIPE
+══════════════════════════════════════ */
 .equipe-entete {
-  background: white;
-  border-bottom: 1px solid var(--couleur-bordure);
+  background: #ffffff;
   padding: var(--espace-l) 0;
   margin-bottom: var(--espace-xl);
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.equipe-entete::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
 }
 
 .equipe-entete-interieur {
@@ -580,23 +647,71 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   gap: var(--espace-l);
 }
 
-.equipe-nom {
-  font-size: 1.5rem;
+.equipe-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.65rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.equipe-nom {
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--couleur-titre);
   margin-bottom: 0.2rem;
 }
 
 .equipe-meta {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--couleur-texte-discret);
   display: flex;
+  align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
+.equipe-meta-lieu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+/* ══════════════════════════════════════
+   CONTENU PRINCIPAL
+══════════════════════════════════════ */
 .equipe-contenu {
   display: flex;
   flex-direction: column;
   gap: var(--espace-l);
+  position: relative;
+  z-index: 1;
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+/* ══════════════════════════════════════
+   CARTE (override global, scoped)
+══════════════════════════════════════ */
+.carte {
+  border: 1.5px solid #dde8dd;
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.carte::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
 }
 
 .section-demande-joueur,
@@ -608,6 +723,38 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   padding: var(--espace-l);
 }
 
+/* ══════════════════════════════════════
+   EN-TÊTES DE SECTION
+══════════════════════════════════════ */
+.section-titre-icone {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: var(--espace-l);
+  padding-bottom: var(--espace-m);
+  border-bottom: 1px solid var(--couleur-bordure);
+}
+
+.section-titre-icone h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--couleur-titre);
+  flex: 1;
+}
+
+.membres-count {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--couleur-accent-texte);
+  background: var(--couleur-accent-fond);
+  padding: 0.22rem 0.65rem;
+  border-radius: var(--rayon-badge);
+}
+
+/* ══════════════════════════════════════
+   SECTION REJOINDRE
+══════════════════════════════════════ */
 .demande-etat {
   font-size: 0.9rem;
   margin-bottom: var(--espace-m);
@@ -620,41 +767,13 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   margin-bottom: var(--espace-s);
 }
 
-.liste-demandes {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--espace-m);
+.btn-quitter {
+  color: var(--couleur-refuse) !important;
+  border-color: rgba(198, 40, 40, 0.3) !important;
 }
 
-.ligne-demande {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--espace-m);
-  padding: var(--espace-m);
-  background: var(--couleur-fond);
-  border-radius: var(--rayon-carte);
-}
-
-.demande-joueur {
-  display: flex;
-  align-items: center;
-  gap: var(--espace-s);
-}
-
-.demande-boutons {
-  display: flex;
-  gap: var(--espace-s);
-}
-
-.membre-avatar-sm {
-  width: 40px;
-  height: 40px;
-  font-size: 0.85rem;
+.btn-quitter:hover:not(:disabled) {
+  background: var(--couleur-refuse-fond) !important;
 }
 
 .inviter-aide {
@@ -670,13 +789,64 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   font-size: 0.85rem;
 }
 
+/* ══════════════════════════════════════
+   SECTION DEMANDES
+══════════════════════════════════════ */
+.liste-demandes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-s);
+}
+
+.ligne-demande {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--espace-m);
+  padding: var(--espace-m);
+  background: var(--couleur-fond);
+  border-radius: calc(var(--rayon-carte) - 2px);
+  transition: background 0.18s ease;
+}
+
+.ligne-demande:hover {
+  background: var(--couleur-primaire-tres-claire);
+}
+
+.demande-joueur {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-s);
+}
+
+.demande-boutons {
+  display: flex;
+  gap: var(--espace-s);
+}
+
+/* ══════════════════════════════════════
+   SECTION INVITER / RECHERCHE
+══════════════════════════════════════ */
 .champ-recherche {
   width: 100%;
   max-width: 420px;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--couleur-bordure);
-  border-radius: var(--rayon-bouton);
-  font-size: 0.95rem;
+  padding: 0.62rem 0.95rem;
+  border: 1.5px solid var(--couleur-bordure);
+  border-radius: var(--rayon-champ);
+  font-size: 0.9rem;
+  color: var(--couleur-texte);
+  background: var(--couleur-fond-blanc);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.champ-recherche:focus {
+  border-color: var(--couleur-primaire);
+  box-shadow: 0 0 0 3px rgba(154, 230, 0, 0.28), 0 0 0 1px var(--couleur-primaire);
 }
 
 .recherche-etat {
@@ -691,7 +861,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--espace-s);
+  gap: 2px;
 }
 
 .resultats-recherche li {
@@ -699,9 +869,14 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   align-items: center;
   justify-content: space-between;
   gap: var(--espace-m);
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--couleur-bordure);
+  padding: 0.55rem var(--espace-s);
+  border-radius: 6px;
   font-size: 0.9rem;
+  transition: background 0.15s ease;
+}
+
+.resultats-recherche li:hover {
+  background: var(--couleur-primaire-tres-claire);
 }
 
 .resultats-recherche small {
@@ -710,7 +885,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 }
 
 .btn-compact {
-  padding: 0.35rem 0.75rem;
+  padding: 0.32rem 0.72rem;
   font-size: 0.82rem;
 }
 
@@ -719,67 +894,65 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   color: var(--couleur-texte-discret);
 }
 
-.section-titre-icone {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: var(--espace-l);
-  padding-bottom: var(--espace-m);
-  border-bottom: 1px solid var(--couleur-bordure);
-}
-
-.section-titre-icone h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  flex: 1;
-}
-
-.membres-count {
-  font-size: 0.82rem;
-  color: var(--couleur-texte-discret);
-  background: var(--couleur-fond);
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--rayon-badge);
-}
-
+/* ══════════════════════════════════════
+   MEMBRES — LAYOUT HORIZONTAL
+══════════════════════════════════════ */
 .grille-membres {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--espace-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-s);
 }
 
 .carte-membre {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
-  padding: var(--espace-l);
+  padding: var(--espace-m);
   background: var(--couleur-fond);
-  border-radius: var(--rayon-carte);
-  gap: var(--espace-s);
+  border: 1.5px solid #e8f0e8;
+  border-radius: calc(var(--rayon-carte) - 2px);
+  gap: var(--espace-m);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.carte-membre:hover {
+  border-color: var(--couleur-primaire-claire);
+  background: #f0f8f0;
 }
 
 .membre-avatar {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: var(--couleur-primaire);
+  background: linear-gradient(135deg, #388e3c, #66bb6a);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.membre-avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 0.85rem;
 }
 
 .membre-info {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .membre-info strong {
   font-size: 0.9rem;
+  color: var(--couleur-titre);
+  font-weight: 700;
 }
 
 .membre-role {
@@ -788,9 +961,11 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 }
 
 .membre-statut {
-  font-size: 0.72rem;
-  padding: 0.15rem 0.45rem;
+  font-size: 0.71rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
   border-radius: var(--rayon-badge);
+  align-self: flex-start;
   margin-top: 0.15rem;
 }
 
@@ -809,22 +984,38 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   color: var(--couleur-refuse);
 }
 
+/* ── Boutons d'action membre ── */
 .btn-membre-action {
-  margin-top: 0.25rem;
+  flex-shrink: 0;
   background: none;
-  border: none;
+  border: 1.5px solid var(--couleur-bordure);
+  border-radius: 6px;
+  padding: 0.28rem 0.7rem;
   font-size: 0.78rem;
+  font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
+  white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
 }
 
 .btn-annuler-invitation {
   color: var(--couleur-texte-discret);
 }
 
-.btn-retirer-membre,
-.btn-quitter {
+.btn-annuler-invitation:hover:not(:disabled) {
+  background: var(--couleur-fond);
+  color: var(--couleur-texte);
+  border-color: var(--couleur-texte-discret);
+}
+
+.btn-retirer-membre {
   color: var(--couleur-refuse);
+  border-color: rgba(198, 40, 40, 0.25);
+}
+
+.btn-retirer-membre:hover:not(:disabled) {
+  background: var(--couleur-refuse-fond);
+  border-color: var(--couleur-refuse);
 }
 
 .btn-membre-action:disabled {
@@ -832,10 +1023,9 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   cursor: not-allowed;
 }
 
-.demande-actions .btn-quitter {
-  border: 1px solid var(--couleur-refuse);
-}
-
+/* ══════════════════════════════════════
+   BAS — CALENDRIER + STATS
+══════════════════════════════════════ */
 .bas-contenu {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -849,6 +1039,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   font-size: 0.88rem;
 }
 
+/* ── Statistiques ── */
 .stats-grille {
   display: flex;
   gap: var(--espace-m);
@@ -857,7 +1048,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
 .stat-principale {
   flex: 1;
-  background: var(--couleur-primaire);
+  background: var(--degrade-primaire);
   color: white;
   border-radius: var(--rayon-carte);
   display: flex;
@@ -930,7 +1121,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
 
 .barre-remplie {
   height: 100%;
-  background: var(--couleur-primaire);
+  background: var(--degrade-primaire);
   border-radius: 4px;
 }
 
@@ -957,6 +1148,17 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   font-weight: 700;
 }
 
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
 @media (max-width: 768px) {
   .bas-contenu {
     grid-template-columns: 1fr;
@@ -965,6 +1167,16 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   .equipe-entete-interieur {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .equipe-nom {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .carte-membre {
+    flex-wrap: wrap;
   }
 }
 </style>

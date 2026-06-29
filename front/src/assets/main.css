@@ -1,52 +1,89 @@
 @import './base.css';
 
+html,
+body {
+  width: 100%;
+  max-width: none;
+}
+
 #app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: none;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .conteneur {
-  max-width: 1200px;
+  max-width: var(--largeur-conteneur);
   margin: 0 auto;
   padding: 0 var(--espace-l);
   width: 100%;
 }
 
+/* —— Boutons —— */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--espace-xs);
-  padding: 0.6rem 1.2rem;
+  gap: 0.4rem;
+  padding: 0.62rem 1.25rem;
   border-radius: var(--rayon-bouton);
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   border: none;
   text-decoration: none;
-  transition: background 0.2s, box-shadow 0.2s;
+  transition:
+    transform var(--transition-interaction),
+    box-shadow var(--transition-interaction),
+    background var(--transition-interaction),
+    border-color var(--transition-interaction),
+    color var(--transition-interaction);
   white-space: nowrap;
 }
 
-.btn-primaire {
-  background: var(--couleur-bouton);
-  color: var(--couleur-bouton-texte);
+.btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
-.btn-primaire:hover {
-  background: var(--couleur-bouton-survol);
-  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.4);
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-primaire {
+  background: var(--degrade-primaire);
+  color: var(--couleur-bouton-texte);
+  box-shadow: var(--ombre-bouton);
+}
+
+.btn-primaire:hover:not(:disabled) {
+  background: var(--degrade-primaire-survol);
+  box-shadow: var(--ombre-bouton-survol);
+  transform: translateY(-2px);
 }
 
 .btn-secondaire {
-  background: transparent;
+  background: var(--couleur-fond-blanc);
   color: var(--couleur-bouton);
-  border: 1.5px solid var(--couleur-bouton);
+  border: 1.5px solid var(--couleur-bordure);
+  box-shadow: var(--ombre-carte);
 }
 
-.btn-secondaire:hover {
+.btn-secondaire:hover:not(:disabled) {
   background: var(--couleur-primaire-tres-claire);
+  border-color: var(--couleur-primaire-claire);
+  transform: translateY(-1px);
+  box-shadow: var(--ombre-carte-survol);
 }
 
 .btn-pleine-largeur {
@@ -54,35 +91,71 @@
 }
 
 .btn-danger {
-  background: #c62828;
+  background: linear-gradient(135deg, #c62828, #e53935);
   color: white;
+  box-shadow: 0 4px 12px rgba(198, 40, 40, 0.25);
 }
 
-.btn-danger:hover {
-  background: #b71c1c;
+.btn-danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(198, 40, 40, 0.32);
 }
 
+/* —— Cartes —— */
 .carte {
   background: var(--couleur-fond-blanc);
   border-radius: var(--rayon-carte);
   box-shadow: var(--ombre-carte);
   border: 1px solid var(--couleur-bordure);
+  transition:
+    transform var(--transition-interaction),
+    box-shadow var(--transition-interaction);
 }
 
+.carte-interactive:hover {
+  box-shadow: var(--ombre-carte-survol);
+  transform: translateY(-3px);
+}
+
+/* Texte structurel (titres de section hors h1–h3) */
+.texte-fort {
+  color: var(--couleur-titre);
+  font-weight: 600;
+}
+
+/* Fond vert très clair pour alterner les sections */
+.fond-section {
+  background: var(--couleur-fond-section);
+}
+
+/* —— Champs —— */
 .champ {
   width: 100%;
-  padding: 0.6rem 0.9rem;
+  padding: 0.65rem 0.95rem;
   border: 1.5px solid var(--couleur-bordure);
-  border-radius: var(--rayon-bouton);
+  border-radius: var(--rayon-champ);
   font-size: 0.9rem;
   color: var(--couleur-texte);
-  background: white;
-  transition: border-color 0.2s;
+  background: var(--couleur-fond-blanc);
+  transition:
+    border-color var(--transition-rapide),
+    box-shadow var(--transition-rapide);
   outline: none;
+}
+
+.champ:hover:not(:disabled):not(:focus) {
+  border-color: #c5d4c5;
 }
 
 .champ:focus {
   border-color: var(--couleur-primaire-claire);
+  box-shadow: var(--ombre-focus);
+}
+
+.champ:disabled {
+  background: var(--couleur-fond);
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 .champ-groupe {
@@ -94,14 +167,95 @@
 
 .champ-groupe label {
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--couleur-texte-discret);
 }
 
 .obligatoire {
-  color: #e53935;
+  color: var(--couleur-refuse);
 }
 
+/* —— Badges (base globale, complète BadgeStatut) —— */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.badge-confirme {
+  background: var(--couleur-confirme-fond);
+  color: var(--couleur-confirme);
+  border-color: rgba(46, 125, 50, 0.2);
+}
+
+.badge-attente {
+  background: var(--couleur-attente-fond);
+  color: var(--couleur-attente);
+  border-color: rgba(245, 124, 0, 0.2);
+}
+
+.badge-refuse {
+  background: var(--couleur-refuse-fond);
+  color: var(--couleur-refuse);
+  border-color: rgba(198, 40, 40, 0.2);
+}
+
+.badge-termine,
+.badge-neutre {
+  background: var(--couleur-fond);
+  color: var(--couleur-texte-discret);
+  border-color: var(--couleur-bordure);
+}
+
+.badge-accent {
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  border-color: rgba(154, 230, 0, 0.45);
+}
+
+/* —— Icône inline (Lucide dans composants) —— */
+.icone-ligne {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: inherit;
+}
+
+.icone-ligne svg {
+  flex-shrink: 0;
+  color: var(--couleur-primaire);
+}
+
+.icone-ligne--discret svg {
+  color: var(--couleur-texte-discret);
+}
+
+.icone-section {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--rayon-bouton);
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-primaire);
+  flex-shrink: 0;
+}
+
+.icone-section svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke-width: 2.25;
+}
+
+/* —— Grilles & alertes —— */
 .grille-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -122,15 +276,15 @@
 }
 
 .alerte-erreur {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef9a9a;
+  background: var(--couleur-refuse-fond);
+  color: var(--couleur-refuse);
+  border: 1px solid rgba(198, 40, 40, 0.25);
 }
 
 .alerte-succes {
   background: var(--couleur-primaire-tres-claire);
   color: var(--couleur-primaire);
-  border: 1px solid #a5d6a7;
+  border: 1px solid rgba(76, 175, 80, 0.35);
 }
 
 .chargement {

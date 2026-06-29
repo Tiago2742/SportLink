@@ -5,6 +5,11 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/apercu-design',
+      name: 'apercu-design',
+      component: () => import('@/views/ApercuFondationsView.vue'),
+    },
+    {
       path: '/connexion',
       name: 'connexion',
       component: () => import('@/views/ConnexionView.vue'),

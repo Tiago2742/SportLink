@@ -8,6 +8,8 @@ import {
   type CampResume,
 } from '@/composables/useMatchCamps'
 import { nomAffichage } from '@/utils/nomAffichage'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
+import { Calendar, MapPin, User, Users } from 'lucide-vue-next'
 
 const props = defineProps<{
   match: {
@@ -77,29 +79,31 @@ const lienEquipeCollectif = computed(
 </script>
 
 <template>
-  <div class="carte-match carte">
+  <div class="carte-match carte carte-interactive" :class="{ 'carte-match--inscrit': dejaInscrit }">
     <div class="carte-corps">
+      <span v-if="match.sport?.type" class="chip-type-sport">
+        {{ match.sport.type === 'collectif' ? 'Collectif' : 'Individuel' }}
+      </span>
       <h3 class="carte-titre">{{ titreMatch }}</h3>
 
       <ul class="carte-infos">
         <li>
-          <span class="icone">📅</span>
-          <span>{{ dateFormatee }}</span>
+          <IconeLigne :icone="Calendar" discret>{{ dateFormatee }}</IconeLigne>
         </li>
         <li v-if="match.lieu">
-          <span class="icone">📍</span>
-          <span>{{ match.lieu }}</span>
+          <IconeLigne :icone="MapPin" discret>{{ match.lieu }}</IconeLigne>
         </li>
         <li v-if="match.createur">
-          <span class="icone">👤</span>
-          <span>{{ nomAffichage(match.createur) }}</span>
+          <IconeLigne :icone="User" discret>{{ nomAffichage(match.createur) }}</IconeLigne>
         </li>
       </ul>
 
       <div class="carte-tags" v-if="match.niveauRequis || match.statut">
         <BadgeStatut :statut="match.statut" />
         <span v-if="match.niveauRequis" class="tag-niveau">{{ match.niveauRequis.libelle }}</span>
-        <span class="tag-joueurs">👥 {{ libellePlaces }}</span>
+        <span class="tag-joueurs">
+          <IconeLigne :icone="Users" :taille="14" discret>{{ libellePlaces }}</IconeLigne>
+        </span>
         <span v-if="dejaInscrit" class="tag-inscrit">Vous participez</span>
       </div>
     </div>
@@ -132,21 +136,50 @@ const lienEquipeCollectif = computed(
   flex-direction: column;
   gap: var(--espace-m);
   padding: var(--espace-l);
-  transition: box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
 }
 
-.carte-match:hover {
-  box-shadow: var(--ombre-carte-survol);
+/* Filet gradient en haut de chaque carte */
+.carte-match::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+/* État "je participe" : bordure gauche verte */
+.carte-match--inscrit {
+  border-left-width: 3px;
+  border-left-color: var(--couleur-primaire);
 }
 
 .carte-corps {
   flex: 1;
 }
 
+.chip-type-sport {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--couleur-accent-texte);
+  background: var(--couleur-accent-fond);
+  padding: 0.18rem 0.55rem;
+  border-radius: var(--rayon-badge);
+  margin-bottom: var(--espace-xs);
+}
+
 .carte-titre {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--couleur-texte);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--couleur-titre);
   margin-bottom: var(--espace-s);
 }
 
@@ -164,11 +197,6 @@ const lienEquipeCollectif = computed(
   gap: 0.4rem;
   font-size: 0.88rem;
   color: var(--couleur-texte-discret);
-}
-
-.icone {
-  font-size: 0.85rem;
-  flex-shrink: 0;
 }
 
 .carte-tags {
@@ -207,6 +235,8 @@ const lienEquipeCollectif = computed(
   display: flex;
   gap: var(--espace-s);
   flex-wrap: wrap;
+  border-top: 1px solid var(--couleur-bordure);
+  padding-top: var(--espace-s);
 }
 
 .carte-actions .btn {

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { creerMatch, chargerEquipes } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import type { NiveauRef } from '@/services/api'
+import { CircleCheck, Users, Zap } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -13,12 +14,12 @@ const { listeSports, niveauxPour, chargerCatalogue } = useSports()
 onMounted(chargerCatalogue)
 
 const form = ref({
-  sportId:       '' as number | '',
-  equipeId:      '' as number | '',
-  dateMatch:     '',
-  lieu:          '',
+  sportId:        '' as number | '',
+  equipeId:       '' as number | '',
+  dateMatch:      '',
+  lieu:           '',
   niveauRequisId: '' as number | '',
-  description:   '',
+  description:    '',
 })
 
 const equipes = ref<{ id: number; nom: string }[]>([])
@@ -74,7 +75,7 @@ async function soumettre() {
     return
   }
   if (besoinEquipe.value && form.value.equipeId === '') {
-    erreur.value = 'Sélectionnez l\'équipe qui participera à ce match.'
+    erreur.value = "Sélectionnez l'équipe qui participera à ce match."
     return
   }
   chargement.value = true
@@ -107,202 +108,262 @@ function annuler() {
 </script>
 
 <template>
-  <div class="page-creer conteneur">
-    <div class="creer-layout">
-      <!-- Sidebar info -->
-      <aside class="sidebar-info carte">
-        <div class="sidebar-icone">
-          <span>+</span>
-        </div>
-        <h2 class="sidebar-titre">Créer un match</h2>
-        <p class="sidebar-sous-titre">Organisez votre partie</p>
+  <!-- Fond plein-largeur teinté -->
+  <div class="page-creer">
+    <div class="conteneur creer-corps">
+      <div class="creer-layout">
 
-        <p class="sidebar-desc">
-          Remplissez les informations pour créer un match. Tous les champs marqués * sont
-          obligatoires.
-        </p>
+        <!-- Sidebar éditoriale -->
+        <aside class="sidebar-info">
+          <span class="sidebar-eyebrow">Nouveau match</span>
+          <h2 class="sidebar-titre">Créer un match</h2>
+          <p class="sidebar-desc">
+            Remplissez les informations pour créer un match. Les champs marqués
+            <span class="obligatoire">*</span> sont obligatoires.
+          </p>
+          <ul class="sidebar-infos">
+            <li>
+              <span class="info-icone" aria-hidden="true">
+                <CircleCheck :size="15" stroke-width="2.25" />
+              </span>
+              Le match sera visible par tous les utilisateurs
+            </li>
+            <li>
+              <span class="info-icone" aria-hidden="true">
+                <Users :size="15" stroke-width="2.25" />
+              </span>
+              Vous serez automatiquement participant
+            </li>
+            <li>
+              <span class="info-icone" aria-hidden="true">
+                <Zap :size="15" stroke-width="2.25" />
+              </span>
+              Création instantanée après validation
+            </li>
+          </ul>
+        </aside>
 
-        <ul class="sidebar-infos">
-          <li>
-            <span class="info-icone">✅</span>
-            Le match sera visible par tous les utilisateurs
-          </li>
-          <li>
-            <span class="info-icone">👥</span>
-            Vous serez automatiquement participant
-          </li>
-          <li>
-            <span class="info-icone">⚡</span>
-            Création instantanée après validation
-          </li>
-        </ul>
-      </aside>
+        <!-- Formulaire -->
+        <div class="formulaire-section">
+          <div class="formulaire-entete">
+            <span class="form-eyebrow">Informations du match</span>
+            <h1 class="formulaire-titre">Créer un nouveau match</h1>
+            <p class="formulaire-sous-titre">
+              Complétez le formulaire pour organiser votre match sportif
+            </p>
+          </div>
 
-      <!-- Formulaire -->
-      <div class="formulaire-section">
-        <h1 class="formulaire-titre">Créer un nouveau match</h1>
-        <p class="formulaire-sous-titre">
-          Complétez le formulaire ci-dessous pour organiser votre match sportif
-        </p>
+          <div class="formulaire-carte">
+            <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
 
-        <div class="carte formulaire-carte">
-          <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
+            <form @submit.prevent="soumettre">
+              <div class="grille-champs">
+                <div class="champ-groupe">
+                  <label for="sport">Sport <span class="obligatoire">*</span></label>
+                  <select id="sport" v-model="form.sportId" class="champ" required @change="onSportChange">
+                    <option value="">Choisir un sport</option>
+                    <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">
+                      {{ sport.nom }}
+                    </option>
+                  </select>
+                </div>
 
-          <form @submit.prevent="soumettre">
-            <div class="grille-2">
-              <div class="champ-groupe">
-                <label for="sport">Sport <span class="obligatoire">*</span></label>
-                <select id="sport" v-model="form.sportId" class="champ" required @change="onSportChange">
-                  <option value="">Choisir un sport</option>
-                  <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">{{ sport.nom }}</option>
+                <div class="champ-groupe">
+                  <label for="dateMatch">Date et heure <span class="obligatoire">*</span></label>
+                  <input
+                    id="dateMatch"
+                    v-model="form.dateMatch"
+                    type="datetime-local"
+                    class="champ"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div v-if="besoinEquipe" class="champ-groupe">
+                <label for="equipe">Votre équipe <span class="obligatoire">*</span></label>
+                <select
+                  id="equipe"
+                  v-model="form.equipeId"
+                  class="champ"
+                  required
+                  :disabled="chargementEquipes || equipes.length === 0"
+                >
+                  <option value="">
+                    {{
+                      chargementEquipes
+                        ? 'Chargement…'
+                        : equipes.length === 0
+                          ? '— aucune équipe pour ce sport —'
+                          : 'Choisir une équipe'
+                    }}
+                  </option>
+                  <option v-for="equipe in equipes" :key="equipe.id" :value="equipe.id">
+                    {{ equipe.nom }}
+                  </option>
                 </select>
               </div>
 
               <div class="champ-groupe">
-                <label for="dateMatch">Date et Heure <span class="obligatoire">*</span></label>
+                <label for="lieu">Lieu <span class="obligatoire">*</span></label>
                 <input
-                  id="dateMatch"
-                  v-model="form.dateMatch"
-                  type="datetime-local"
+                  id="lieu"
+                  v-model="form.lieu"
+                  type="text"
                   class="champ"
+                  placeholder="Adresse ou terrain"
                   required
                 />
               </div>
-            </div>
 
-            <div v-if="besoinEquipe" class="champ-groupe">
-              <label for="equipe">Votre équipe <span class="obligatoire">*</span></label>
-              <select
-                id="equipe"
-                v-model="form.equipeId"
-                class="champ"
-                required
-                :disabled="chargementEquipes || equipes.length === 0"
-              >
-                <option value="">
-                  {{
-                    chargementEquipes
-                      ? 'Chargement…'
-                      : equipes.length === 0
-                        ? '— aucune équipe pour ce sport —'
-                        : 'Choisir une équipe'
-                  }}
-                </option>
-                <option v-for="equipe in equipes" :key="equipe.id" :value="equipe.id">
-                  {{ equipe.nom }}
-                </option>
-              </select>
-            </div>
+              <div class="champ-groupe">
+                <label for="niveauRequis">Niveau requis <span class="label-optionnel">(optionnel)</span></label>
+                <select
+                  id="niveauRequis"
+                  v-model="form.niveauRequisId"
+                  class="champ"
+                  :disabled="form.sportId === ''"
+                >
+                  <option value="">
+                    {{ form.sportId !== '' ? 'Choisir un niveau' : "— choisir un sport d'abord —" }}
+                  </option>
+                  <option v-for="niveau in niveauxDisponibles" :key="niveau.id" :value="niveau.id">
+                    {{ niveau.libelle }}
+                  </option>
+                </select>
+              </div>
 
-            <div class="champ-groupe">
-              <label for="lieu">Lieu <span class="obligatoire">*</span></label>
-              <input
-                id="lieu"
-                v-model="form.lieu"
-                type="text"
-                class="champ"
-                placeholder="Adresse ou terrain"
-                required
-              />
-            </div>
+              <div class="champ-groupe">
+                <label for="description">Description <span class="label-optionnel">(optionnel)</span></label>
+                <textarea
+                  id="description"
+                  v-model="form.description"
+                  class="champ textarea"
+                  placeholder="Ajoutez des détails sur votre match..."
+                  rows="3"
+                ></textarea>
+              </div>
 
-            <div class="champ-groupe">
-              <label for="niveauRequis">Niveau requis</label>
-              <select
-                id="niveauRequis"
-                v-model="form.niveauRequisId"
-                class="champ"
-                :disabled="form.sportId === ''"
-              >
-                <option value="">
-                  {{ form.sportId !== '' ? 'Choisir un niveau' : '— choisir un sport d\'abord —' }}
-                </option>
-                <option v-for="niveau in niveauxDisponibles" :key="niveau.id" :value="niveau.id">
-                  {{ niveau.libelle }}
-                </option>
-              </select>
-            </div>
-
-            <div class="champ-groupe">
-              <label for="description">Description (optionnel)</label>
-              <textarea
-                id="description"
-                v-model="form.description"
-                class="champ textarea"
-                placeholder="Ajoutez des détails sur votre match..."
-                rows="4"
-              ></textarea>
-            </div>
-
-            <div class="formulaire-actions">
-              <button
-                type="submit"
-                class="btn btn-primaire"
-                :disabled="chargement"
-              >
-                + {{ chargement ? 'Création...' : 'Créer match' }}
-              </button>
-              <button type="button" class="btn btn-secondaire" @click="annuler">
-                × Annuler
-              </button>
-            </div>
-          </form>
+              <div class="formulaire-actions">
+                <button type="submit" class="btn btn-primaire btn-action" :disabled="chargement">
+                  {{ chargement ? 'Création en cours…' : 'Créer le match' }}
+                </button>
+                <button type="button" class="btn btn-secondaire btn-action" @click="annuler">
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
+
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════
+   FOND PLEIN-LARGEUR
+══════════════════════════════════════ */
 .page-creer {
-  padding-top: var(--espace-xl);
-  padding-bottom: var(--espace-xxl);
+  background: #f5f9f5;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
 }
 
+/* Orbe décoratif haut-droit */
+.page-creer::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154, 230, 0, 0.09) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Orbe décoratif bas-gauche */
+.page-creer::after {
+  content: '';
+  position: absolute;
+  bottom: -100px;
+  left: -100px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.creer-corps {
+  padding-top: var(--espace-xl);
+  padding-bottom: var(--espace-xxl);
+  position: relative;
+  z-index: 1;
+}
+
+/* ══════════════════════════════════════
+   LAYOUT 2 COLONNES
+══════════════════════════════════════ */
 .creer-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 252px 1fr;
   gap: var(--espace-xl);
   align-items: start;
 }
 
+/* ══════════════════════════════════════
+   SIDEBAR ÉDITORIALE
+══════════════════════════════════════ */
 .sidebar-info {
+  background: #ffffff;
+  border: 1.5px solid #dde8dd;
+  border-radius: var(--rayon-carte);
   padding: var(--espace-l);
   position: sticky;
   top: 80px;
+  overflow: hidden;
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
 }
 
-.sidebar-icone {
-  width: 52px;
-  height: 52px;
-  background: var(--couleur-primaire);
-  border-radius: var(--rayon-carte);
-  display: flex;
+.sidebar-info::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+.sidebar-eyebrow {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.6rem;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
   font-weight: 700;
-  margin-bottom: var(--espace-m);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
 }
 
 .sidebar-titre {
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--couleur-titre);
   margin-bottom: 0.2rem;
 }
 
-.sidebar-sous-titre {
-  color: var(--couleur-texte-discret);
-  font-size: 0.85rem;
-  margin-bottom: var(--espace-m);
-}
-
 .sidebar-desc {
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   color: var(--couleur-texte-discret);
-  margin-bottom: var(--espace-l);
   line-height: 1.5;
+  margin-bottom: var(--espace-l);
   padding-bottom: var(--espace-m);
   border-bottom: 1px solid var(--couleur-bordure);
 }
@@ -311,67 +372,163 @@ function annuler() {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--espace-m);
+  gap: 0.8rem;
 }
 
 .sidebar-infos li {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.85rem;
+  gap: 0.55rem;
+  font-size: 0.83rem;
   color: var(--couleur-texte);
+  line-height: 1.4;
 }
 
 .info-icone {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  color: var(--couleur-primaire);
+  margin-top: 1px;
 }
 
-.formulaire-titre {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 0.3rem;
+/* ══════════════════════════════════════
+   EN-TÊTE FORMULAIRE
+══════════════════════════════════════ */
+.formulaire-section {
+  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
-.formulaire-sous-titre {
-  color: var(--couleur-texte-discret);
-  font-size: 0.9rem;
+.formulaire-entete {
   margin-bottom: var(--espace-l);
 }
 
+.form-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
+}
+
+.formulaire-titre {
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--couleur-titre);
+  margin-bottom: 0.2rem;
+}
+
+.formulaire-sous-titre {
+  font-size: 0.88rem;
+  color: var(--couleur-texte-discret);
+}
+
+/* ══════════════════════════════════════
+   CARTE FORMULAIRE
+══════════════════════════════════════ */
 .formulaire-carte {
-  padding: var(--espace-xl);
+  background: #ffffff;
+  border: 1.5px solid #dde8dd;
+  border-radius: var(--rayon-carte);
+  padding: var(--espace-xl) var(--espace-xl) var(--espace-l);
+  position: relative;
+  overflow: hidden;
+}
+
+.formulaire-carte::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+.formulaire-carte .champ-groupe label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+  letter-spacing: 0.01em;
+}
+
+.formulaire-carte .champ:focus {
+  border-color: var(--couleur-primaire);
+  box-shadow: 0 0 0 3px rgba(154, 230, 0, 0.28), 0 0 0 1px var(--couleur-primaire);
+}
+
+.grille-champs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--espace-m);
+}
+
+.label-optionnel {
+  font-weight: 400;
+  color: var(--couleur-texte-discret);
+  font-size: 0.78rem;
+  margin-left: 0.25rem;
 }
 
 .textarea {
   resize: vertical;
-  min-height: 100px;
+  min-height: 72px;
+  font-family: inherit;
 }
 
 .formulaire-actions {
   display: flex;
   gap: var(--espace-m);
-  margin-top: var(--espace-m);
+  margin-top: var(--espace-l);
+  padding-top: var(--espace-m);
+  border-top: 1px solid var(--couleur-bordure);
 }
 
-.formulaire-actions .btn {
+.btn-action {
   flex: 1;
-  padding: 0.85rem;
-  font-size: 1rem;
+  padding: 0.72rem var(--espace-m);
+  font-size: 0.95rem;
 }
 
 button:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
 @media (max-width: 900px) {
   .creer-layout {
     grid-template-columns: 1fr;
   }
-
   .sidebar-info {
     position: static;
+  }
+  .formulaire-titre {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .grille-champs {
+    grid-template-columns: 1fr;
+  }
+  .formulaire-actions {
+    flex-direction: column;
   }
 }
 </style>

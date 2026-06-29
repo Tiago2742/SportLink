@@ -18,6 +18,7 @@ import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
+import { ArrowLeft, Calendar, FileText, MapPin, Target, User } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -252,7 +253,8 @@ function formaterHeure(dateStr: string) {
 </script>
 
 <template>
-  <div class="conteneur page-detail">
+  <div class="page-detail">
+    <div class="conteneur page-corps">
     <div v-if="chargement" class="chargement">Chargement...</div>
     <div v-else-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
 
@@ -260,8 +262,14 @@ function formaterHeure(dateStr: string) {
       <!-- En-tête match -->
       <div class="detail-entete">
         <div class="entete-gauche">
-          <RouterLink to="/" class="lien-retour">← Retour</RouterLink>
-          <h1>Match de {{ match.sport?.nom ?? 'Sport' }}</h1>
+          <RouterLink to="/" class="lien-retour">
+            <ArrowLeft :size="16" aria-hidden="true" />
+            Retour
+          </RouterLink>
+          <div>
+            <span class="page-eyebrow">Match</span>
+            <h1 class="page-titre">Match de {{ match.sport?.nom ?? 'Sport' }}</h1>
+          </div>
           <BadgeStatut :statut="match.statut" />
         </div>
         <div class="entete-actions">
@@ -277,17 +285,24 @@ function formaterHeure(dateStr: string) {
           <section class="carte section-infos">
             <h2 class="section-h2">Informations</h2>
             <ul class="infos-liste">
-              <li><span class="info-icone">📅</span> {{ formaterDate(match.dateMatch) }}</li>
-              <li v-if="match.lieu"><span class="info-icone">📍</span> {{ match.lieu }}</li>
+              <li>
+                <span class="info-icone" aria-hidden="true"><Calendar :size="18" stroke-width="2.25" /></span>
+                {{ formaterDate(match.dateMatch) }}
+              </li>
+              <li v-if="match.lieu">
+                <span class="info-icone" aria-hidden="true"><MapPin :size="18" stroke-width="2.25" /></span>
+                {{ match.lieu }}
+              </li>
               <li v-if="match.niveauRequis">
-                <span class="info-icone">🎯</span> Niveau : {{ match.niveauRequis?.libelle }}
+                <span class="info-icone" aria-hidden="true"><Target :size="18" stroke-width="2.25" /></span>
+                Niveau : {{ match.niveauRequis?.libelle }}
               </li>
               <li>
-                <span class="info-icone">👤</span>
+                <span class="info-icone" aria-hidden="true"><User :size="18" stroke-width="2.25" /></span>
                 Créé par {{ nomAffichage(match.createur) }}
               </li>
               <li v-if="match.description" class="description-match">
-                <span class="info-icone">📝</span>
+                <span class="info-icone" aria-hidden="true"><FileText :size="18" stroke-width="2.25" /></span>
                 <span>{{ match.description }}</span>
               </li>
             </ul>
@@ -516,32 +531,108 @@ function formaterHeure(dateStr: string) {
         </aside>
       </div>
     </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════
+   FOND PLEIN-LARGEUR
+══════════════════════════════════════ */
 .page-detail {
-  padding-top: var(--espace-xl);
-  padding-bottom: var(--espace-xxl);
+  background: #f5f9f5;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
 }
 
+.page-detail::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 380px; height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154, 230, 0, 0.09) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-detail::after {
+  content: '';
+  position: absolute;
+  bottom: -100px; left: -100px;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-corps {
+  padding-top: var(--espace-xl);
+  padding-bottom: var(--espace-xxl);
+  position: relative;
+  z-index: 1;
+}
+
+/* ══════════════════════════════════════
+   EN-TÊTE DE PAGE
+══════════════════════════════════════ */
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
+}
+
+.page-titre {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--couleur-titre);
+  line-height: 1.15;
+}
+
+/* ══════════════════════════════════════
+   CARTE (override scoped)
+══════════════════════════════════════ */
+.carte {
+  border: 1.5px solid #dde8dd;
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.carte::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+  z-index: 1;
+}
+
+/* ══════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════ */
 .detail-entete {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: var(--espace-xl);
   gap: var(--espace-m);
+  animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .entete-gauche {
   display: flex;
   flex-direction: column;
   gap: var(--espace-s);
-}
-
-.entete-gauche h1 {
-  font-size: 1.6rem;
-  font-weight: 700;
 }
 
 .lien-retour {
@@ -614,7 +705,16 @@ function formaterHeure(dateStr: string) {
 }
 
 .info-icone {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--couleur-primaire);
+}
+
+.lien-retour {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .score-affichage {
@@ -623,7 +723,7 @@ function formaterHeure(dateStr: string) {
   justify-content: center;
   gap: var(--espace-l);
   padding: var(--espace-l);
-  background: var(--couleur-fond);
+  background: var(--couleur-primaire-tres-claire);
   border-radius: var(--rayon-carte);
 }
 
@@ -903,6 +1003,22 @@ function formaterHeure(dateStr: string) {
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.colonne-principale {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.colonne-sidebar {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
 }
 
 @media (max-width: 900px) {

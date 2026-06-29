@@ -6,7 +6,9 @@ import { useSports } from '@/composables/useSports'
 import { chargerEquipes, demanderRejoindreEquipe } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutDemanderRejoindre, type AdhesionEquipe } from '@/utils/adhesionEquipe'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { nomAffichage } from '@/utils/nomAffichage'
+import { MapPin } from 'lucide-vue-next'
 
 const props = defineProps<{
   adhesions: AdhesionEquipe[]
@@ -126,7 +128,9 @@ async function demander(equipeId: number) {
               <template v-if="equipe.niveau"> · {{ equipe.niveau.libelle }}</template>
             </p>
             <p class="resultat-club">{{ nomAffichage(equipe.club) }}</p>
-            <p v-if="equipe.localisation" class="resultat-lieu">📍 {{ equipe.localisation }}</p>
+            <p v-if="equipe.localisation" class="resultat-lieu">
+              <IconeLigne :icone="MapPin" :taille="14" discret>{{ equipe.localisation }}</IconeLigne>
+            </p>
           </div>
         </div>
         <div class="resultat-actions">

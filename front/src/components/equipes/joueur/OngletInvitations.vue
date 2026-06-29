@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { repondreAdhesionEquipe } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
+import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { nomAffichage } from '@/utils/nomAffichage'
+import { MapPin } from 'lucide-vue-next'
 
 defineProps<{
   invitations: any[]
@@ -58,7 +60,7 @@ async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
               Club : <strong>{{ nomAffichage(inv.equipe?.club) }}</strong>
             </p>
             <p v-if="inv.equipe?.localisation" class="invitation-lieu">
-              📍 {{ inv.equipe.localisation }}
+              <IconeLigne :icone="MapPin" :taille="14" discret>{{ inv.equipe.localisation }}</IconeLigne>
             </p>
           </div>
         </div>

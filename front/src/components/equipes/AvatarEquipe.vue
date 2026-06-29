@@ -46,13 +46,17 @@ const afficherImage = computed(() => !!logoUrl.value && !imageErreur.value)
 <style scoped>
 .avatar-equipe {
   flex-shrink: 0;
-  border-radius: var(--rayon-carte, 12px);
+  border-radius: var(--rayon-carte);
   overflow: hidden;
-  background: linear-gradient(135deg, var(--couleur-primaire-tres-claire), var(--couleur-info-fond));
-  border: 2px solid var(--couleur-bordure);
+  background: var(--degrade-avatar);
+  border: 2px solid rgba(76, 175, 80, 0.25);
+  box-shadow: var(--ombre-carte);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    transform var(--transition-interaction),
+    box-shadow var(--transition-interaction);
 }
 
 .avatar-equipe-sm {
@@ -83,6 +87,6 @@ const afficherImage = computed(() => !!logoUrl.value && !imageErreur.value)
 .avatar-equipe-initiales {
   font-weight: 800;
   color: var(--couleur-primaire);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 </style>

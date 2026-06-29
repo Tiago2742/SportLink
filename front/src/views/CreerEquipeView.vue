@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { creerEquipe } from '@/services/api'
 import { useSports } from '@/composables/useSports'
+import { ArrowLeft, Shield, UserPlus, Trophy } from 'lucide-vue-next'
 import type { NiveauRef } from '@/services/api'
 
 const auth = useAuthStore()
@@ -56,7 +57,7 @@ async function soumettre() {
     erreur.value =
       e.message ||
       (e.donnees as { erreur?: string })?.erreur ||
-      'Impossible de créer l\'équipe.'
+      "Impossible de créer l'équipe."
   } finally {
     chargement.value = false
   }
@@ -64,142 +65,470 @@ async function soumettre() {
 </script>
 
 <template>
-  <div class="page-creer-equipe conteneur">
-    <RouterLink to="/mes-equipes" class="lien-retour">← Mes équipes</RouterLink>
+  <!-- Fond plein-largeur teinté -->
+  <div class="page-creer-equipe">
+    <div class="conteneur creer-corps">
+      <div class="creer-layout">
 
-    <h1>Créer une équipe</h1>
-    <p class="sous-titre">
-      Une équipe est rattachée à un sport collectif. Vous serez enregistré comme gestionnaire de l'équipe.
-    </p>
+        <!-- Sidebar éditoriale -->
+        <aside class="sidebar-info">
+          <span class="sidebar-eyebrow">Nouvelle équipe</span>
+          <h2 class="sidebar-titre">Construisez votre équipe</h2>
+          <p class="sidebar-desc">
+            Créez votre équipe, définissez son niveau et son sport — les joueurs pourront vous rejoindre.
+          </p>
 
-    <form class="carte formulaire-equipe" @submit.prevent="soumettre">
-      <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
+          <!-- Avatars décoratifs -->
+          <div class="sidebar-avatars">
+            <div class="avatar avatar--1"></div>
+            <div class="avatar avatar--2"></div>
+            <div class="avatar avatar--3"></div>
+            <span class="avatar-label">Votre équipe vous attend</span>
+          </div>
 
-      <div class="champ-groupe">
-        <label for="nom">Nom de l'équipe <span class="obligatoire">*</span></label>
-        <input
-          id="nom"
-          v-model="form.nom"
-          type="text"
-          class="champ"
-          placeholder="Ex. AS Arras 1ère"
-          required
-        />
+          <ul class="sidebar-infos">
+            <li>
+              <span class="info-icone" aria-hidden="true">
+                <Shield :size="15" stroke-width="2.25" />
+              </span>
+              Vous devenez gestionnaire de l'équipe
+            </li>
+            <li>
+              <span class="info-icone" aria-hidden="true">
+                <UserPlus :size="15" stroke-width="2.25" />
+              </span>
+              Invitez des joueurs ou acceptez leurs demandes
+            </li>
+            <li>
+              <span class="info-icone" aria-hidden="true">
+                <Trophy :size="15" stroke-width="2.25" />
+              </span>
+              Organisez des matchs collectifs ensemble
+            </li>
+          </ul>
+        </aside>
+
+        <!-- Formulaire -->
+        <div class="formulaire-section">
+          <div class="formulaire-entete">
+            <RouterLink to="/mes-equipes" class="lien-retour">
+              <ArrowLeft :size="15" aria-hidden="true" />
+              Mes équipes
+            </RouterLink>
+            <span class="form-eyebrow">Informations de l'équipe</span>
+            <h1 class="formulaire-titre">Créer une équipe</h1>
+            <p class="formulaire-sous-titre">
+              Une équipe est rattachée à un sport collectif. Vous serez enregistré comme gestionnaire.
+            </p>
+          </div>
+
+          <form class="formulaire-carte" @submit.prevent="soumettre">
+            <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
+
+            <div class="champ-groupe">
+              <label for="nom">Nom de l'équipe <span class="obligatoire">*</span></label>
+              <input
+                id="nom"
+                v-model="form.nom"
+                type="text"
+                class="champ"
+                placeholder="Ex. AS Arras 1ère"
+                required
+              />
+            </div>
+
+            <div class="champ-groupe">
+              <label for="sport">Sport <span class="obligatoire">*</span></label>
+              <select
+                id="sport"
+                v-model="form.sportId"
+                class="champ"
+                required
+                @change="onSportChange"
+              >
+                <option value="">Choisir un sport collectif</option>
+                <option v-for="sport in sportsCollectifs" :key="sport.id" :value="sport.id">
+                  {{ sport.nom }}
+                </option>
+              </select>
+            </div>
+
+            <div class="cols-2">
+              <div class="champ-groupe">
+                <label for="niveau">Niveau</label>
+                <select
+                  id="niveau"
+                  v-model="form.niveauId"
+                  class="champ"
+                  :disabled="form.sportId === '' || niveauxDisponibles.length === 0"
+                >
+                  <option value="">
+                    {{
+                      form.sportId === ''
+                        ? "Choisissez d'abord un sport"
+                        : niveauxDisponibles.length === 0
+                          ? 'Aucun niveau'
+                          : 'Sans niveau précis'
+                    }}
+                  </option>
+                  <option v-for="n in niveauxDisponibles" :key="n.id" :value="n.id">
+                    {{ n.libelle }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="champ-groupe">
+                <label for="localisation">Localisation</label>
+                <input
+                  id="localisation"
+                  v-model="form.localisation"
+                  type="text"
+                  class="champ"
+                  placeholder="Ville, région..."
+                />
+              </div>
+            </div>
+
+            <div class="champ-groupe">
+              <label for="logo">Logo <span class="label-optionnel">(URL, optionnel)</span></label>
+              <input
+                id="logo"
+                v-model="form.logo"
+                type="url"
+                class="champ"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div class="formulaire-actions">
+              <button type="submit" class="btn btn-primaire btn-action" :disabled="chargement">
+                {{ chargement ? 'Création en cours…' : "Créer l'équipe" }}
+              </button>
+              <RouterLink to="/mes-equipes" class="btn btn-secondaire btn-action">
+                Annuler
+              </RouterLink>
+            </div>
+          </form>
+        </div>
+
       </div>
-
-      <div class="champ-groupe">
-        <label for="sport">Sport <span class="obligatoire">*</span></label>
-        <select
-          id="sport"
-          v-model="form.sportId"
-          class="champ"
-          required
-          @change="onSportChange"
-        >
-          <option value="">Choisir un sport collectif</option>
-          <option v-for="sport in sportsCollectifs" :key="sport.id" :value="sport.id">
-            {{ sport.nom }}
-          </option>
-        </select>
-      </div>
-
-      <div class="champ-groupe">
-        <label for="niveau">Niveau</label>
-        <select
-          id="niveau"
-          v-model="form.niveauId"
-          class="champ"
-          :disabled="form.sportId === '' || niveauxDisponibles.length === 0"
-        >
-          <option value="">
-            {{
-              form.sportId === ''
-                ? 'Choisissez d\'abord un sport'
-                : niveauxDisponibles.length === 0
-                  ? 'Aucun niveau'
-                  : 'Sans niveau précis'
-            }}
-          </option>
-          <option v-for="n in niveauxDisponibles" :key="n.id" :value="n.id">
-            {{ n.libelle }}
-          </option>
-        </select>
-      </div>
-
-      <div class="champ-groupe">
-        <label for="localisation">Localisation</label>
-        <input
-          id="localisation"
-          v-model="form.localisation"
-          type="text"
-          class="champ"
-          placeholder="Ville, région..."
-        />
-      </div>
-
-      <div class="champ-groupe">
-        <label for="logo">Logo <span class="label-optionnel">(URL, optionnel)</span></label>
-        <input
-          id="logo"
-          v-model="form.logo"
-          type="url"
-          class="champ"
-          placeholder="https://..."
-        />
-      </div>
-
-      <button type="submit" class="btn btn-primaire" :disabled="chargement">
-        {{ chargement ? 'Création...' : 'Créer l\'équipe' }}
-      </button>
-    </form>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════
+   FOND PLEIN-LARGEUR
+══════════════════════════════════════ */
 .page-creer-equipe {
+  background: #f5f9f5;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-creer-equipe::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154, 230, 0, 0.09) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-creer-equipe::after {
+  content: '';
+  position: absolute;
+  bottom: -100px;
+  left: -100px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.creer-corps {
   padding-top: var(--espace-xl);
   padding-bottom: var(--espace-xxl);
-  max-width: 560px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ══════════════════════════════════════
+   LAYOUT 2 COLONNES
+══════════════════════════════════════ */
+.creer-layout {
+  display: grid;
+  grid-template-columns: 252px 1fr;
+  gap: var(--espace-xl);
+  align-items: start;
+}
+
+/* ══════════════════════════════════════
+   SIDEBAR ÉDITORIALE
+══════════════════════════════════════ */
+.sidebar-info {
+  background: #ffffff;
+  border: 1.5px solid #dde8dd;
+  border-radius: var(--rayon-carte);
+  padding: var(--espace-l);
+  position: sticky;
+  top: 80px;
+  overflow: hidden;
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.05s both;
+}
+
+.sidebar-info::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+.sidebar-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
+}
+
+.sidebar-titre {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--couleur-titre);
+  margin-bottom: 0.2rem;
+}
+
+.sidebar-desc {
+  font-size: 0.83rem;
+  color: var(--couleur-texte-discret);
+  line-height: 1.5;
+  margin-bottom: var(--espace-l);
+  padding-bottom: var(--espace-m);
+  border-bottom: 1px solid var(--couleur-bordure);
+}
+
+/* ── Avatars décoratifs ── */
+.sidebar-avatars {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--espace-l);
+  padding-bottom: var(--espace-m);
+  border-bottom: 1px solid var(--couleur-bordure);
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2.5px solid #ffffff;
+  flex-shrink: 0;
+}
+
+.avatar + .avatar {
+  margin-left: -10px;
+}
+
+.avatar--1 { background: linear-gradient(135deg, #388e3c, #66bb6a); }
+.avatar--2 { background: linear-gradient(135deg, #2e7d32, #9ae600); }
+.avatar--3 { background: linear-gradient(135deg, #1b5e20, #43a047); }
+
+.avatar-label {
+  font-size: 0.76rem;
+  color: var(--couleur-texte-discret);
+  font-weight: 500;
+  margin-left: var(--espace-s);
+  line-height: 1.3;
+}
+
+.sidebar-infos {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.sidebar-infos li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.83rem;
+  color: var(--couleur-texte);
+  line-height: 1.4;
+}
+
+.info-icone {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--couleur-primaire);
+  margin-top: 1px;
+}
+
+/* ══════════════════════════════════════
+   EN-TÊTE FORMULAIRE
+══════════════════════════════════════ */
+.formulaire-section {
+  animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
 
 .lien-retour {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   margin-bottom: var(--espace-m);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   color: var(--couleur-texte-discret);
   text-decoration: none;
+  transition: color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lien-retour:hover {
   color: var(--couleur-primaire);
 }
 
-.page-creer-equipe h1 {
-  font-size: 1.5rem;
+.formulaire-entete {
+  margin-bottom: var(--espace-l);
+}
+
+.form-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
 }
 
-.sous-titre {
+.formulaire-titre {
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--couleur-titre);
+  margin-bottom: 0.2rem;
+}
+
+.formulaire-sous-titre {
+  font-size: 0.88rem;
   color: var(--couleur-texte-discret);
-  font-size: 0.9rem;
-  margin: 0.5rem 0 var(--espace-l);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
-.formulaire-equipe {
-  padding: var(--espace-l);
-  display: flex;
-  flex-direction: column;
+/* ══════════════════════════════════════
+   CARTE FORMULAIRE
+══════════════════════════════════════ */
+.formulaire-carte {
+  background: #ffffff;
+  border: 1.5px solid #dde8dd;
+  border-radius: var(--rayon-carte);
+  padding: var(--espace-xl) var(--espace-xl) var(--espace-l);
+  position: relative;
+  overflow: hidden;
+}
+
+.formulaire-carte::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+.formulaire-carte .champ-groupe label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+  letter-spacing: 0.01em;
+}
+
+.formulaire-carte .champ:focus {
+  border-color: var(--couleur-primaire);
+  box-shadow: 0 0 0 3px rgba(154, 230, 0, 0.28), 0 0 0 1px var(--couleur-primaire);
+}
+
+.cols-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--espace-m);
 }
 
 .label-optionnel {
   font-weight: 400;
   color: var(--couleur-texte-discret);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  margin-left: 0.25rem;
 }
 
-.obligatoire {
-  color: var(--couleur-erreur, #c62828);
+.formulaire-actions {
+  display: flex;
+  gap: var(--espace-m);
+  margin-top: var(--espace-l);
+  padding-top: var(--espace-m);
+  border-top: 1px solid var(--couleur-bordure);
+}
+
+.btn-action {
+  flex: 1;
+  padding: 0.72rem var(--espace-m);
+  font-size: 0.95rem;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
+@media (max-width: 900px) {
+  .creer-layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-info {
+    position: static;
+  }
+  .formulaire-titre {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .cols-2 {
+    grid-template-columns: 1fr;
+  }
+  .formulaire-actions {
+    flex-direction: column;
+  }
+  .formulaire-carte {
+    padding: var(--espace-l);
+  }
 }
 </style>
