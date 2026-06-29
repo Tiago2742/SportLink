@@ -84,243 +84,356 @@ function formaterDate(dateStr: string) {
 </script>
 
 <template>
-  <div class="page-mes-matchs conteneur">
-    <div class="page-entete">
-      <div>
-        <h1>Mes matchs</h1>
-        <p class="sous-titre">Matchs que vous organisez ou auxquels vous participez</p>
-      </div>
-      <RouterLink to="/creer-match" class="btn btn-primaire">+ Créer un match</RouterLink>
-    </div>
+  <div class="page-mes-matchs">
+    <div class="conteneur page-corps">
 
-    <div class="filtres-statut">
-      <button class="chip" :class="{ actif: filtreStatut === '' }" @click="filtreStatut = ''">
-        Tous ({{ mesMatchs.length }})
-      </button>
-      <button class="chip" :class="{ actif: filtreStatut === 'avenir' }" @click="filtreStatut = 'avenir'">
-        À venir
-      </button>
-      <button class="chip" :class="{ actif: filtreStatut === 'passe' }" @click="filtreStatut = 'passe'">
-        Passés
-      </button>
-      <button
-        class="chip"
-        :class="{ actif: filtreStatut === 'en_attente' }"
-        @click="filtreStatut = 'en_attente'"
-      >
-        En attente
-      </button>
-      <button
-        class="chip"
-        :class="{ actif: filtreStatut === 'confirme' }"
-        @click="filtreStatut = 'confirme'"
-      >
-        Confirmés
-      </button>
-      <button
-        class="chip"
-        :class="{ actif: filtreStatut === 'termine' }"
-        @click="filtreStatut = 'termine'"
-      >
-        Terminés
-      </button>
-    </div>
-
-    <div v-if="chargement" class="chargement">Chargement...</div>
-    <div v-else-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
-
-    <template v-else>
-      <template v-if="afficherSections">
-        <section v-if="matchsAvenir.length > 0">
-          <h2 class="section-titre">À venir ({{ matchsAvenir.length }})</h2>
-          <div class="carte liste-matchs">
-            <div
-              v-for="match in matchsAvenir"
-              :key="match.id"
-              class="ligne-match"
-              @click="router.push(`/matchs/${match.id}`)"
-            >
-              <div class="ligne-gauche">
-                <div class="ligne-sport-icone" aria-hidden="true">
-                  <Trophy :size="20" stroke-width="2" />
-                </div>
-                <div class="ligne-info">
-                  <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
-                  <span>{{ formaterDate(match.dateMatch) }}</span>
-                  <IconeLigne
-                    v-if="match.lieu"
-                    :icone="MapPin"
-                    :taille="14"
-                    discret
-                    class="ligne-lieu"
-                  >
-                    {{ match.lieu }}
-                  </IconeLigne>
-                </div>
-              </div>
-              <div class="ligne-droite">
-                <BadgeStatut :statut="match.statut" />
-                <span class="ligne-fleche">›</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section v-if="matchsPasses.length > 0" class="section-passe">
-          <h2 class="section-titre">Passés ({{ matchsPasses.length }})</h2>
-          <div class="carte liste-matchs liste-passee">
-            <div
-              v-for="match in matchsPasses"
-              :key="match.id"
-              class="ligne-match"
-              @click="router.push(`/matchs/${match.id}`)"
-            >
-              <div class="ligne-gauche">
-                <div class="ligne-sport-icone passé" aria-hidden="true">
-                  <Trophy :size="20" stroke-width="2" />
-                </div>
-                <div class="ligne-info">
-                  <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
-                  <span>{{ formaterDate(match.dateMatch) }}</span>
-                  <IconeLigne
-                    v-if="match.lieu"
-                    :icone="MapPin"
-                    :taille="14"
-                    discret
-                    class="ligne-lieu"
-                  >
-                    {{ match.lieu }}
-                  </IconeLigne>
-                </div>
-              </div>
-              <div class="ligne-droite">
-                <BadgeStatut :statut="match.statut" />
-                <span class="ligne-fleche">›</span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </template>
-
-      <section v-else-if="listeUnique.length > 0">
-        <h2 class="section-titre">Résultats ({{ listeUnique.length }})</h2>
-        <div class="carte liste-matchs" :class="{ 'liste-passee': filtreStatut === 'passe' || filtreStatut === 'termine' }">
-          <div
-            v-for="match in listeUnique"
-            :key="match.id"
-            class="ligne-match"
-            @click="router.push(`/matchs/${match.id}`)"
-          >
-            <div class="ligne-gauche">
-              <div class="ligne-sport-icone" :class="{ passé: estPasse(match.dateMatch) }" aria-hidden="true">
-                <Trophy :size="20" stroke-width="2" />
-              </div>
-              <div class="ligne-info">
-                <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
-                <span>{{ formaterDate(match.dateMatch) }}</span>
-                <IconeLigne
-                  v-if="match.lieu"
-                  :icone="MapPin"
-                  :taille="14"
-                  discret
-                  class="ligne-lieu"
-                >
-                  {{ match.lieu }}
-                </IconeLigne>
-              </div>
-            </div>
-            <div class="ligne-droite">
-              <BadgeStatut :statut="match.statut" />
-              <span class="ligne-fleche">›</span>
-            </div>
-          </div>
+      <!-- ── En-tête ── -->
+      <div class="entete-page">
+        <div>
+          <span class="page-eyebrow">{{ auth.utilisateur?.type === 'club' ? 'Club' : 'Joueur' }}</span>
+          <h1 class="page-titre">Mes matchs</h1>
+          <p class="sous-titre">Matchs que vous organisez ou auxquels vous participez</p>
         </div>
-      </section>
-
-      <div v-if="mesMatchs.length === 0" class="vide">
-        <p>Vous ne participez à aucun match pour le moment.</p>
-        <RouterLink to="/rechercher" class="btn btn-secondaire" style="margin-top: var(--espace-s)">
-          Trouver un match
-        </RouterLink>
+        <RouterLink to="/creer-match" class="btn btn-primaire">+ Créer un match</RouterLink>
       </div>
 
-      <div v-else-if="matchsFiltres.length === 0" class="vide">
-        <p>Aucun match pour ce filtre.</p>
-        <button type="button" class="btn btn-secondaire" style="margin-top: var(--espace-s)" @click="filtreStatut = ''">
-          Voir tous mes matchs
+      <!-- ── Filtres (pill container) ── -->
+      <nav class="filtres-statut" aria-label="Filtrer les matchs">
+        <button class="chip" :class="{ actif: filtreStatut === '' }" @click="filtreStatut = ''">
+          Tous ({{ mesMatchs.length }})
         </button>
-      </div>
-    </template>
+        <button class="chip" :class="{ actif: filtreStatut === 'avenir' }" @click="filtreStatut = 'avenir'">
+          À venir
+        </button>
+        <button class="chip" :class="{ actif: filtreStatut === 'passe' }" @click="filtreStatut = 'passe'">
+          Passés
+        </button>
+        <button
+          class="chip"
+          :class="{ actif: filtreStatut === 'en_attente' }"
+          @click="filtreStatut = 'en_attente'"
+        >
+          En attente
+        </button>
+        <button
+          class="chip"
+          :class="{ actif: filtreStatut === 'confirme' }"
+          @click="filtreStatut = 'confirme'"
+        >
+          Confirmés
+        </button>
+        <button
+          class="chip"
+          :class="{ actif: filtreStatut === 'termine' }"
+          @click="filtreStatut = 'termine'"
+        >
+          Terminés
+        </button>
+      </nav>
+
+      <div v-if="chargement" class="chargement">Chargement...</div>
+      <div v-else-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
+
+      <template v-else>
+
+        <template v-if="afficherSections">
+
+          <!-- À venir -->
+          <section v-if="matchsAvenir.length > 0" class="section-matchs">
+            <p class="section-eyebrow">À venir · {{ matchsAvenir.length }}</p>
+            <div class="carte liste-matchs">
+              <div
+                v-for="match in matchsAvenir"
+                :key="match.id"
+                class="ligne-match"
+                @click="router.push(`/matchs/${match.id}`)"
+              >
+                <div class="ligne-gauche">
+                  <div class="ligne-sport-icone" aria-hidden="true">
+                    <Trophy :size="18" stroke-width="2" />
+                  </div>
+                  <div class="ligne-info">
+                    <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                    <span>{{ formaterDate(match.dateMatch) }}</span>
+                    <IconeLigne v-if="match.lieu" :icone="MapPin" :taille="13" discret class="ligne-lieu">
+                      {{ match.lieu }}
+                    </IconeLigne>
+                  </div>
+                </div>
+                <div class="ligne-droite">
+                  <BadgeStatut :statut="match.statut" />
+                  <span class="ligne-fleche" aria-hidden="true">›</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Passés -->
+          <section v-if="matchsPasses.length > 0" class="section-matchs section-passe">
+            <p class="section-eyebrow section-eyebrow-dim">Passés · {{ matchsPasses.length }}</p>
+            <div class="carte liste-matchs liste-passee">
+              <div
+                v-for="match in matchsPasses"
+                :key="match.id"
+                class="ligne-match"
+                @click="router.push(`/matchs/${match.id}`)"
+              >
+                <div class="ligne-gauche">
+                  <div class="ligne-sport-icone icone-passe" aria-hidden="true">
+                    <Trophy :size="18" stroke-width="2" />
+                  </div>
+                  <div class="ligne-info">
+                    <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                    <span>{{ formaterDate(match.dateMatch) }}</span>
+                    <IconeLigne v-if="match.lieu" :icone="MapPin" :taille="13" discret class="ligne-lieu">
+                      {{ match.lieu }}
+                    </IconeLigne>
+                  </div>
+                </div>
+                <div class="ligne-droite">
+                  <BadgeStatut :statut="match.statut" />
+                  <span class="ligne-fleche" aria-hidden="true">›</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </template>
+
+        <!-- Filtre actif — liste unique -->
+        <section v-else-if="listeUnique.length > 0" class="section-matchs">
+          <p class="section-eyebrow">Résultats · {{ listeUnique.length }}</p>
+          <div
+            class="carte liste-matchs"
+            :class="{ 'liste-passee': filtreStatut === 'passe' || filtreStatut === 'termine' }"
+          >
+            <div
+              v-for="match in listeUnique"
+              :key="match.id"
+              class="ligne-match"
+              @click="router.push(`/matchs/${match.id}`)"
+            >
+              <div class="ligne-gauche">
+                <div
+                  class="ligne-sport-icone"
+                  :class="{ 'icone-passe': estPasse(match.dateMatch) }"
+                  aria-hidden="true"
+                >
+                  <Trophy :size="18" stroke-width="2" />
+                </div>
+                <div class="ligne-info">
+                  <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                  <span>{{ formaterDate(match.dateMatch) }}</span>
+                  <IconeLigne v-if="match.lieu" :icone="MapPin" :taille="13" discret class="ligne-lieu">
+                    {{ match.lieu }}
+                  </IconeLigne>
+                </div>
+              </div>
+              <div class="ligne-droite">
+                <BadgeStatut :statut="match.statut" />
+                <span class="ligne-fleche" aria-hidden="true">›</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- État vide global -->
+        <div v-if="mesMatchs.length === 0" class="etat-vide">
+          <div class="vide-icone-cercle" aria-hidden="true">
+            <Trophy :size="28" stroke-width="1.5" />
+          </div>
+          <p class="vide-titre">Aucun match pour le moment</p>
+          <p class="vide-desc">Participez à votre premier match ou créez-en un.</p>
+          <RouterLink to="/rechercher" class="btn btn-secondaire">Trouver un match</RouterLink>
+        </div>
+
+        <!-- Filtre sans résultat -->
+        <div v-else-if="matchsFiltres.length === 0" class="etat-vide">
+          <p class="vide-titre">Aucun match pour ce filtre</p>
+          <button type="button" class="btn btn-secondaire" @click="filtreStatut = ''">
+            Voir tous mes matchs
+          </button>
+        </div>
+
+      </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════
+   FOND PLEIN-LARGEUR
+══════════════════════════════════════ */
 .page-mes-matchs {
+  background: #f5f9f5;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-mes-matchs::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 380px; height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154, 230, 0, 0.09) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-mes-matchs::after {
+  content: '';
+  position: absolute;
+  bottom: -100px; left: -100px;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-corps {
   padding-top: var(--espace-xl);
   padding-bottom: var(--espace-xxl);
-}
-
-.page-entete {
+  position: relative;
+  z-index: 1;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--espace-xl);
+  flex-direction: column;
+  gap: var(--espace-l);
 }
 
-.page-entete h1 {
-  font-size: 1.6rem;
+/* ══════════════════════════════════════
+   EN-TÊTE
+══════════════════════════════════════ */
+.entete-page {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espace-m);
+  animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
+}
+
+.page-titre {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--couleur-titre);
+  margin-bottom: 0.15rem;
 }
 
 .sous-titre {
   color: var(--couleur-texte-discret);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
+/* ══════════════════════════════════════
+   FILTRES (pill container)
+══════════════════════════════════════ */
 .filtres-statut {
   display: flex;
-  gap: var(--espace-s);
-  margin-bottom: var(--espace-l);
   flex-wrap: wrap;
+  gap: 4px;
+  background: #ffffff;
+  border: 1.5px solid #dde8dd;
+  border-radius: 10px;
+  padding: 4px;
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .chip {
-  padding: 0.35rem 1rem;
-  border: 1.5px solid var(--couleur-bordure);
-  border-radius: var(--rayon-badge);
-  background: white;
-  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.95rem;
   font-size: 0.85rem;
-  transition: all 0.2s;
+  color: var(--couleur-texte-discret);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.18s ease, color 0.18s ease;
+  white-space: nowrap;
+}
+
+.chip:hover {
+  background: var(--couleur-primaire-tres-claire);
+  color: var(--couleur-primaire);
 }
 
 .chip.actif {
-  border-color: var(--couleur-primaire);
+  background: var(--couleur-accent-fond);
   color: var(--couleur-primaire);
-  background: var(--couleur-primaire-tres-claire);
+  font-weight: 700;
 }
 
-.section-titre {
-  font-weight: 700;
-  margin-bottom: var(--espace-s);
-  color: var(--couleur-texte-discret);
-  text-transform: uppercase;
-  font-size: 0.82rem;
-  letter-spacing: 0.5px;
+/* ══════════════════════════════════════
+   SECTIONS
+══════════════════════════════════════ */
+.section-matchs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
 }
 
 .section-passe {
-  margin-top: var(--espace-xl);
+  opacity: 0.88;
 }
 
-.liste-matchs {
+.section-eyebrow {
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--couleur-texte-discret);
+}
+
+.section-eyebrow-dim {
+  opacity: 0.7;
+}
+
+/* ══════════════════════════════════════
+   CARTE (override scoped)
+══════════════════════════════════════ */
+.carte {
+  border: 1.5px solid #dde8dd;
+  box-shadow: none;
+  position: relative;
   overflow: hidden;
 }
 
-.liste-passee {
-  opacity: 0.85;
+.carte::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+  z-index: 1;
 }
 
+.liste-matchs {
+  padding: 0;
+}
+
+.liste-passee {
+  opacity: 0.88;
+}
+
+/* ══════════════════════════════════════
+   LIGNES MATCH
+══════════════════════════════════════ */
 .ligne-match {
   display: flex;
   align-items: center;
@@ -331,12 +444,16 @@ function formaterDate(dateStr: string) {
   transition: background 0.15s;
 }
 
+.ligne-match:first-child {
+  margin-top: 3px;
+}
+
 .ligne-match:last-child {
   border-bottom: none;
 }
 
 .ligne-match:hover {
-  background: var(--couleur-fond);
+  background: var(--couleur-primaire-tres-claire);
 }
 
 .ligne-gauche {
@@ -346,8 +463,8 @@ function formaterDate(dateStr: string) {
 }
 
 .ligne-sport-icone {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   background: var(--couleur-primaire-tres-claire);
   border-radius: 50%;
   display: flex;
@@ -357,19 +474,21 @@ function formaterDate(dateStr: string) {
   color: var(--couleur-primaire);
 }
 
-.ligne-sport-icone.passé {
-  background: #f5f5f5;
+.ligne-sport-icone.icone-passe {
+  background: #f0f0f0;
   color: var(--couleur-texte-discret);
 }
 
 .ligne-info {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.12rem;
 }
 
 .ligne-info strong {
   font-size: 0.95rem;
+  color: var(--couleur-titre);
+  font-weight: 600;
 }
 
 .ligne-info span {
@@ -378,7 +497,7 @@ function formaterDate(dateStr: string) {
 }
 
 .ligne-lieu {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .ligne-droite {
@@ -392,15 +511,64 @@ function formaterDate(dateStr: string) {
   font-size: 1.2rem;
 }
 
-.vide {
-  text-align: center;
-  padding: var(--espace-xxl);
-  color: var(--couleur-texte-discret);
-  background: white;
-  border-radius: var(--rayon-carte);
-  border: 1px dashed var(--couleur-bordure);
+/* ══════════════════════════════════════
+   ÉTAT VIDE
+══════════════════════════════════════ */
+.etat-vide {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: var(--espace-m);
+  text-align: center;
+  padding: var(--espace-xxl) var(--espace-xl);
+  background: white;
+  border: 2px dashed #c0d4c0;
+  border-radius: var(--rayon-carte);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.vide-icone-cercle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--couleur-primaire-tres-claire);
+  color: var(--couleur-primaire);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vide-titre {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+}
+
+.vide-desc {
+  font-size: 0.88rem;
+  color: var(--couleur-texte-discret);
+  max-width: 280px;
+}
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .entete-page {
+    flex-direction: column;
+    gap: var(--espace-s);
+  }
+
+  .ligne-match {
+    padding: var(--espace-m);
+  }
 }
 </style>

@@ -120,8 +120,17 @@ async function rejoindreMatch(matchId: number) {
 </script>
 
 <template>
-  <div class="page-recherche conteneur">
-    <div class="recherche-layout">
+  <div class="page-recherche">
+    <div class="conteneur page-corps">
+
+      <!-- ── En-tête ── -->
+      <div class="page-entete">
+        <span class="page-eyebrow">Explorer</span>
+        <h1 class="page-titre">Trouver un match</h1>
+        <p class="sous-titre">Parcourez les matchs disponibles et rejoignez une partie</p>
+      </div>
+
+      <div class="recherche-layout">
       <!-- Sidebar filtres -->
       <aside class="sidebar-filtres carte">
         <h3 class="sidebar-titre">Filtres</h3>
@@ -247,14 +256,119 @@ async function rejoindreMatch(matchId: number) {
           </button>
         </div>
       </main>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* ══════════════════════════════════════
+   FOND PLEIN-LARGEUR
+══════════════════════════════════════ */
 .page-recherche {
+  background: #f5f9f5;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-recherche::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 380px; height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154, 230, 0, 0.09) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-recherche::after {
+  content: '';
+  position: absolute;
+  bottom: -100px; left: -100px;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(46, 125, 50, 0.07) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.page-corps {
   padding-top: var(--espace-xl);
   padding-bottom: var(--espace-xxl);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-l);
+}
+
+/* ══════════════════════════════════════
+   EN-TÊTE
+══════════════════════════════════════ */
+.page-entete {
+  animation: fadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  padding: 0.2rem 0.7rem;
+  border-radius: var(--rayon-badge);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--espace-s);
+}
+
+.page-titre {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--couleur-titre);
+  margin-bottom: 0.15rem;
+}
+
+.sous-titre {
+  color: var(--couleur-texte-discret);
+  font-size: 0.88rem;
+}
+
+/* ══════════════════════════════════════
+   CARTE (override scoped)
+══════════════════════════════════════ */
+.carte {
+  border: 1.5px solid #dde8dd;
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.carte::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+  z-index: 1;
+}
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sidebar-filtres {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.recherche-contenu {
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
 }
 
 .recherche-layout {
@@ -360,6 +474,16 @@ async function rejoindreMatch(matchId: number) {
   padding-left: 2.2rem;
 }
 
+.recherche-input:focus {
+  border-color: var(--couleur-primaire);
+  box-shadow: 0 0 0 3px rgba(154, 230, 0, 0.28), 0 0 0 1px var(--couleur-primaire);
+}
+
+.sidebar-filtres .champ:focus {
+  border-color: var(--couleur-primaire);
+  box-shadow: 0 0 0 3px rgba(154, 230, 0, 0.28), 0 0 0 1px var(--couleur-primaire);
+}
+
 .chips-rapides {
   display: flex;
   gap: var(--espace-s);
@@ -378,11 +502,17 @@ async function rejoindreMatch(matchId: number) {
   transition: all 0.2s;
 }
 
-.chip:hover,
-.chip.actif {
+.chip:hover {
   border-color: var(--couleur-primaire);
   color: var(--couleur-primaire);
   background: var(--couleur-primaire-tres-claire);
+}
+
+.chip.actif {
+  border-color: var(--couleur-primaire);
+  color: var(--couleur-primaire);
+  background: var(--couleur-accent-fond);
+  font-weight: 600;
 }
 
 .resultats-entete {
@@ -447,8 +577,8 @@ async function rejoindreMatch(matchId: number) {
 }
 
 .page-btn.actif {
-  background: var(--couleur-bouton);
-  border-color: var(--couleur-bouton);
+  background: var(--couleur-primaire);
+  border-color: var(--couleur-primaire);
   color: white;
 }
 
