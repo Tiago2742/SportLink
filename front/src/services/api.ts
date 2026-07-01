@@ -98,6 +98,17 @@ export const ajouterCamp = (
 export const repondreCamp = (token: string, matchId: number, campId: number, statut: string) =>
   requete('PATCH', `/matchs/${matchId}/camps/${campId}`, { statut }, token)
 
+// Profil — logo
+export const mettreAJourLogo = (token: string, logo: string | null) =>
+  requete('PATCH', '/profil/logo', { logo }, token)
+
+// Profil — sports/niveaux
+export const ajouterSportNiveau = (token: string, sportId: number, niveauId: number) =>
+  requete('POST', '/profil/sports', { sportId, niveauId }, token)
+
+export const modifierNiveauSport = (token: string, sportId: number, niveauId: number) =>
+  requete('PATCH', `/profil/sports/${sportId}`, { niveauId }, token)
+
 export const supprimerCamp = (token: string, matchId: number, campId: number) =>
   requete('DELETE', `/matchs/${matchId}/camps/${campId}`, null, token)
 

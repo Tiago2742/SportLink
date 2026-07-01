@@ -8,7 +8,6 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
   ],
   server: {
     // Écoute dans le conteneur ; le navigateur Windows utilise localhost:5173

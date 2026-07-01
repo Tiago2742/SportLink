@@ -85,11 +85,12 @@ class AppFixtures extends Fixture
         // ═══════════════════════════════════════════════════════
         $clubs = [];
         foreach ([
-            ['club1@test.com', 'AS Arras Sport'],
-            ['club2@test.com', 'FC Lyon Métropole'],
-            ['club3@test.com', 'Olympique Marseille Club'],
-        ] as [$email, $nom]) {
-            $u = $this->makeUser($email, $nom, null, TypeUtilisateur::Club, 'Arras', $sports, $niveaux);
+            ['club1@test.com', 'AS Arras Sport',           'Arras',     'https://ui-avatars.com/api/?name=AS+Arras&size=200&background=2e7d32&color=ffffff&bold=true&rounded=true'],
+            ['club2@test.com', 'FC Lyon Métropole',        'Lyon',      'https://ui-avatars.com/api/?name=FC+Lyon&size=200&background=c62828&color=ffffff&bold=true&rounded=true'],
+            ['club3@test.com', 'Olympique Marseille Club', 'Marseille', 'https://ui-avatars.com/api/?name=OM&size=200&background=009fda&color=ffffff&bold=true&rounded=true'],
+        ] as [$email, $nom, $ville, $logo]) {
+            $u = $this->makeUser($email, $nom, null, TypeUtilisateur::Club, $ville, $sports, $niveaux);
+            $u->setLogo($logo);
             $this->save($u);
             $clubs[] = $u;
         }

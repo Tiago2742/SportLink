@@ -57,6 +57,10 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['utilisateur:read'])]
     private ?string $localisation = null;
 
+    #[ORM\Column(length: 512, nullable: true)]
+    #[Groups(['utilisateur:read'])]
+    private ?string $logo = null;
+
     /** @var Collection<int, UtilisateurNiveau> */
     #[ORM\OneToMany(targetEntity: UtilisateurNiveau::class, mappedBy: 'utilisateur', orphanRemoval: true, cascade: ['persist'])]
     #[Groups(['utilisateur:detail'])]
@@ -236,6 +240,17 @@ $this->messages = new ArrayCollection();
     {
         $this->localisation = $localisation;
 
+        return $this;
+    }
+
+    public function getLogo(): ?string
+    {
+        return $this->logo;
+    }
+
+    public function setLogo(?string $logo): static
+    {
+        $this->logo = $logo;
         return $this;
     }
 

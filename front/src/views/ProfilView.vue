@@ -2,73 +2,63 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMesMatchs, chargerEquipes, chargerProfil } from '@/services/api'
+import {
+  chargerMesMatchs,
+  chargerEquipes,
+  mettreAJourLogo,
+  ajouterSportNiveau,
+  modifierNiveauSport,
+} from '@/services/api'
+import { useSports } from '@/composables/useSports'
 import IconeSection from '@/components/ui/IconeSection.vue'
-import { Calendar, KeyRound, Lock, Pencil, User, Users } from 'lucide-vue-next'
-const auth = useAuthStore()
-const router = useRouter()
+import SelecteurSportNiveau from '@/components/form/SelecteurSportNiveau.vue'
+import type { EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
+import { Calendar, Image, KeyRound, Lock, Pencil, Trophy, User, Users } from 'lucide-vue-next'
 
-const profil = ref<any>(auth.utilisateur)
-const mesEquipes = ref<any[]>([])
-const mesMatchs = ref<any[]>([])
-const chargement = ref(true)
+const auth    = useAuthStore()
+const router  = useRouter()
+const { niveauxPour } = useSports()
 
-const modeEdition = ref(false)
-const formEdition = ref({ nom: '', prenom: '', localisation: '' })
+const profil      = ref<any>(auth.utilisateur)
+const mesEquipes  = ref<any[]>([])
+const mesMatchs   = ref<any[]>([])
+const chargement  = ref(true)
+
+// ── Édition profil ────────────────────────────────────────────────────────────
+const modeEdition   = ref(false)
+const formEdition   = ref({ nom: '', prenom: '', localisation: '' })
 const erreurEdition = ref('')
+
+// ── Logo club ─────────────────────────────────────────────────────────────────
+const modeEditionLogo = ref(false)
+const formLogo        = ref('')
+const enregistreLogo  = ref(false)
+const erreurLogo      = ref('')
+
+// ── Sports/niveaux ────────────────────────────────────────────────────────────
+const sportEnCoursEdit = ref<Record<number, { ouvert: boolean; niveauId: number | '' }>>({})
+const enregistreSport  = ref<Record<number, boolean>>({})
+const erreurSport      = ref('')
+const ajoutEnCours     = ref(false)
 
 onMounted(async () => {
   const userId = auth.utilisateur?.id
-  if (!userId) {
-    chargement.value = false
-    return
-  }
+  if (!userId) { chargement.value = false; return }
   try {
     const [matchs, equipes] = await Promise.all([
       chargerMesMatchs(auth.token!),
       chargerEquipes(auth.token!, { clubId: userId }),
     ])
-    mesMatchs.value = matchs
+    mesMatchs.value  = matchs
     mesEquipes.value = equipes
   } finally {
     chargement.value = false
   }
 })
 
-function ouvrirEdition() {
-  formEdition.value = {
-    nom: profil.value?.nom || '',
-    prenom: profil.value?.prenom || '',
-    localisation: profil.value?.localisation || '',
-  }
-  modeEdition.value = true
-}
-
-function annulerEdition() {
-  modeEdition.value = false
-  erreurEdition.value = ''
-}
-
-function formaterDate(dateStr: string) {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-const matchsAvenir = computed(() =>
-  mesMatchs.value.filter((m) => new Date(m.dateMatch) >= new Date()),
-)
-
-const matchsPasses = computed(() =>
-  mesMatchs.value.filter((m) => new Date(m.dateMatch) < new Date()),
-)
-
+// ── Computed ──────────────────────────────────────────────────────────────────
 const estClub = computed(() => profil.value?.type === 'club')
 
-// ── Computed visuels (aucune logique métier) ──
 const initiales = computed(() => {
   const p = profil.value
   if (!p) return '?'
@@ -85,6 +75,110 @@ const nomComplet = computed(() =>
 const typeLabel = computed(() =>
   profil.value?.type === 'club' ? 'Club / Association' : 'Joueur',
 )
+
+const matchsAvenir = computed(() =>
+  mesMatchs.value.filter((m) => new Date(m.dateMatch) >= new Date()),
+)
+const matchsPasses = computed(() =>
+  mesMatchs.value.filter((m) => new Date(m.dateMatch) < new Date()),
+)
+
+// IDs des sports déjà déclarés par l'utilisateur
+const sportsDeclaresIds = computed<number[]>(() =>
+  (profil.value?.niveaux ?? []).map((un: any) => un.sport?.id),
+)
+
+// ── Profil édition ────────────────────────────────────────────────────────────
+function ouvrirEdition() {
+  formEdition.value = {
+    nom:         profil.value?.nom || '',
+    prenom:      profil.value?.prenom || '',
+    localisation: profil.value?.localisation || '',
+  }
+  modeEdition.value = true
+}
+function annulerEdition() { modeEdition.value = false; erreurEdition.value = '' }
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+function ouvrirEditionLogo() {
+  formLogo.value       = profil.value?.logo || ''
+  erreurLogo.value     = ''
+  modeEditionLogo.value = true
+}
+function annulerEditionLogo() { modeEditionLogo.value = false; erreurLogo.value = '' }
+
+async function sauvegarderLogo() {
+  if (enregistreLogo.value) return
+  enregistreLogo.value = true
+  erreurLogo.value     = ''
+  try {
+    const mis = await mettreAJourLogo(auth.token!, formLogo.value.trim() || null)
+    profil.value         = mis
+    auth.utilisateur     = mis
+    modeEditionLogo.value = false
+  } catch (e: any) {
+    erreurLogo.value = e.message || 'Impossible de mettre à jour le logo.'
+  } finally {
+    enregistreLogo.value = false
+  }
+}
+
+// ── Sports / niveaux ──────────────────────────────────────────────────────────
+function ouvrirChangementNiveau(unId: number, niveauActuelId: number) {
+  sportEnCoursEdit.value[unId] = { ouvert: true, niveauId: niveauActuelId }
+}
+function annulerChangementNiveau(unId: number) {
+  delete sportEnCoursEdit.value[unId]
+}
+
+async function sauvegarderNiveau(un: any) {
+  const edit = sportEnCoursEdit.value[un.id]
+  if (!edit || edit.niveauId === '') return
+  enregistreSport.value[un.id] = true
+  erreurSport.value = ''
+  try {
+    const mis = await modifierNiveauSport(auth.token!, un.sport.id, edit.niveauId as number)
+    profil.value     = mis
+    auth.utilisateur = mis
+    delete sportEnCoursEdit.value[un.id]
+  } catch (e: any) {
+    erreurSport.value = e.message || 'Impossible de modifier le niveau.'
+  } finally {
+    delete enregistreSport.value[un.id]
+  }
+}
+
+async function onAjoutSport(liste: EntreeSportNiveau[]) {
+  // Le composant émet la liste complète ; la dernière entrée est l'ajout
+  const derniere = liste.at(-1)
+  if (!derniere) return
+
+  // Ignore si déjà dans la liste (sport déjà déclaré avec même niveau)
+  const existant = (profil.value?.niveaux ?? []).find(
+    (un: any) => un.sport?.id === derniere.sportId && un.niveau?.id === derniere.niveauId,
+  )
+  if (existant) return
+
+  ajoutEnCours.value = true
+  erreurSport.value  = ''
+  try {
+    const mis = await ajouterSportNiveau(auth.token!, derniere.sportId, derniere.niveauId)
+    profil.value     = mis
+    auth.utilisateur = mis
+  } catch (e: any) {
+    erreurSport.value = e.message || 'Impossible d\'ajouter ce sport.'
+  } finally {
+    ajoutEnCours.value = false
+  }
+}
+
+// ── Utilitaires ───────────────────────────────────────────────────────────────
+function formaterDate(dateStr: string) {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
 </script>
 
 <template>
@@ -110,7 +204,52 @@ const typeLabel = computed(() =>
           <!-- MODE LECTURE -->
           <template v-if="!modeEdition">
             <div class="profil-banner">
-              <div class="profil-avatar-grand" aria-hidden="true">{{ initiales }}</div>
+
+              <!-- Avatar / Logo -->
+              <div class="profil-avatar-zone">
+                <template v-if="estClub">
+                  <!-- Logo existant -->
+                  <template v-if="profil?.logo && !modeEditionLogo">
+                    <button class="logo-btn" @click="ouvrirEditionLogo" title="Modifier le logo">
+                      <img :src="profil.logo" :alt="nomComplet" class="profil-logo" />
+                      <span class="logo-overlay"><Pencil :size="14" /></span>
+                    </button>
+                  </template>
+                  <!-- Placeholder logo -->
+                  <template v-else-if="!modeEditionLogo">
+                    <button class="logo-btn logo-btn--vide" @click="ouvrirEditionLogo" title="Ajouter un logo">
+                      <span class="logo-initiales">{{ initiales }}</span>
+                      <span class="logo-overlay logo-overlay--vide">
+                        <Image :size="14" />
+                        <span class="logo-overlay-texte">Logo</span>
+                      </span>
+                    </button>
+                  </template>
+                  <!-- Formulaire inline logo -->
+                  <div v-if="modeEditionLogo" class="logo-form">
+                    <p class="logo-form-label">URL du logo</p>
+                    <input
+                      v-model="formLogo"
+                      type="url"
+                      class="champ"
+                      placeholder="https://..."
+                      @keyup.enter="sauvegarderLogo"
+                    />
+                    <div v-if="erreurLogo" class="alerte alerte-erreur alerte-sm">{{ erreurLogo }}</div>
+                    <div class="logo-form-actions">
+                      <button
+                        class="btn btn-primaire btn-sm"
+                        :disabled="enregistreLogo"
+                        @click="sauvegarderLogo"
+                      >{{ enregistreLogo ? '...' : 'Enregistrer' }}</button>
+                      <button class="btn btn-secondaire btn-sm" @click="annulerEditionLogo">Annuler</button>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Joueur : avatar classique -->
+                <div v-else class="profil-avatar-grand" aria-hidden="true">{{ initiales }}</div>
+              </div>
 
               <div class="profil-identite">
                 <span class="tag-type">{{ typeLabel }}</span>
@@ -141,7 +280,7 @@ const typeLabel = computed(() =>
             </div>
           </template>
 
-          <!-- MODE ÉDITION -->
+          <!-- MODE ÉDITION profil -->
           <template v-else>
             <div class="profil-form-entete">
               <div class="profil-avatar-grand" aria-hidden="true">{{ initiales }}</div>
@@ -180,6 +319,68 @@ const typeLabel = computed(() =>
             </div>
           </template>
 
+        </section>
+
+        <!-- ── Carte Sports pratiqués ── -->
+        <section class="carte section-sports">
+          <div class="section-titre-icone">
+            <IconeSection :icone="Trophy" label="Sports" />
+            <h2>Sports pratiqués</h2>
+            <span v-if="profil?.niveaux?.length" class="section-badge">{{ profil.niveaux.length }}</span>
+          </div>
+
+          <div v-if="erreurSport" class="alerte alerte-erreur">{{ erreurSport }}</div>
+
+          <!-- Liste des sports déjà déclarés -->
+          <div v-if="profil?.niveaux?.length" class="sports-liste">
+            <div v-for="un in profil.niveaux" :key="un.id" class="sport-ligne">
+              <div class="sport-ligne-info">
+                <span class="sport-ligne-nom">{{ un.sport?.nom }}</span>
+                <template v-if="!sportEnCoursEdit[un.id]">
+                  <span class="sport-ligne-niveau">{{ un.niveau?.libelle }}</span>
+                  <button
+                    class="btn-changer-niveau"
+                    @click="ouvrirChangementNiveau(un.id, un.niveau?.id)"
+                  >Changer niveau</button>
+                </template>
+                <template v-else>
+                  <select
+                    v-model="sportEnCoursEdit[un.id].niveauId"
+                    class="champ champ-niveau-inline"
+                  >
+                    <option value="">Choisir un niveau</option>
+                    <option
+                      v-for="niv in niveauxPour(un.sport?.id)"
+                      :key="niv.id"
+                      :value="niv.id"
+                    >{{ niv.libelle }}</option>
+                  </select>
+                  <button
+                    class="btn btn-primaire btn-sm"
+                    :disabled="!sportEnCoursEdit[un.id]?.niveauId || !!enregistreSport[un.id]"
+                    @click="sauvegarderNiveau(un)"
+                  >{{ enregistreSport[un.id] ? '...' : 'OK' }}</button>
+                  <button class="btn btn-secondaire btn-sm" @click="annulerChangementNiveau(un.id)">✕</button>
+                </template>
+              </div>
+            </div>
+          </div>
+          <p v-else class="section-desc">Aucun sport déclaré pour le moment.</p>
+
+          <!-- Ajout d'un nouveau sport -->
+          <div class="sports-ajout">
+            <p class="sports-ajout-label">Ajouter un sport</p>
+            <SelecteurSportNiveau
+              :model-value="[]"
+              :masquer-retrait="true"
+              :filtre-type="estClub ? 'collectif' : undefined"
+              @update:model-value="onAjoutSport"
+            />
+            <p v-if="ajoutEnCours" class="sports-ajout-info">Enregistrement…</p>
+            <p v-if="estClub" class="sports-ajout-info">
+              Les clubs ne peuvent déclarer que des sports collectifs.
+            </p>
+          </div>
         </section>
 
         <!-- ── Grid secondaire (sécurité + équipes) ── -->
@@ -366,6 +567,10 @@ const typeLabel = computed(() =>
   flex-wrap: wrap;
 }
 
+.profil-avatar-zone {
+  flex-shrink: 0;
+}
+
 .profil-avatar-grand {
   width: 72px;
   height: 72px;
@@ -379,6 +584,105 @@ const typeLabel = computed(() =>
   font-weight: 800;
   letter-spacing: -0.02em;
   flex-shrink: 0;
+}
+
+/* ── Logo club ── */
+.logo-btn {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--couleur-bordure);
+  overflow: hidden;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  display: block;
+}
+
+.logo-btn:hover .logo-overlay {
+  opacity: 1;
+}
+
+.profil-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.logo-initiales {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--degrade-primaire);
+  color: white;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.logo-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  border-radius: 50%;
+}
+
+.logo-overlay--vide {
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.logo-overlay-texte {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.logo-btn--vide {
+  border-style: dashed;
+  border-color: var(--couleur-primaire-claire);
+}
+
+.logo-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-xs);
+  width: 260px;
+}
+
+.logo-form-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--couleur-texte-discret);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.logo-form-actions {
+  display: flex;
+  gap: var(--espace-xs);
+}
+
+.btn-sm {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.alerte-sm {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
 }
 
 .profil-identite {
@@ -464,6 +768,99 @@ const typeLabel = computed(() =>
   margin-top: var(--espace-l);
   padding-top: var(--espace-m);
   border-top: 1px solid var(--couleur-bordure);
+}
+
+/* ══════════════════════════════════════
+   SECTION SPORTS
+══════════════════════════════════════ */
+.section-sports {
+  padding: var(--espace-l);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.10s both;
+}
+
+.sports-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: var(--espace-l);
+}
+
+.sport-ligne {
+  border-bottom: 1px solid var(--couleur-bordure);
+}
+
+.sport-ligne:last-child {
+  border-bottom: none;
+}
+
+.sport-ligne-info {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-s);
+  padding: 0.65rem 0;
+  flex-wrap: wrap;
+}
+
+.sport-ligne-nom {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--couleur-titre);
+  min-width: 110px;
+}
+
+.sport-ligne-niveau {
+  font-size: 0.82rem;
+  color: var(--couleur-texte-discret);
+  background: var(--couleur-primaire-tres-claire);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--rayon-badge);
+  flex: 1;
+}
+
+.btn-changer-niveau {
+  background: none;
+  border: 1px solid var(--couleur-bordure);
+  border-radius: var(--rayon-bouton);
+  padding: 0.22rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--couleur-texte-discret);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-changer-niveau:hover {
+  border-color: var(--couleur-primaire);
+  color: var(--couleur-primaire);
+}
+
+.champ-niveau-inline {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.sports-ajout {
+  padding-top: var(--espace-m);
+  border-top: 1px solid var(--couleur-bordure);
+  margin-top: var(--espace-s);
+}
+
+.sports-ajout-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--couleur-texte-discret);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--espace-s);
+}
+
+.sports-ajout-info {
+  font-size: 0.78rem;
+  color: var(--couleur-texte-discret);
+  margin-top: var(--espace-xs);
+  font-style: italic;
 }
 
 /* ══════════════════════════════════════
@@ -557,13 +954,8 @@ button:disabled {
   border-bottom: 1px solid var(--couleur-bordure);
 }
 
-.item-match:last-child {
-  border-bottom: none;
-}
-
-.item-match:hover {
-  background: var(--couleur-primaire-tres-claire);
-}
+.item-match:last-child { border-bottom: none; }
+.item-match:hover { background: var(--couleur-primaire-tres-claire); }
 
 .match-info {
   display: flex;
@@ -612,27 +1004,13 @@ button:disabled {
    RESPONSIVE
 ══════════════════════════════════════ */
 @media (max-width: 640px) {
-  .profil-principale {
-    padding: var(--espace-l);
-  }
-
-  .profil-banner {
-    gap: var(--espace-m);
-  }
-
-  .profil-avatar-grand {
-    width: 56px;
-    height: 56px;
-    font-size: 1.25rem;
-  }
-
-  .profil-info-grille {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .btn-modifier {
-    width: 100%;
-    justify-content: center;
-  }
+  .profil-principale { padding: var(--espace-l); }
+  .profil-banner { gap: var(--espace-m); }
+  .profil-avatar-grand { width: 56px; height: 56px; font-size: 1.25rem; }
+  .logo-btn { width: 56px; height: 56px; }
+  .profil-info-grille { grid-template-columns: 1fr 1fr; }
+  .btn-modifier { width: 100%; justify-content: center; }
+  .logo-form { width: 100%; }
+  .sport-ligne-info { flex-wrap: wrap; }
 }
 </style>

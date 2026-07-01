@@ -10,6 +10,8 @@ export interface EntreeSportNiveau {
 const props = defineProps<{
   modelValue: EntreeSportNiveau[]
   multiple?: boolean
+  filtreType?: string      // 'collectif' | 'individuel' — filtre la liste des sports
+  masquerRetrait?: boolean // cache le bouton × sur les badges
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +24,12 @@ const sportEnCours  = ref<number | ''>('')
 const niveauEnCours = ref<number | ''>('')
 
 onMounted(chargerCatalogue)
+
+const sportsFiltres = computed(() =>
+  props.filtreType
+    ? listeSports.value.filter((s) => s.type === props.filtreType)
+    : listeSports.value,
+)
 
 const niveauxDisponibles = computed(() =>
   sportEnCours.value !== '' ? niveauxPour(sportEnCours.value as number) : [],
@@ -65,7 +73,7 @@ function retirer(index: number) {
       <div v-for="(entree, i) in modelValue" :key="i" class="sport-badge">
         <span class="sport-nom">{{ nomSport(entree.sportId) }}</span>
         <span class="niveau-nom">{{ nomNiveau(entree.niveauId) }}</span>
-        <button type="button" class="btn-retirer" @click="retirer(i)" title="Retirer">×</button>
+        <button v-if="!masquerRetrait" type="button" class="btn-retirer" @click="retirer(i)" title="Retirer">×</button>
       </div>
     </div>
     <p v-else class="aucun-sport">Aucun sport ajouté.</p>
@@ -74,7 +82,7 @@ function retirer(index: number) {
     <div class="ajout-sport">
       <select v-model="sportEnCours" class="champ" @change="onSportChange">
         <option value="">Choisir un sport</option>
-        <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">
+        <option v-for="sport in sportsFiltres" :key="sport.id" :value="sport.id">
           {{ sport.nom }}
         </option>
       </select>
