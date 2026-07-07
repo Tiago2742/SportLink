@@ -31,5 +31,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('utilisateur')
   }
 
-  return { token, utilisateur, estConnecte, seConnecter, sInscrire, seDeconnecter }
+  /** Met à jour le profil en mémoire ET dans localStorage (évite de perdre les niveaux après F5). */
+  function rafraichirProfil(profil: any) {
+    utilisateur.value = profil
+    localStorage.setItem('utilisateur', JSON.stringify(profil))
+  }
+
+  return { token, utilisateur, estConnecte, seConnecter, sInscrire, seDeconnecter, rafraichirProfil }
 })

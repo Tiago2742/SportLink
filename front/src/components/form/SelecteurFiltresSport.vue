@@ -5,6 +5,7 @@ import { useSports } from '@/composables/useSports'
 const props = defineProps<{
   sport: number | ''
   niveau: number | ''
+  sports?: { id: number; nom: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -15,6 +16,8 @@ const emit = defineEmits<{
 const { listeSports, niveauxPour, chargerCatalogue } = useSports()
 
 onMounted(chargerCatalogue)
+
+const listeFiltree = computed(() => props.sports ?? listeSports.value)
 
 const niveauxDisponibles = computed(() =>
   props.sport !== '' ? niveauxPour(props.sport as number) : [],
@@ -36,7 +39,7 @@ function onNiveauChange(event: Event) {
   <div class="filtres-sport">
     <select class="champ" :value="sport !== '' ? sport : ''" @change="onSportChange">
       <option value="">Tous les sports</option>
-      <option v-for="s in listeSports" :key="s.id" :value="s.id">{{ s.nom }}</option>
+      <option v-for="s in listeFiltree" :key="s.id" :value="s.id">{{ s.nom }}</option>
     </select>
 
     <select class="champ" :value="niveau !== '' ? niveau : ''" @change="onNiveauChange" :disabled="sport === ''">

@@ -24,12 +24,13 @@ class GameRepository extends ServiceEntityRepository
 
     /** @return Game[] */
     public function trouverAvecFiltres(
-        ?int    $sportId          = null,
-        ?string $lieu             = null,
-        ?string $statut           = null,
-        ?int    $niveauId         = null,
-        ?int    $createurId       = null,
+        ?int    $sportId             = null,
+        ?string $lieu                = null,
+        ?string $statut              = null,
+        ?int    $niveauId            = null,
+        ?int    $createurId          = null,
         bool    $disponibleSeulement = false,
+        array   $sportIds            = [],
     ): array {
         $qb = $this->createQueryBuilder('g')
             ->addSelect('s', 'n', 'c', 'camps')
@@ -37,6 +38,12 @@ class GameRepository extends ServiceEntityRepository
             ->leftJoin('g.niveauRequis', 'n')
             ->leftJoin('g.createur', 'c')
             ->leftJoin('g.camps', 'camps');
+
+        // Restriction aux sports déclarés par l'utilisateur
+        if (!empty($sportIds)) {
+            $qb->andWhere('s.id IN (:sportIds)')
+               ->setParameter('sportIds', $sportIds);
+        }
 
         if ($disponibleSeulement) {
             // en_attente, date future, et moins de 2 camps (place libre)

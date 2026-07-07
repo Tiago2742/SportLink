@@ -12,4 +12,21 @@ class UtilisateurNiveauRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, UtilisateurNiveau::class);
     }
+
+    /**
+     * Retourne les IDs des sports déclarés par un utilisateur.
+     *
+     * @return int[]
+     */
+    public function findSportIdsByUtilisateur(int $userId): array
+    {
+        $rows = $this->createQueryBuilder('un')
+            ->select('IDENTITY(un.sport) AS sportId')
+            ->where('un.utilisateur = :id')
+            ->setParameter('id', $userId)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_column($rows, 'sportId');
+    }
 }

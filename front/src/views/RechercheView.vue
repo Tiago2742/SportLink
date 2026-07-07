@@ -3,7 +3,6 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerMatchs, ajouterCamp } from '@/services/api'
-import { useSports } from '@/composables/useSports'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
@@ -30,13 +29,13 @@ const triParDate = ref('asc')
 const pageCourante = ref(1)
 const parPage = 6
 
-const { listeSports, chargerCatalogue } = useSports()
-const chipsRapides = computed(() => listeSports.value.slice(0, 5))
+const sportsDeclares = computed(() =>
+  (auth.utilisateur?.niveaux ?? []).map((un: any) => un.sport).filter(Boolean),
+)
 
-onMounted(() => {
-  chargerCatalogue()
-  charger()
-})
+const chipsRapides = computed(() => sportsDeclares.value.slice(0, 5))
+
+onMounted(charger)
 
 let debounceTimeout: ReturnType<typeof setTimeout> | null = null
 watch(
@@ -141,6 +140,7 @@ async function rejoindreMatch(matchId: number) {
           <SelecteurFiltresSport
             :sport="filtres.sportId"
             :niveau="filtres.niveauId"
+            :sports="sportsDeclares"
             @update:sport="(v) => { filtres.sportId = v; filtres.niveauId = '' }"
             @update:niveau="(v) => filtres.niveauId = v"
           />

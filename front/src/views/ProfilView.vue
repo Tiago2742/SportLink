@@ -114,7 +114,7 @@ async function sauvegarderLogo() {
   try {
     const mis = await mettreAJourLogo(auth.token!, formLogo.value.trim() || null)
     profil.value         = mis
-    auth.utilisateur     = mis
+    auth.rafraichirProfil(mis)
     modeEditionLogo.value = false
   } catch (e: any) {
     erreurLogo.value = e.message || 'Impossible de mettre à jour le logo.'
@@ -138,8 +138,8 @@ async function sauvegarderNiveau(un: any) {
   erreurSport.value = ''
   try {
     const mis = await modifierNiveauSport(auth.token!, un.sport.id, edit.niveauId as number)
-    profil.value     = mis
-    auth.utilisateur = mis
+    profil.value = mis
+    auth.rafraichirProfil(mis)
     delete sportEnCoursEdit.value[un.id]
   } catch (e: any) {
     erreurSport.value = e.message || 'Impossible de modifier le niveau.'
@@ -163,8 +163,8 @@ async function onAjoutSport(liste: EntreeSportNiveau[]) {
   erreurSport.value  = ''
   try {
     const mis = await ajouterSportNiveau(auth.token!, derniere.sportId, derniere.niveauId)
-    profil.value     = mis
-    auth.utilisateur = mis
+    profil.value = mis
+    auth.rafraichirProfil(mis)
   } catch (e: any) {
     erreurSport.value = e.message || 'Impossible d\'ajouter ce sport.'
   } finally {

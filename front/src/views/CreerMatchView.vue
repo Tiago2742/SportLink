@@ -9,9 +9,13 @@ import { CircleCheck, Users, Zap } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
-const { listeSports, niveauxPour, chargerCatalogue } = useSports()
+const { niveauxPour, chargerCatalogue } = useSports()
 
 onMounted(chargerCatalogue)
+
+const sportsDeclares = computed(() =>
+  (auth.utilisateur?.niveaux ?? []).map((un: any) => un.sport),
+)
 
 const form = ref({
   sportId:        '' as number | '',
@@ -30,7 +34,7 @@ const niveauxDisponibles = computed<NiveauRef[]>(() =>
 )
 
 const sportSelectionne = computed(() =>
-  listeSports.value.find((s) => s.id === form.value.sportId),
+  sportsDeclares.value.find((s) => s.id === form.value.sportId),
 )
 
 const besoinEquipe = computed(
@@ -154,6 +158,13 @@ function annuler() {
           </div>
 
           <div class="formulaire-carte">
+            <div v-if="sportsDeclares.length === 0" class="alerte alerte-info">
+              Déclarez des sports dans votre
+              <router-link to="/profil">profil</router-link>
+              pour créer un match.
+            </div>
+
+            <template v-else>
             <div v-if="erreur" class="alerte alerte-erreur">{{ erreur }}</div>
 
             <form @submit.prevent="soumettre">
@@ -162,7 +173,7 @@ function annuler() {
                   <label for="sport">Sport <span class="obligatoire">*</span></label>
                   <select id="sport" v-model="form.sportId" class="champ" required @change="onSportChange">
                     <option value="">Choisir un sport</option>
-                    <option v-for="sport in listeSports" :key="sport.id" :value="sport.id">
+                    <option v-for="sport in sportsDeclares" :key="sport.id" :value="sport.id">
                       {{ sport.nom }}
                     </option>
                   </select>
@@ -253,6 +264,7 @@ function annuler() {
                 </button>
               </div>
             </form>
+            </template>
           </div>
         </div>
 
@@ -498,6 +510,22 @@ function annuler() {
 button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.alerte-info {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  font-size: 0.88rem;
+  margin-bottom: var(--espace-m);
+}
+
+.alerte-info a {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: underline;
 }
 
 /* ══════════════════════════════════════

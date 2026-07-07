@@ -10,6 +10,7 @@ use App\Repository\MatchCampRepository;
 use App\Repository\MessageRepository;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
+use App\Repository\UtilisateurNiveauRepository;
 use App\Service\MatchService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,13 +21,14 @@ use Symfony\Component\Routing\Attribute\Route;
 class MatchController extends AbstractController
 {
     public function __construct(
-        private MatchService        $matchService,
-        private EquipeRepository    $equipeRepository,
-        private GameRepository      $gameRepository,
-        private MatchCampRepository $matchCampRepository,
-        private MessageRepository   $messageRepository,
-        private SportRepository     $sportRepository,
-        private NiveauRepository    $niveauRepository,
+        private MatchService                  $matchService,
+        private EquipeRepository              $equipeRepository,
+        private GameRepository                $gameRepository,
+        private MatchCampRepository           $matchCampRepository,
+        private MessageRepository             $messageRepository,
+        private SportRepository               $sportRepository,
+        private NiveauRepository              $niveauRepository,
+        private UtilisateurNiveauRepository   $utilisateurNiveauRepository,
     ) {}
 
     // ---- Groupes de sérialisation réutilisés --------------------------------
@@ -45,7 +47,8 @@ class MatchController extends AbstractController
     {
         $statut              = $request->query->get('statut');
         $disponibleSeulement = $statut === 'disponible';
-        $mesMatchs             = $request->query->getBoolean('mesMatchs');
+        $mesMatchs           = $request->query->getBoolean('mesMatchs');
+        $sportIds            = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($this->getUser()->getId());
 
         if ($mesMatchs) {
             $matchs = $this->gameRepository->trouverPourParticipant(
@@ -60,6 +63,7 @@ class MatchController extends AbstractController
                 $request->query->getInt('niveauId') ?: null,
                 $request->query->getInt('createurId') ?: null,
                 $disponibleSeulement,
+                $sportIds,
             );
         }
 
@@ -78,6 +82,11 @@ class MatchController extends AbstractController
         $sport = $this->sportRepository->find((int) $donnees['sportId']);
         if (!$sport) {
             return $this->json(['erreur' => 'Sport introuvable.'], 404);
+        }
+
+        $sportIds = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($this->getUser()->getId());
+        if (!in_array($sport->getId(), $sportIds, true)) {
+            return $this->json(['erreur' => "Vous n'avez pas déclaré ce sport dans votre profil."], 422);
         }
 
         $niveauRequis = null;
