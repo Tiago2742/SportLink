@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { useSports } from '@/composables/useSports'
 import { chargerEquipes, demanderRejoindreEquipe } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutDemanderRejoindre, type AdhesionEquipe } from '@/utils/adhesionEquipe'
@@ -19,7 +18,6 @@ const emit = defineEmits<{
 }>()
 
 const auth = useAuthStore()
-const { listeSports, chargerCatalogue } = useSports()
 
 const nom = ref('')
 const sportId = ref<number | ''>('')
@@ -29,11 +27,12 @@ const chargement = ref(false)
 const erreur = ref('')
 const demandeEnCours = ref<number | null>(null)
 
-const sportsCollectifs = computed(() =>
-  listeSports.value.filter((s) => s.type === 'collectif'),
+// Seuls les sports collectifs que le joueur a déclarés dans son profil
+const sportsDeclaresCollectifs = computed(() =>
+  (auth.utilisateur?.niveaux ?? [])
+    .map((un: any) => un.sport)
+    .filter((s: any) => s?.type === 'collectif'),
 )
-
-onMounted(chargerCatalogue)
 
 async function rechercher() {
   const n = nom.value.trim()
@@ -97,8 +96,8 @@ async function demander(equipeId: number) {
         placeholder="Nom de l'équipe (min. 2 car.)"
       />
       <select v-model="sportId" class="champ">
-        <option value="">Tous les sports collectifs</option>
-        <option v-for="s in sportsCollectifs" :key="s.id" :value="s.id">{{ s.nom }}</option>
+        <option value="">Tous mes sports collectifs</option>
+        <option v-for="s in sportsDeclaresCollectifs" :key="s.id" :value="s.id">{{ s.nom }}</option>
       </select>
       <input
         v-model="localisation"

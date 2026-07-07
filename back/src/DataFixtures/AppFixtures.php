@@ -12,11 +12,11 @@ use App\Entity\Resultat;
 use App\Entity\Sport;
 use App\Entity\Utilisateur;
 use App\Entity\UtilisateurNiveau;
+use App\Enum\OrigineMembreEquipe;
 use App\Enum\RoleEquipe;
 use App\Enum\RoleMatchCamp;
 use App\Enum\StatutGame;
 use App\Enum\StatutMatchCamp;
-use App\Enum\OrigineMembreEquipe;
 use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
@@ -56,10 +56,10 @@ class AppFixtures extends Fixture
         // ═══════════════════════════════════════════════════════
         /** @var array<string, Sport> $sports */
         $sports    = [];
-        /** @var array<string, Niveau[]> $niveaux */
+        /** @var array<string, array<string, Niveau>> $niveaux  libelle → Niveau */
         $niveaux   = [];
-        $sportsCol = [];   // noms de sports collectifs
-        $sportsInd = [];   // noms de sports individuels
+        $sportsCol = [];  // noms des sports collectifs
+        $sportsInd = [];  // noms des sports individuels
 
         foreach (SportNiveaux::CATALOGUE as $nom => $cfg) {
             $sport = new Sport();
@@ -80,121 +80,209 @@ class AppFixtures extends Fixture
         }
         $manager->flush();
 
+        // ─── Index croisé sportNom → utilisateurs ───────────────
+        /** @var array<string, Utilisateur[]> $joueursDuSport  sport → joueurs */
+        $joueursDuSport = array_fill_keys(array_keys(SportNiveaux::CATALOGUE), []);
+
+        /** @var array<int, string[]> $sportsDeclares  spl_id → sportNoms */
+        $sportsDeclares = [];
+
         // ═══════════════════════════════════════════════════════
-        // 2. COMPTES DE TEST CONNUS (password "password")
+        // 2. CLUBS DE TEST (sports collectifs explicites)
         // ═══════════════════════════════════════════════════════
         $clubs = [];
-        foreach ([
-            ['club1@test.com', 'AS Arras Sport',           'Arras',     'https://ui-avatars.com/api/?name=AS+Arras&size=200&background=2e7d32&color=ffffff&bold=true&rounded=true'],
-            ['club2@test.com', 'FC Lyon Métropole',        'Lyon',      'https://ui-avatars.com/api/?name=FC+Lyon&size=200&background=c62828&color=ffffff&bold=true&rounded=true'],
-            ['club3@test.com', 'Olympique Marseille Club', 'Marseille', 'https://ui-avatars.com/api/?name=OM&size=200&background=009fda&color=ffffff&bold=true&rounded=true'],
-        ] as [$email, $nom, $ville, $logo]) {
-            $u = $this->makeUser($email, $nom, null, TypeUtilisateur::Club, $ville, $sports, $niveaux);
+
+        $testClubsData = [
+            ['club1@test.com', 'AS Arras Sport',           'Arras',
+             'https://ui-avatars.com/api/?name=AS+Arras&size=200&background=2e7d32&color=ffffff&bold=true&rounded=true',
+             ['Football', 'Handball']],
+            ['club2@test.com', 'FC Lyon Métropole',        'Lyon',
+             'https://ui-avatars.com/api/?name=FC+Lyon&size=200&background=c62828&color=ffffff&bold=true&rounded=true',
+             ['Football', 'Basketball']],
+            ['club3@test.com', 'Olympique Marseille Club', 'Marseille',
+             'https://ui-avatars.com/api/?name=OM&size=200&background=009fda&color=ffffff&bold=true&rounded=true',
+             ['Volleyball', 'Rugby']],
+        ];
+
+        foreach ($testClubsData as [$email, $nom, $ville, $logo, $sportsClub]) {
+            $u = $this->makeUser($email, $nom, null, TypeUtilisateur::Club, $ville);
             $u->setLogo($logo);
+            $this->ajouterSports($u, $sportsClub, $sports, $niveaux);
             $this->save($u);
             $clubs[] = $u;
+            $sportsDeclares[spl_object_id($u)] = $sportsClub;
         }
 
+        // ═══════════════════════════════════════════════════════
+        // 3. JOUEURS DE TEST (sports explicites variés)
+        // ═══════════════════════════════════════════════════════
         $joueurs = [];
-        foreach ([
-            ['jean.dupont@test.com',    'Dupont',  'Jean'],
-            ['marc.dubois@test.com',    'Dubois',  'Marc'],
-            ['thomas.martin@test.com',  'Martin',  'Thomas'],
-            ['pierre.leroy@test.com',   'Leroy',   'Pierre'],
-            ['antoine.moreau@test.com', 'Moreau',  'Antoine'],
-            ['lea.bernard@test.com',    'Bernard', 'Léa'],
-            ['marie.petit@test.com',    'Petit',   'Marie'],
-        ] as [$email, $nom, $prenom]) {
-            $u = $this->makeUser($email, $nom, $prenom, TypeUtilisateur::Joueur, $faker->city(), $sports, $niveaux);
+
+        $testJoueursData = [
+            ['jean.dupont@test.com',    'Dupont',  'Jean',    ['Football', 'Tennis']],
+            ['marc.dubois@test.com',    'Dubois',  'Marc',    ['Football', 'Badminton']],
+            ['thomas.martin@test.com',  'Martin',  'Thomas',  ['Handball', 'Tennis']],
+            ['pierre.leroy@test.com',   'Leroy',   'Pierre',  ['Basketball', 'Badminton']],
+            ['antoine.moreau@test.com', 'Moreau',  'Antoine', ['Volleyball', 'Badminton']],
+            ['lea.bernard@test.com',    'Bernard', 'Léa',     ['Rugby', 'Tennis']],
+            ['marie.petit@test.com',    'Petit',   'Marie',   ['Football', 'Handball', 'Tennis']],
+        ];
+
+        foreach ($testJoueursData as [$email, $nom, $prenom, $sportsJ]) {
+            $u = $this->makeUser($email, $nom, $prenom, TypeUtilisateur::Joueur, $faker->city());
+            $this->ajouterSports($u, $sportsJ, $sports, $niveaux);
             $this->save($u);
             $joueurs[] = $u;
+            $sportsDeclares[spl_object_id($u)] = $sportsJ;
+            foreach ($sportsJ as $s) {
+                $joueursDuSport[$s][] = $u;
+            }
         }
 
+        // Marqueur de fin des comptes de test (indices 0–6)
+        $nbJoueursTest = count($joueurs);
+
         // ═══════════════════════════════════════════════════════
-        // 3. CLUBS GÉNÉRÉS (~27 → total ~30)
+        // 4. CLUBS GÉNÉRÉS (12 → total 15)
+        //    Déclarent 1 ou 2 sports collectifs uniquement
         // ═══════════════════════════════════════════════════════
         $prefixesClub = ['AS', 'FC', 'US', 'SC', 'CA', 'Stade', 'Club Sportif', 'Racing Club', 'Entente Sportive'];
-        for ($i = 0; $i < 27; $i++) {
+        for ($i = 0; $i < 12; $i++) {
+            $pool      = $sportsCol;
+            shuffle($pool);
+            $sportsGen = array_slice($pool, 0, rand(1, 2));
+
             $u = $this->makeUser(
                 "club{$i}@gen.sportlink.fr",
                 $faker->randomElement($prefixesClub) . ' ' . $faker->city(),
                 null,
                 TypeUtilisateur::Club,
                 $faker->city(),
-                $sports,
-                $niveaux,
             );
+            $this->ajouterSports($u, $sportsGen, $sports, $niveaux);
             $this->save($u);
             $clubs[] = $u;
+            $sportsDeclares[spl_object_id($u)] = $sportsGen;
         }
 
         // ═══════════════════════════════════════════════════════
-        // 4. JOUEURS GÉNÉRÉS (~193 → total ~200)
+        // 5. JOUEURS GÉNÉRÉS (73 → total 80)
+        //    Déclarent 1 à 3 sports (tous types)
         // ═══════════════════════════════════════════════════════
-        for ($i = 0; $i < 193; $i++) {
+        $sportsNoms = array_keys(SportNiveaux::CATALOGUE);
+        for ($i = 0; $i < 73; $i++) {
+            $pool      = $sportsNoms;
+            shuffle($pool);
+            $sportsGen = array_slice($pool, 0, rand(1, 3));
+
             $u = $this->makeUser(
                 "joueur{$i}@gen.sportlink.fr",
                 $faker->lastName(),
                 $faker->firstName(),
                 TypeUtilisateur::Joueur,
                 $faker->city(),
-                $sports,
-                $niveaux,
             );
+            $this->ajouterSports($u, $sportsGen, $sports, $niveaux);
             $this->save($u);
             $joueurs[] = $u;
+            $sportsDeclares[spl_object_id($u)] = $sportsGen;
+            foreach ($sportsGen as $s) {
+                $joueursDuSport[$s][] = $u;
+            }
         }
         $manager->flush();
 
         // ═══════════════════════════════════════════════════════
-        // 5. ÉQUIPES — sports collectifs uniquement (~80)
+        // 6. ÉQUIPES (~30)
+        //    Clubs de test : config fixe
+        //    Clubs générés : 1-2 équipes par sport déclaré
         // ═══════════════════════════════════════════════════════
         /** @var Equipe[] $equipes */
         $equipes      = [];
-        $equipesSport = array_fill_keys($sportsCol, []);   // sportNom → Equipe[]
-        $equipesClub  = [];                                // spl_object_id($club) → Equipe[]
-        $prefEq       = ['FC', 'AS', 'US', 'SC', 'Club', 'Les', 'Team', 'Racing', 'Stade', 'Entente'];
+        $equipesSport = array_fill_keys($sportsCol, []);  // sportNom → Equipe[]
+        $equipesClub  = [];                               // spl_id($club) → Equipe[]
+        $prefEq       = ['FC', 'AS', 'US', 'SC', 'Club', 'Les', 'Team', 'Racing', 'Stade'];
 
-        for ($i = 0; $i < 80; $i++) {
-            $sportNom = $sportsCol[$i % count($sportsCol)];
-            $nivsArr  = array_values($niveaux[$sportNom]);
-            $club     = $clubs[$i % count($clubs)];
-
+        $creerEquipe = function (Utilisateur $club, string $sNom) use (
+            &$equipes, &$equipesSport, &$equipesClub, $prefEq, $sports, $niveaux, $faker
+        ): Equipe {
+            $nivsArr = array_values($niveaux[$sNom]);
             $e = new Equipe();
             $e->setNom($faker->randomElement($prefEq) . ' ' . $faker->lastName());
-            $e->setSport($sports[$sportNom]);
+            $e->setSport($sports[$sNom]);
             $e->setNiveau($nivsArr[array_rand($nivsArr)]);
-            $e->setLocalisation($faker->city());
+            $e->setLocalisation($club->getLocalisation() ?? $faker->city());
             $e->setClub($club);
             $this->save($e);
 
-            $equipes[]                             = $e;
-            $equipesSport[$sportNom][]             = $e;
-            $equipesClub[spl_object_id($club)][]   = $e;
-
-            // Le club est gestionnaire de ses propres équipes (toujours confirmé)
             $ej = new EquipeJoueur();
-            $ej->setEquipe($e);
-            $ej->setUtilisateur($club);
-            $ej->setRole(RoleEquipe::Gestionnaire);
-            $ej->setStatut(StatutMembreEquipe::Confirme);
-            $ej->setOrigine(OrigineMembreEquipe::InvitationClub);
+            $ej->setEquipe($e)->setUtilisateur($club)
+               ->setRole(RoleEquipe::Gestionnaire)
+               ->setStatut(StatutMembreEquipe::Confirme)
+               ->setOrigine(OrigineMembreEquipe::InvitationClub);
             $this->save($ej);
+
+            $equipes[] = $e;
+            $equipesSport[$sNom][] = $e;
+            $equipesClub[spl_object_id($club)][] = $e;
+
+            return $e;
+        };
+
+        // ── Clubs de test (config fixe) ──
+        $clubsTestEquipes = [
+            [$clubs[0], 'Football',   3],
+            [$clubs[0], 'Handball',   2],
+            [$clubs[1], 'Football',   3],
+            [$clubs[1], 'Basketball', 2],
+            [$clubs[2], 'Volleyball', 2],
+            [$clubs[2], 'Rugby',      2],
+        ];
+        foreach ($clubsTestEquipes as [$club, $sNom, $nbEq]) {
+            for ($k = 0; $k < $nbEq; $k++) {
+                $creerEquipe($club, $sNom);
+            }
+        }
+
+        // ── Clubs générés : 1-2 équipes par sport déclaré ──
+        foreach (array_slice($clubs, 3) as $club) {
+            foreach ($sportsDeclares[spl_object_id($club)] ?? [] as $sNom) {
+                $nbEq = $faker->numberBetween(1, 2);
+                for ($k = 0; $k < $nbEq; $k++) {
+                    $creerEquipe($club, $sNom);
+                }
+            }
         }
         $manager->flush();
 
         // ═══════════════════════════════════════════════════════
-        // 6. ADHÉSIONS joueurs ↔ équipes
+        // 7. ADHÉSIONS générales
+        //    Source : $joueursDuSport[sport] → respect R3b
         //    Règle : max 1 équipe CONFIRMÉE par sport par joueur
+        //    Skip : les 7 comptes de test joueur (gérés en §8)
         // ═══════════════════════════════════════════════════════
-        // confirmeParSport[ spl_object_id($joueur) ][ $sportNom ] = true
+        // confirmeParSport[ spl_id($joueur) ][ sportNom ] = true
         $confirmeParSport = [];
+        // dejaMembre[ spl_id($joueur) ][ spl_id($equipe) ] = true
+        $dejaMembre = [];
+
+        $joueursTestIds = array_map('spl_object_id', array_slice($joueurs, 0, $nbJoueursTest));
 
         foreach ($equipes as $equipe) {
-            $sportNom  = $equipe->getSport()->getNom();
-            $objectif  = $faker->numberBetween(3, 8);
-            $ajouts    = 0;
-            $candidats = $faker->randomElements($joueurs, min(25, count($joueurs)));
+            $sNom = $equipe->getSport()->getNom();
+
+            // Candidats = joueurs qui déclarent ce sport, hors comptes de test
+            $candidats = array_values(array_filter(
+                $joueursDuSport[$sNom],
+                fn ($j) => !\in_array(spl_object_id($j), $joueursTestIds, true),
+            ));
+            if (empty($candidats)) {
+                continue;
+            }
+
+            shuffle($candidats);
+            $objectif = $faker->numberBetween(3, 8);
+            $ajouts   = 0;
 
             foreach ($candidats as $joueur) {
                 if ($ajouts >= $objectif) {
@@ -202,149 +290,191 @@ class AppFixtures extends Fixture
                 }
 
                 $jId = spl_object_id($joueur);
+                $eId = spl_object_id($equipe);
+                if (!empty($dejaMembre[$jId][$eId])) {
+                    continue;
+                }
+
                 $roll = $faker->numberBetween(1, 100);
 
-                if ($roll <= 68) {
-                    // Confirme — vérifie la contrainte "1 équipe confirmée max par sport"
-                    if (!empty($confirmeParSport[$jId][$sportNom])) {
+                if ($roll <= 65) {
+                    if (!empty($confirmeParSport[$jId][$sNom])) {
                         continue;
                     }
                     $statut  = StatutMembreEquipe::Confirme;
                     $origine = $faker->boolean(60)
                         ? OrigineMembreEquipe::InvitationClub
                         : OrigineMembreEquipe::DemandeJoueur;
-                    $confirmeParSport[$jId][$sportNom] = true;
-                } elseif ($roll <= 84) {
-                    // En attente — invitation du club
+                    $confirmeParSport[$jId][$sNom] = true;
+                } elseif ($roll <= 80) {
                     $statut  = StatutMembreEquipe::EnAttente;
                     $origine = OrigineMembreEquipe::InvitationClub;
                 } else {
-                    // En attente — demande du joueur
                     $statut  = StatutMembreEquipe::EnAttente;
                     $origine = OrigineMembreEquipe::DemandeJoueur;
                 }
 
                 $ej = new EquipeJoueur();
-                $ej->setEquipe($equipe);
-                $ej->setUtilisateur($joueur);
-                $ej->setRole(RoleEquipe::Joueur);
-                $ej->setStatut($statut);
-                $ej->setOrigine($origine);
+                $ej->setEquipe($equipe)->setUtilisateur($joueur)
+                   ->setRole(RoleEquipe::Joueur)
+                   ->setStatut($statut)
+                   ->setOrigine($origine);
                 $this->save($ej);
+                $dejaMembre[$jId][$eId] = true;
                 $ajouts++;
             }
         }
         $manager->flush();
 
         // ═══════════════════════════════════════════════════════
-        // 7. CAS DE TEST — COMPTES CONNUS
-        //    Scénarios visibles dès la première connexion
+        // 8. CAS DE TEST — SCÉNARIOS CONCENTRÉS
+        //    Memberships ajoutés sans doublon (via $dejaMembre)
         // ═══════════════════════════════════════════════════════
-        $eq1C1 = $equipesClub[spl_object_id($clubs[0])] ?? [];  // équipes de club1
-        $eq1C2 = $equipesClub[spl_object_id($clubs[1])] ?? [];  // équipes de club2
-        $eq1C3 = $equipesClub[spl_object_id($clubs[2])] ?? [];  // équipes de club3
+        $filterBySport = fn (array $eqs, string $s): array => array_values(
+            array_filter($eqs, fn (Equipe $e) => $e->getSport()->getNom() === $s),
+        );
 
-        // ── club1 : demandes joueurs en attente à traiter sur ses 3 équipes ──
-        // Joueurs générés (index 7+) pour ne pas mélanger les comptes de test
-        foreach ($eq1C1 as $eqIdx => $eqC1) {
-            for ($d = 0; $d < 3; $d++) {
-                $candidat = $joueurs[10 + $eqIdx * 7 + $d]; // index fixe, pas de risque doublon
-                $ej = new EquipeJoueur();
-                $ej->setEquipe($eqC1)->setUtilisateur($candidat)
-                   ->setRole(RoleEquipe::Joueur)
-                   ->setStatut(StatutMembreEquipe::EnAttente)
-                   ->setOrigine(OrigineMembreEquipe::DemandeJoueur);
-                $this->save($ej);
+        $cId0 = spl_object_id($clubs[0]);
+        $cId1 = spl_object_id($clubs[1]);
+        $cId2 = spl_object_id($clubs[2]);
+
+        $eqC1F = $filterBySport($equipesClub[$cId0] ?? [], 'Football');    // 3 équipes
+        $eqC1H = $filterBySport($equipesClub[$cId0] ?? [], 'Handball');    // 2 équipes
+        $eqC2F = $filterBySport($equipesClub[$cId1] ?? [], 'Football');    // 3 équipes
+        $eqC2B = $filterBySport($equipesClub[$cId1] ?? [], 'Basketball'); // 2 équipes
+        $eqC3V = $filterBySport($equipesClub[$cId2] ?? [], 'Volleyball'); // 2 équipes
+        $eqC3R = $filterBySport($equipesClub[$cId2] ?? [], 'Rugby');       // 2 équipes
+
+        // Helper : ajouter membership sans doublon
+        $addM = function (
+            Equipe $equipe,
+            Utilisateur $joueur,
+            StatutMembreEquipe $statut,
+            OrigineMembreEquipe $origine,
+        ) use (&$dejaMembre): void {
+            $jId = spl_object_id($joueur);
+            $eId = spl_object_id($equipe);
+            if (!empty($dejaMembre[$jId][$eId])) {
+                return;
+            }
+            $ej = new EquipeJoueur();
+            $ej->setEquipe($equipe)->setUtilisateur($joueur)
+               ->setRole(RoleEquipe::Joueur)
+               ->setStatut($statut)
+               ->setOrigine($origine);
+            $this->save($ej);
+            $dejaMembre[$jId][$eId] = true;
+        };
+
+        // ── club1 : demandes de joueurs déclarant Football ──
+        $jFoot = array_values(array_filter(
+            $joueursDuSport['Football'],
+            fn ($j) => !\in_array(spl_object_id($j), $joueursTestIds, true),
+        ));
+        foreach ($eqC1F as $idx => $eq) {
+            for ($d = 0; $d < 3 && isset($jFoot[$idx * 6 + $d]); $d++) {
+                $addM($eq, $jFoot[$idx * 6 + $d], StatutMembreEquipe::EnAttente, OrigineMembreEquipe::DemandeJoueur);
             }
         }
 
-        // ── jean.dupont : invitations à accepter / refuser ──
-        $jDupont   = $joueurs[0];
-        $jDupontId = spl_object_id($jDupont);
-        // Invitation de club2 vers jean.dupont
-        if (!empty($eq1C2)) {
-            $ej = new EquipeJoueur();
-            $ej->setEquipe($eq1C2[0])->setUtilisateur($jDupont)
-               ->setRole(RoleEquipe::Joueur)
-               ->setStatut(StatutMembreEquipe::EnAttente)
-               ->setOrigine(OrigineMembreEquipe::InvitationClub);
-            $this->save($ej);
-        }
-        if (count($eq1C2) >= 2) {
-            $ej = new EquipeJoueur();
-            $ej->setEquipe($eq1C2[1])->setUtilisateur($jDupont)
-               ->setRole(RoleEquipe::Joueur)
-               ->setStatut(StatutMembreEquipe::EnAttente)
-               ->setOrigine(OrigineMembreEquipe::InvitationClub);
-            $this->save($ej);
-        }
-        // Invitation de club3 vers jean.dupont
-        if (!empty($eq1C3)) {
-            $ej = new EquipeJoueur();
-            $ej->setEquipe($eq1C3[0])->setUtilisateur($jDupont)
-               ->setRole(RoleEquipe::Joueur)
-               ->setStatut(StatutMembreEquipe::EnAttente)
-               ->setOrigine(OrigineMembreEquipe::InvitationClub);
-            $this->save($ej);
-        }
-        // Demande envoyée de jean.dupont vers une équipe d'un club généré
-        if (!empty($equipes[5])) {
-            $ej = new EquipeJoueur();
-            $ej->setEquipe($equipes[5])->setUtilisateur($jDupont)
-               ->setRole(RoleEquipe::Joueur)
-               ->setStatut(StatutMembreEquipe::EnAttente)
-               ->setOrigine(OrigineMembreEquipe::DemandeJoueur);
-            $this->save($ej);
-        }
-        // jean.dupont membre confirmé de la 1ʳᵉ équipe de club1 (si sport pas déjà pris)
-        if (!empty($eq1C1)) {
-            $sNomC1 = $eq1C1[0]->getSport()->getNom();
-            if (empty($confirmeParSport[$jDupontId][$sNomC1])) {
-                $ej = new EquipeJoueur();
-                $ej->setEquipe($eq1C1[0])->setUtilisateur($jDupont)
-                   ->setRole(RoleEquipe::Joueur)
-                   ->setStatut(StatutMembreEquipe::Confirme)
-                   ->setOrigine(OrigineMembreEquipe::InvitationClub);
-                $this->save($ej);
-                $confirmeParSport[$jDupontId][$sNomC1] = true;
+        // ── club1 : demandes de joueurs déclarant Handball ──
+        $jHand = array_values(array_filter(
+            $joueursDuSport['Handball'],
+            fn ($j) => !\in_array(spl_object_id($j), $joueursTestIds, true),
+        ));
+        foreach ($eqC1H as $idx => $eq) {
+            for ($d = 0; $d < 2 && isset($jHand[$idx * 4 + $d]); $d++) {
+                $addM($eq, $jHand[$idx * 4 + $d], StatutMembreEquipe::EnAttente, OrigineMembreEquipe::DemandeJoueur);
             }
         }
 
-        // ── Autres joueurs de test : 1-2 invitations visibles dès connexion ──
-        // [1] marc.dubois ← club2, [2] thomas.martin ← club3
-        // [3] pierre.leroy ← club2, [4] antoine.moreau ← club3
-        // [5] lea.bernard ← club2, [6] marie.petit ← club3
-        $invPairs = [
-            [1, $eq1C2, 0],   // marc ← club2 équipe 0
-            [2, $eq1C3, 0],   // thomas ← club3 équipe 0
-            [3, $eq1C2, count($eq1C2) >= 2 ? 1 : 0],  // pierre ← club2 équipe 1
-            [4, $eq1C3, count($eq1C3) >= 2 ? 1 : 0],  // antoine ← club3 équipe 1
-            [5, $eq1C2, 0],   // lea ← club2 équipe 0
-            [6, $eq1C3, 0],   // marie ← club3 équipe 0
-        ];
-        foreach ($invPairs as [$jIdx, $eqList, $eqPos]) {
-            if (empty($eqList)) {
-                continue;
+        // ── club2 : demandes sur Football ──
+        foreach ($eqC2F as $idx => $eq) {
+            for ($d = 0; $d < 2 && isset($jFoot[20 + $idx * 4 + $d]); $d++) {
+                $addM($eq, $jFoot[20 + $idx * 4 + $d], StatutMembreEquipe::EnAttente, OrigineMembreEquipe::DemandeJoueur);
             }
-            $ej = new EquipeJoueur();
-            $ej->setEquipe($eqList[$eqPos])->setUtilisateur($joueurs[$jIdx])
-               ->setRole(RoleEquipe::Joueur)
-               ->setStatut(StatutMembreEquipe::EnAttente)
-               ->setOrigine(OrigineMembreEquipe::InvitationClub);
-            $this->save($ej);
         }
+
+        // ── club3 : demandes Volleyball + Rugby ──
+        $jVoll = array_values(array_filter(
+            $joueursDuSport['Volleyball'],
+            fn ($j) => !\in_array(spl_object_id($j), $joueursTestIds, true),
+        ));
+        $jRugb = array_values(array_filter(
+            $joueursDuSport['Rugby'],
+            fn ($j) => !\in_array(spl_object_id($j), $joueursTestIds, true),
+        ));
+        foreach ($eqC3V as $idx => $eq) {
+            for ($d = 0; $d < 2 && isset($jVoll[$idx * 3 + $d]); $d++) {
+                $addM($eq, $jVoll[$idx * 3 + $d], StatutMembreEquipe::EnAttente, OrigineMembreEquipe::DemandeJoueur);
+            }
+        }
+        foreach ($eqC3R as $idx => $eq) {
+            for ($d = 0; $d < 2 && isset($jRugb[$idx * 3 + $d]); $d++) {
+                $addM($eq, $jRugb[$idx * 3 + $d], StatutMembreEquipe::EnAttente, OrigineMembreEquipe::DemandeJoueur);
+            }
+        }
+
+        // ── jean.dupont (Football + Tennis) ──
+        // Invitation club2 → 1 invitation Football à accepter/refuser
+        [$jean, $marc, $thomas, $pierre, $antoine, $lea, $marie] = $joueurs;
+        if (!empty($eqC2F)) {
+            $addM($eqC2F[0], $jean, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
+        // ── marc.dubois (Football + Badminton) ──
+        // Invitation club1 → 1 invitation Football
+        if (!empty($eqC1F)) {
+            $addM($eqC1F[0], $marc, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
+        // ── thomas.martin (Handball + Tennis) ──
+        // Invitation club1 → 1 invitation Handball
+        if (!empty($eqC1H)) {
+            $addM($eqC1H[0], $thomas, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
+        // ── pierre.leroy (Basketball + Badminton) ──
+        // Invitation club2 → Basketball
+        if (!empty($eqC2B)) {
+            $addM($eqC2B[0], $pierre, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
+        // ── antoine.moreau (Volleyball + Badminton) ──
+        // Invitation club3 → Volleyball
+        if (!empty($eqC3V)) {
+            $addM($eqC3V[0], $antoine, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
+        // ── lea.bernard (Rugby + Tennis) ──
+        // Invitation club3 → Rugby
+        if (!empty($eqC3R)) {
+            $addM($eqC3R[0], $lea, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
+        // ── marie.petit (Football + Handball + Tennis) ──
+        // 2 invitations dans des sports différents (légal par règle métier)
+        if (count($eqC1F) >= 2) {
+            $addM($eqC1F[1], $marie, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        } elseif (!empty($eqC1F)) {
+            $addM($eqC1F[0], $marie, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+        if (!empty($eqC1H)) {
+            $addM($eqC1H[0], $marie, StatutMembreEquipe::EnAttente, OrigineMembreEquipe::InvitationClub);
+        }
+
         $manager->flush();
 
         // ═══════════════════════════════════════════════════════
-        // 8. MATCHS (~500) + CAMPS + RÉSULTATS + MESSAGES
+        // 9. MATCHS (~200) + CAMPS + RÉSULTATS + MESSAGES
         //
         //    Statuts : 30 % en_attente | 20 % confirme
         //              40 % termine    | 10 % annule
         //    Types   : 60 % collectif  | 40 % individuel
         //
-        //    R2 : confirme quand les 2 camps sont confirmés
-        //    R3 : résultat uniquement pour termine (date passée, 2 camps)
-        //    R5 : equipe XOR joueur selon le type de sport
+        //    R5 : equipe obligatoire si collectif, joueur si individuel
+        //    R3 : résultat uniquement pour termine (2 camps, date passée)
+        //    3b : joueurs individuels tirés depuis $joueursDuSport[sport]
         // ═══════════════════════════════════════════════════════
         $lieuxBase = [
             'Stade Municipal', 'Gymnase Central', 'Court Couvert', 'Centre Sportif',
@@ -367,7 +497,6 @@ class AppFixtures extends Fixture
             'Le match est annulé, on reporte la semaine prochaine.',
         ];
 
-        // Pool pondéré pour le tirage des statuts
         $statutPool = [
             StatutGame::EnAttente, StatutGame::EnAttente, StatutGame::EnAttente,
             StatutGame::Confirme,  StatutGame::Confirme,
@@ -375,25 +504,30 @@ class AppFixtures extends Fixture
             StatutGame::Annule,
         ];
 
-        for ($i = 0; $i < 500; $i++) {
+        for ($i = 0; $i < 185; $i++) {
             $statut    = $faker->randomElement($statutPool);
-            $collectif = $faker->boolean(60) && !empty($sportsCol);
+            $collectif = $faker->boolean(60);
 
             // Choisir un sport cohérent avec le type
+            $sNom = null;
             if ($collectif) {
-                $sportNom = $faker->randomElement($sportsCol);
-                if (empty($equipesSport[$sportNom])) {
+                $colPool = array_values(array_filter($sportsCol, fn ($s) => !empty($equipesSport[$s])));
+                if (empty($colPool)) {
                     $collectif = false;
+                } else {
+                    $sNom = $faker->randomElement($colPool);
                 }
             }
             if (!$collectif) {
-                $sportNom = $faker->randomElement($sportsInd);
+                $indPool = array_values(array_filter($sportsInd, fn ($s) => count($joueursDuSport[$s]) >= 2));
+                if (empty($indPool)) {
+                    continue;
+                }
+                $sNom = $faker->randomElement($indPool);
             }
 
-            $nivsArr = array_values($niveaux[$sportNom]);
-
-            // Date cohérente avec le statut
-            $date = match ($statut) {
+            $nivsArr = array_values($niveaux[$sNom]);
+            $date    = match ($statut) {
                 StatutGame::Termine  => $faker->dateTimeBetween('-180 days', '-1 day'),
                 StatutGame::Confirme => $faker->dateTimeBetween('+1 day', '+90 days'),
                 StatutGame::Annule   => $faker->boolean()
@@ -403,22 +537,22 @@ class AppFixtures extends Fixture
             };
 
             $g = new Game();
-            $g->setSport($sports[$sportNom]);
+            $g->setSport($sports[$sNom]);
             if ($faker->boolean(70)) {
                 $g->setNiveauRequis($nivsArr[array_rand($nivsArr)]);
             }
             $g->setDateMatch($date);
             $g->setLieu($faker->randomElement($lieuxBase) . ', ' . $faker->city());
             $g->setStatut($statut);
-            if ($faker->boolean(30)) {
-                $g->setDescription($faker->sentence($faker->numberBetween(6, 15)));
+            if ($faker->boolean(25)) {
+                $g->setDescription($faker->sentence($faker->numberBetween(5, 12)));
             }
 
             $nbCamps = 0;
 
             if ($collectif) {
-                // ── R5 : equipe obligatoire (sport collectif) ──
-                $eqList = $equipesSport[$sportNom];
+                // ── R5 : equipe obligatoire ──
+                $eqList = $equipesSport[$sNom];
                 $eq1    = $faker->randomElement($eqList);
                 $g->setCreateur($eq1->getClub());
                 $this->save($g);
@@ -429,15 +563,18 @@ class AppFixtures extends Fixture
                 $this->save($c1);
                 $nbCamps++;
 
-                // Camp 2 : absent uniquement pour annule ou si un seul équipe dans ce sport
-                if ($statut !== StatutGame::Annule && count($eqList) > 1) {
-                    $eqAutres = array_values(array_filter($eqList, fn(Equipe $e) => $e !== $eq1));
+                // Camp 2 : absent pour annule ou ~40 % des en_attente (rejoignables)
+                $ajouterCamp2 = $statut !== StatutGame::Annule
+                    && count($eqList) > 1
+                    && !($statut === StatutGame::EnAttente && $faker->boolean(40));
+
+                if ($ajouterCamp2) {
+                    $eqAutres = array_values(array_filter($eqList, fn (Equipe $e) => $e !== $eq1));
                     if (!empty($eqAutres)) {
                         $eq2   = $faker->randomElement($eqAutres);
-                        $stat2 = in_array($statut, [StatutGame::Confirme, StatutGame::Termine], true)
+                        $stat2 = \in_array($statut, [StatutGame::Confirme, StatutGame::Termine], true)
                             ? StatutMatchCamp::Confirme
                             : StatutMatchCamp::Invite;
-
                         $c2 = new MatchCamp();
                         $c2->setGame($g)->setRole(RoleMatchCamp::Camp2)
                            ->setStatut($stat2)->setEquipe($eq2);
@@ -446,8 +583,9 @@ class AppFixtures extends Fixture
                     }
                 }
             } else {
-                // ── R5 : joueur obligatoire (sport individuel) ──
-                $j1 = $faker->randomElement($joueurs);
+                // ── R5 : joueur obligatoire (3b : depuis $joueursDuSport) ──
+                $jPool = $joueursDuSport[$sNom];
+                $j1    = $faker->randomElement($jPool);
                 $g->setCreateur($j1);
                 $this->save($g);
 
@@ -457,18 +595,17 @@ class AppFixtures extends Fixture
                 $this->save($c1);
                 $nbCamps++;
 
-                if ($statut !== StatutGame::Annule) {
-                    // Tire un 2ᵉ joueur distinct
-                    $j2    = $j1;
-                    $tries = 0;
-                    while ($j2 === $j1 && $tries++ < 15) {
-                        $j2 = $faker->randomElement($joueurs);
-                    }
-                    if ($j2 !== $j1) {
-                        $stat2 = in_array($statut, [StatutGame::Confirme, StatutGame::Termine], true)
+                // Camp 2 : absent pour annule ou ~45 % des en_attente
+                $ajouterCamp2 = $statut !== StatutGame::Annule
+                    && !($statut === StatutGame::EnAttente && $faker->boolean(45));
+
+                if ($ajouterCamp2) {
+                    $autres = array_values(array_filter($jPool, fn ($j) => $j !== $j1));
+                    if (!empty($autres)) {
+                        $j2    = $faker->randomElement($autres);
+                        $stat2 = \in_array($statut, [StatutGame::Confirme, StatutGame::Termine], true)
                             ? StatutMatchCamp::Confirme
                             : StatutMatchCamp::Invite;
-
                         $c2 = new MatchCamp();
                         $c2->setGame($g)->setRole(RoleMatchCamp::Camp2)
                            ->setStatut($stat2)->setJoueur($j2);
@@ -478,30 +615,21 @@ class AppFixtures extends Fixture
                 }
             }
 
-            // R3 : résultat seulement si termine + 2 camps (date passée par construction)
+            // R3 : résultat si termine + 2 camps (date passée par construction)
             if ($statut === StatutGame::Termine && $nbCamps === 2) {
                 $r = new Resultat();
                 $r->setGame($g);
-                if ($collectif) {
-                    // Score buts (0–10, validé par le frontend ≤ 200)
-                    $r->setScoreCamp1($faker->numberBetween(0, 10));
-                    $r->setScoreCamp2($faker->numberBetween(0, 10));
-                } else {
-                    // Score sets (0–5, validé par le frontend ≤ 5)
-                    $r->setScoreCamp1($faker->numberBetween(0, 5));
-                    $r->setScoreCamp2($faker->numberBetween(0, 5));
-                }
+                $r->setScoreCamp1($faker->numberBetween(0, $collectif ? 10 : 5));
+                $r->setScoreCamp2($faker->numberBetween(0, $collectif ? 10 : 5));
                 $this->save($r);
             }
 
-            // Messages sur ~60 % des matchs (1 à 4 par match)
-            if ($faker->boolean(60)) {
-                $nbMsg = $faker->numberBetween(1, 4);
-                for ($m = 0; $m < $nbMsg; $m++) {
-                    $offset  = $faker->numberBetween(0, 10);
+            // Messages sur ~40 % des matchs (1 à 4 par match)
+            if ($faker->boolean(40)) {
+                for ($m = 0; $m < $faker->numberBetween(1, 4); $m++) {
+                    $offset  = $faker->numberBetween(0, 12);
                     $msgDate = (clone $date)->modify("-{$offset} days");
-
-                    $msg = new Message();
+                    $msg     = new Message();
                     $msg->setGame($g);
                     $msg->setExpediteur($faker->randomElement($joueurs));
                     $msg->setContenu($faker->randomElement($msgTemplates));
@@ -513,59 +641,13 @@ class AppFixtures extends Fixture
         $manager->flush();
 
         // ═══════════════════════════════════════════════════════
-        // 9. MATCHS REJOIGNABLES OUVERTS (~65 matchs)
-        //    statut en_attente + date future + UN SEUL camp
-        //    → visibles dans Recherche par tous les adversaires
+        // 10. MATCHS REJOIGNABLES — COMPTES DE TEST
+        //     Un seul camp, statut en_attente, date future
         // ═══════════════════════════════════════════════════════
 
-        // ── 9a. Collectifs génériques : round-robin sur toutes les équipes ──
-        for ($i = 0; $i < 36; $i++) {
-            $eq       = $equipes[$i % count($equipes)];
-            $sNom     = $eq->getSport()->getNom();
-            $nivsArr  = array_values($niveaux[$sNom]);
-
-            $g = new Game();
-            $g->setSport($sports[$sNom]);
-            $g->setNiveauRequis($nivsArr[array_rand($nivsArr)]);
-            $g->setDateMatch($faker->dateTimeBetween('+2 days', '+90 days'));
-            $g->setLieu($faker->randomElement($lieuxBase) . ', ' . $faker->city());
-            $g->setStatut(StatutGame::EnAttente);
-            $g->setCreateur($eq->getClub());
-            if ($faker->boolean(50)) {
-                $g->setDescription('Cherche adversaire · ' . $sNom);
-            }
-            $this->save($g);
-
-            $c1 = new MatchCamp();
-            $c1->setGame($g)->setRole(RoleMatchCamp::Camp1)
-               ->setStatut(StatutMatchCamp::Confirme)->setEquipe($eq);
-            $this->save($c1);
-        }
-
-        // ── 9b. Individuels génériques ──
-        for ($i = 0; $i < 18; $i++) {
-            $sNom    = $sportsInd[$i % count($sportsInd)];
-            $nivsArr = array_values($niveaux[$sNom]);
-            $joueur  = $joueurs[7 + $i];  // joueurs générés uniquement
-
-            $g = new Game();
-            $g->setSport($sports[$sNom]);
-            $g->setNiveauRequis($nivsArr[array_rand($nivsArr)]);
-            $g->setDateMatch($faker->dateTimeBetween('+2 days', '+90 days'));
-            $g->setLieu($faker->randomElement($lieuxBase) . ', ' . $faker->city());
-            $g->setStatut(StatutGame::EnAttente);
-            $g->setCreateur($joueur);
-            $this->save($g);
-
-            $c1 = new MatchCamp();
-            $c1->setGame($g)->setRole(RoleMatchCamp::Camp1)
-               ->setStatut(StatutMatchCamp::Confirme)->setJoueur($joueur);
-            $this->save($c1);
-        }
-
-        // ── 9c. Matchs ouverts de club1 (visibles dès connexion) ──
-        foreach ($eq1C1 as $eqC1) {
-            $sNom    = $eqC1->getSport()->getNom();
+        // ── club1 : 1 match ouvert par équipe (5 matchs) ──
+        foreach ($equipesClub[$cId0] ?? [] as $eqTest) {
+            $sNom    = $eqTest->getSport()->getNom();
             $nivsArr = array_values($niveaux[$sNom]);
 
             $g = new Game();
@@ -580,19 +662,19 @@ class AppFixtures extends Fixture
 
             $c1 = new MatchCamp();
             $c1->setGame($g)->setRole(RoleMatchCamp::Camp1)
-               ->setStatut(StatutMatchCamp::Confirme)->setEquipe($eqC1);
+               ->setStatut(StatutMatchCamp::Confirme)->setEquipe($eqTest);
             $this->save($c1);
         }
 
-        // ── 9d. Matchs ouverts des joueurs de test ──
-        $joueursTestMatch = [
-            [$joueurs[0], $sportsInd[0]],                                // jean   → individuel sport 0
-            [$joueurs[2], $sportsInd[count($sportsInd) > 1 ? 1 : 0]],   // thomas → individuel sport 1
-            [$joueurs[4], $sportsInd[0]],                                // antoine → individuel sport 0
-        ];
-        foreach ($joueursTestMatch as [$jTest, $sNom]) {
+        // ── Joueurs de test : matchs individuels ouverts ──
+        foreach ([
+            [$jean,    'Tennis'],
+            [$thomas,  'Tennis'],
+            [$lea,     'Tennis'],
+            [$marc,    'Badminton'],
+            [$antoine, 'Badminton'],
+        ] as [$jTest, $sNom]) {
             $nivsArr = array_values($niveaux[$sNom]);
-
             $g = new Game();
             $g->setSport($sports[$sNom]);
             $g->setNiveauRequis($nivsArr[array_rand($nivsArr)]);
@@ -611,20 +693,13 @@ class AppFixtures extends Fixture
         $manager->flush();
     }
 
-    /**
-     * Crée un Utilisateur complet avec 1 à 3 sports/niveaux aléatoires.
-     *
-     * @param array<string, Sport>    $sports
-     * @param array<string, Niveau[]> $niveaux
-     */
+    /** Crée un Utilisateur sans sports (sports ajoutés via ajouterSports). */
     private function makeUser(
         string $email,
         string $nom,
         ?string $prenom,
         TypeUtilisateur $type,
         string $localisation,
-        array $sports,
-        array $niveaux,
     ): Utilisateur {
         $u = new Utilisateur();
         $u->setEmail($email);
@@ -636,17 +711,31 @@ class AppFixtures extends Fixture
         $u->setLocalisation($localisation);
         $u->setDateInscription(new \DateTime('-' . rand(1, 730) . ' days'));
 
-        $sportsNoms = array_keys($sports);
-        $nb         = rand(1, min(3, count($sportsNoms)));
-        $choisis    = (array) array_rand(array_flip($sportsNoms), $nb);
-        foreach ($choisis as $sNom) {
+        return $u;
+    }
+
+    /**
+     * Ajoute des UtilisateurNiveau à un utilisateur pour une liste de sports.
+     *
+     * @param string[]                             $sportsNoms
+     * @param array<string, Sport>                 $sports
+     * @param array<string, array<string, Niveau>> $niveaux
+     */
+    private function ajouterSports(
+        Utilisateur $u,
+        array $sportsNoms,
+        array $sports,
+        array $niveaux,
+    ): void {
+        foreach ($sportsNoms as $sNom) {
+            if (!isset($sports[$sNom])) {
+                continue;
+            }
             $nivsArr = array_values($niveaux[$sNom]);
             $un      = new UtilisateurNiveau();
             $un->setSport($sports[$sNom]);
             $un->setNiveau($nivsArr[array_rand($nivsArr)]);
             $u->addNiveau($un);
         }
-
-        return $u;
     }
 }

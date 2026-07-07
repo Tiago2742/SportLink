@@ -20,6 +20,7 @@ class EquipeRepository extends ServiceEntityRepository
         ?string $localisation = null,
         ?int    $clubId       = null,
         ?string $nom          = null,
+        ?array  $sportIds     = null,
     ): array {
         $qb = $this->createQueryBuilder('e')
             ->addSelect('s', 'n', 'c')
@@ -30,6 +31,12 @@ class EquipeRepository extends ServiceEntityRepository
         if ($sportId) {
             $qb->andWhere('s.id = :sportId')
                ->setParameter('sportId', $sportId);
+        } elseif ($sportIds !== null && count($sportIds) > 0) {
+            $qb->andWhere('s.id IN (:sportIds)')
+               ->setParameter('sportIds', $sportIds);
+        } elseif ($sportIds !== null && count($sportIds) === 0) {
+            // Aucun sport déclaré → aucun résultat
+            $qb->andWhere('1 = 0');
         }
 
         if ($niveauId) {

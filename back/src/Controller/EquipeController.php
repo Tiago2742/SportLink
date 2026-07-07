@@ -9,6 +9,7 @@ use App\Repository\EquipeJoueurRepository;
 use App\Repository\EquipeRepository;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
+use App\Repository\UtilisateurNiveauRepository;
 use App\Service\EquipeService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,11 +20,12 @@ use Symfony\Component\Routing\Attribute\Route;
 class EquipeController extends AbstractController
 {
     public function __construct(
-        private EquipeService          $equipeService,
-        private EquipeRepository     $equipeRepository,
-        private EquipeJoueurRepository $equipeJoueurRepository,
-        private SportRepository      $sportRepository,
-        private NiveauRepository     $niveauRepository,
+        private EquipeService                $equipeService,
+        private EquipeRepository             $equipeRepository,
+        private EquipeJoueurRepository       $equipeJoueurRepository,
+        private SportRepository              $sportRepository,
+        private NiveauRepository             $niveauRepository,
+        private UtilisateurNiveauRepository  $utilisateurNiveauRepository,
     ) {}
 
     private const GROUPES_LIST = ['equipe:list', 'utilisateur:embed', 'sport:read', 'niveau:read'];
@@ -33,12 +35,30 @@ class EquipeController extends AbstractController
     #[Route('', name: 'api_equipes_lister', methods: ['GET'])]
     public function lister(Request $request): JsonResponse
     {
+        $moi     = $this->getUser();
+        $sportId = $request->query->getInt('sportId') ?: null;
+        $sportIds = null;
+
+        if ($moi !== null && $moi->getType() === TypeUtilisateur::Joueur) {
+            $sportsDeclares = $this->utilisateurNiveauRepository
+                ->findSportIdsByUtilisateur($moi->getId());
+
+            if ($sportId !== null) {
+                if (!\in_array($sportId, $sportsDeclares, true)) {
+                    return $this->json(['erreur' => 'Vous ne pratiquez pas ce sport.'], 403);
+                }
+            } else {
+                $sportIds = $sportsDeclares;
+            }
+        }
+
         $equipes = $this->equipeRepository->trouverAvecFiltres(
-            $request->query->getInt('sportId') ?: null,
+            $sportId,
             $request->query->getInt('niveauId') ?: null,
             $request->query->get('localisation'),
             $request->query->getInt('clubId') ?: null,
             $request->query->get('nom'),
+            $sportIds,
         );
 
         return $this->json($equipes, 200, [], ['groups' => self::GROUPES_LIST]);

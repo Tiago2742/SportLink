@@ -28,7 +28,8 @@ class JoueurController extends AbstractController
             return $this->json(['erreur' => 'Saisissez au moins 2 caractères pour rechercher.'], 400);
         }
 
-        $joueurs = $this->utilisateurRepository->rechercherJoueurs((string) $q);
+        $sportId = $request->query->getInt('sportId') ?: null;
+        $joueurs = $this->utilisateurRepository->rechercherJoueurs((string) $q, 15, $sportId);
 
         return $this->json($joueurs, 200, [], ['groups' => ['utilisateur:read']]);
     }

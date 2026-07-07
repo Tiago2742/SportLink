@@ -31,17 +31,18 @@ class UtilisateurRepository extends ServiceEntityRepository implements PasswordU
 
     /**
      * Joueurs recherchables par nom/prénom/email (pour invitation club).
+     * Si $sportId est fourni, ne retourne que les joueurs qui déclarent ce sport.
      *
      * @return Utilisateur[]
      */
-    public function rechercherJoueurs(string $terme, int $limite = 15): array
+    public function rechercherJoueurs(string $terme, int $limite = 15, ?int $sportId = null): array
     {
         $terme = trim($terme);
         if ($terme === '') {
             return [];
         }
 
-        return $this->createQueryBuilder('u')
+        $qb = $this->createQueryBuilder('u')
             ->andWhere('u.type = :type')
             ->andWhere(
                 'LOWER(u.email) LIKE LOWER(:q)
@@ -51,8 +52,15 @@ class UtilisateurRepository extends ServiceEntityRepository implements PasswordU
             ->setParameter('type', TypeUtilisateur::Joueur->value)
             ->setParameter('q', '%' . $terme . '%')
             ->orderBy('u.nom', 'ASC')
-            ->setMaxResults($limite)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limite);
+
+        if ($sportId !== null) {
+            $qb->innerJoin('u.niveaux', 'un')
+               ->innerJoin('un.sport', 's_filter')
+               ->andWhere('s_filter.id = :sportId')
+               ->setParameter('sportId', $sportId);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

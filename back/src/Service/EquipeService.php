@@ -13,15 +13,17 @@ use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeJoueurRepository;
+use App\Repository\UtilisateurNiveauRepository;
 use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 class EquipeService
 {
     public function __construct(
-        private EntityManagerInterface $em,
-        private UtilisateurRepository  $utilisateurRepository,
-        private EquipeJoueurRepository $equipeJoueurRepository,
+        private EntityManagerInterface      $em,
+        private UtilisateurRepository       $utilisateurRepository,
+        private EquipeJoueurRepository      $equipeJoueurRepository,
+        private UtilisateurNiveauRepository $utilisateurNiveauRepository,
     ) {}
 
     public function creer(
@@ -115,6 +117,17 @@ class EquipeService
             throw new \InvalidArgumentException('Seuls les comptes joueur peuvent être invités dans une équipe.');
         }
 
+        $sport = $equipe->getSport();
+        $sportsDeclares = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($joueur->getId());
+        if (!\in_array($sport->getId(), $sportsDeclares, true)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Ce joueur ne déclare pas le sport "%s". Il doit l\'ajouter à son profil avant de pouvoir être invité.',
+                    $sport->getNom(),
+                ),
+            );
+        }
+
         foreach ($equipe->getMembres() as $membre) {
             if ($membre->getUtilisateur() !== $joueur) {
                 continue;
@@ -164,6 +177,17 @@ class EquipeService
 
         if ($equipe->getClub() === $joueur) {
             throw new \InvalidArgumentException('Vous ne pouvez pas demander à rejoindre une équipe que vous gérez.');
+        }
+
+        $sport = $equipe->getSport();
+        $sportsDeclares = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($joueur->getId());
+        if (!\in_array($sport->getId(), $sportsDeclares, true)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'Vous ne pratiquez pas le sport "%s". Déclarez ce sport dans votre profil pour rejoindre cette équipe.',
+                    $sport->getNom(),
+                ),
+            );
         }
 
         foreach ($equipe->getMembres() as $membre) {

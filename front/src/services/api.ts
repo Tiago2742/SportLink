@@ -183,5 +183,5 @@ export interface EspaceEquipesJoueur {
 export const chargerEspaceEquipesJoueur = (token: string): Promise<EspaceEquipesJoueur> =>
   requete('GET', '/joueur/espace-equipes', null, token)
 
-export const rechercherJoueurs = (token: string, q: string) =>
-  requete('GET', '/joueurs/recherche' + construireParams({ q }), null, token)
+export const rechercherJoueurs = (token: string, q: string, sportId?: number) =>
+  requete('GET', '/joueurs/recherche' + construireParams({ q, ...(sportId ? { sportId } : {}) }), null, token)

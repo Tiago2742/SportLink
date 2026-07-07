@@ -128,7 +128,7 @@ function onRechercheInput() {
 async function lancerRecherche(q: string) {
   rechercheEnCours.value = true
   try {
-    resultatsRecherche.value = await rechercherJoueurs(auth.token!, q)
+    resultatsRecherche.value = await rechercherJoueurs(auth.token!, q, equipe.value?.sport?.id)
   } catch {
     resultatsRecherche.value = []
   } finally {
