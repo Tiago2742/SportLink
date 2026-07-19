@@ -82,6 +82,24 @@ class GameRepository extends ServiceEntityRepository
     }
 
     /**
+     * Matchs expirés (date passée) encore en statut en_attente ou confirme.
+     * Utilisé par la commande de clôture automatique.
+     *
+     * @return Game[]
+     */
+    public function trouverMatchsExpires(): array
+    {
+        return $this->createQueryBuilder('g')
+            ->addSelect('camps')
+            ->leftJoin('g.camps', 'camps')
+            ->where('g.dateMatch < :maintenant')
+            ->andWhere("g.statut IN ('en_attente', 'confirme')")
+            ->setParameter('maintenant', new \DateTime())
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Matchs du compte connecté : créés par lui ou où il est inscrit (joueur / club d'une équipe).
      *
      * @return Game[]

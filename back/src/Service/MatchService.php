@@ -15,7 +15,6 @@ use App\Enum\StatutMatchCamp;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeRepository;
-use App\Repository\MatchCampRepository;
 use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -25,7 +24,6 @@ class MatchService
         private EntityManagerInterface $em,
         private EquipeRepository       $equipeRepository,
         private UtilisateurRepository  $utilisateurRepository,
-        private MatchCampRepository    $matchCampRepository,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -308,9 +306,17 @@ class MatchService
 
     public function saisirResultat(Game $match, int $scoreCamp1, int $scoreCamp2): Resultat
     {
+        // R3 — le match doit être clôturé par la commande avant toute saisie
+        if ($match->getStatut() !== StatutGame::Termine) {
+            throw new \InvalidArgumentException(
+                'Le résultat ne peut être saisi que sur un match clôturé (statut "terminé"). '
+                . 'La clôture est effectuée automatiquement après la date du match.'
+            );
+        }
+
         $this->validerScoresResultat($match, $scoreCamp1, $scoreCamp2);
 
-        // R3a — 2 camps confirmés
+        // R3a — 2 camps confirmés (défense en profondeur)
         $campsConfirmes = 0;
         foreach ($match->getCamps() as $camp) {
             if ($camp->getStatut() === StatutMatchCamp::Confirme) {
@@ -323,7 +329,7 @@ class MatchService
             );
         }
 
-        // R3b — dateMatch passée
+        // R3b — dateMatch passée (défense en profondeur)
         if ($match->getDateMatch() > new \DateTime()) {
             throw new \InvalidArgumentException(
                 'Le résultat ne peut être saisi qu\'après la date du match (R3).'
@@ -339,8 +345,6 @@ class MatchService
         $resultat->setGame($match);
         $resultat->setScoreCamp1($scoreCamp1);
         $resultat->setScoreCamp2($scoreCamp2);
-
-        $match->setStatut(StatutGame::Termine);
 
         $this->em->persist($resultat);
         $this->em->flush();
