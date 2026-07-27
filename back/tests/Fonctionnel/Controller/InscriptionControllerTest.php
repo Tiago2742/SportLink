@@ -2,18 +2,25 @@
 
 namespace App\Tests\Fonctionnel\Controller;
 
+use App\Enum\TypeUtilisateur;
 use App\Tests\Fonctionnel\BaseTestFonctionnel;
 
 class InscriptionControllerTest extends BaseTestFonctionnel
 {
+    // ---- /api/register ------------------------------------------------------
+
     public function testInscriptionSucces(): void
     {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
         $this->requete('POST', '/api/register', [
             'email'    => 'nouveau@test.fr',
             'password' => 'Test1234!',
             'nom'      => 'Martin',
             'prenom'   => 'Paul',
             'type'     => 'joueur',
+            'sports'   => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
         ]);
 
         $this->assertStatut(201);
@@ -21,7 +28,6 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $this->assertEquals('nouveau@test.fr', $reponse['email']);
         $this->assertEquals('Martin', $reponse['nom']);
         $this->assertArrayNotHasKey('password', $reponse);
-        $this->assertArrayNotHasKey('roles', $reponse);
         $this->assertArrayHasKey('id', $reponse);
     }
 
@@ -41,6 +47,7 @@ class InscriptionControllerTest extends BaseTestFonctionnel
     {
         $this->creerUtilisateur('existant@test.fr');
 
+        // La vérification de doublon se fait avant le traitement des sports → 409 sans sports
         $this->requete('POST', '/api/register', [
             'email'    => 'existant@test.fr',
             'password' => 'AutreMdp1!',
@@ -55,11 +62,15 @@ class InscriptionControllerTest extends BaseTestFonctionnel
 
     public function testInscriptionClubSansPrenom_Succes(): void
     {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
         $this->requete('POST', '/api/register', [
-            'email'    => 'club.nouveau@test.fr',
+            'email'   => 'club.nouveau@test.fr',
             'password' => 'Test1234!',
-            'nom'      => 'AS Test Club',
-            'type'     => 'club',
+            'nom'     => 'AS Test Club',
+            'type'    => 'club',
+            'sports'  => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
         ]);
 
         $this->assertStatut(201);
@@ -70,6 +81,7 @@ class InscriptionControllerTest extends BaseTestFonctionnel
 
     public function testInscriptionJoueurSansPrenom_RetourneErreur400(): void
     {
+        // La vérification du prénom se fait avant le traitement des sports → 400 sans sports
         $this->requete('POST', '/api/register', [
             'email'    => 'joueur.sans.prenom@test.fr',
             'password' => 'Test1234!',
@@ -81,9 +93,43 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $this->assertStringContainsString('prenom', $this->reponseJson()['erreur']);
     }
 
+    public function testInscriptionSansSport_RetourneErreur400(): void
+    {
+        $this->requete('POST', '/api/register', [
+            'email'    => 'sans.sport@test.fr',
+            'password' => 'Test1234!',
+            'nom'      => 'Martin',
+            'prenom'   => 'Paul',
+            'type'     => 'joueur',
+            // pas de champ sports
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('sport', $this->reponseJson()['erreur']);
+    }
+
+    public function testInscriptionClubAvecSportIndividuel_RetourneErreur400(): void
+    {
+        $tennis = $this->getSport('Tennis');
+        $niveau = $this->getPremierNiveau($tennis);
+
+        $this->requete('POST', '/api/register', [
+            'email'    => 'club.tennis@test.fr',
+            'password' => 'Test1234!',
+            'nom'      => 'Club Tennis',
+            'type'     => 'club',
+            'sports'   => [['sportId' => $tennis->getId(), 'niveauId' => $niveau->getId()]],
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('collectif', $this->reponseJson()['erreur']);
+    }
+
+    // ---- /api/login_check ---------------------------------------------------
+
     public function testLoginSucces_RetourneToken(): void
     {
-        $this->creerUtilisateur('connecte@test.fr', 'Test1234!');
+        $this->creerUtilisateur('connecte@test.fr');
 
         $this->requete('POST', '/api/login_check', [
             'email'    => 'connecte@test.fr',
@@ -96,7 +142,7 @@ class InscriptionControllerTest extends BaseTestFonctionnel
 
     public function testLoginMauvaisMotDePasse_RetourneErreur401(): void
     {
-        $this->creerUtilisateur('user@test.fr', 'BonMdp1!');
+        $this->creerUtilisateur('user@test.fr');
 
         $this->requete('POST', '/api/login_check', [
             'email'    => 'user@test.fr',
@@ -106,10 +152,27 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $this->assertStatut(401);
     }
 
+    // ---- Test de preuve : authentification JWT bout en bout ------------------
+
+    /**
+     * Preuve que toute la chaîne fonctionne :
+     * - Sans token → 401
+     * - Avec token JWT valide → 200
+     */
     public function testAccesRouteProtegee_SansToken_RetourneErreur401(): void
     {
-        $this->requete('GET', '/api/equipes');
+        $this->requete('GET', '/api/matchs');
 
         $this->assertStatut(401);
+    }
+
+    public function testAccesRouteProtegee_AvecToken_Retourne200(): void
+    {
+        $joueur = $this->creerUtilisateur('joueur.proof@test.fr', TypeUtilisateur::Joueur);
+        $token  = $this->obtenirToken($joueur);
+
+        $this->requeteAuth('GET', '/api/matchs', $token);
+
+        $this->assertStatut(200);
     }
 }

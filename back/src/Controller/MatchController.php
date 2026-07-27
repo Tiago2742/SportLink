@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Game;
 use App\Enum\StatutGame;
+use App\Security\Voter\GameVoter;
 use App\Enum\StatutMatchCamp;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
@@ -142,9 +143,7 @@ class MatchController extends AbstractController
     #[Route('/{id}', name: 'api_matchs_modifier', methods: ['PUT'])]
     public function modifier(Request $request, Game $match): JsonResponse
     {
-        if ($match->getCreateur() !== $this->getUser()) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
+        $this->denyAccessUnlessGranted(GameVoter::MODIFIER, $match);
 
         $donnees = json_decode($request->getContent(), true);
 
@@ -204,9 +203,7 @@ class MatchController extends AbstractController
     #[Route('/{id}', name: 'api_matchs_supprimer', methods: ['DELETE'])]
     public function supprimer(Game $match): JsonResponse
     {
-        if ($match->getCreateur() !== $this->getUser()) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
+        $this->denyAccessUnlessGranted(GameVoter::SUPPRIMER, $match);
 
         try {
             $this->matchService->supprimer($match);
@@ -259,14 +256,7 @@ class MatchController extends AbstractController
             return $this->json(['erreur' => 'Camp introuvable pour ce match.'], 404);
         }
 
-        // Autorisation : seul le concerné peut répondre
-        $moi = $this->getUser();
-        $peutRepondre = ($camp->getJoueur() === $moi)
-            || ($camp->getEquipe()?->getClub() === $moi);
-
-        if (!$peutRepondre) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
+        $this->denyAccessUnlessGranted(GameVoter::REPONDRE_CAMP, $camp);
 
         $donnees = json_decode($request->getContent(), true);
 
@@ -373,9 +363,7 @@ class MatchController extends AbstractController
     #[Route('/{id}/resultat', name: 'api_matchs_saisir_resultat', methods: ['POST'])]
     public function saisirResultat(Request $request, Game $match): JsonResponse
     {
-        if (!$this->matchService->peutSaisirResultat($match, $this->getUser())) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
+        $this->denyAccessUnlessGranted(GameVoter::SAISIR_RESULTAT, $match);
 
         $donnees = json_decode($request->getContent(), true);
 

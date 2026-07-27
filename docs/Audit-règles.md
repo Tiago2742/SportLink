@@ -1,10 +1,12 @@
 # SportLink — Audit de cohérence (règles & choses impossibles)
 
-> Checklist exhaustive des règles métier à faire respecter côté **back** (source de vérité) et à refléter côté **front** (UX : boutons masqués/désactivés).
+> Checklist des règles métier gardées côté **back** (source de vérité) et reflétées côté **front** (UX).
 > Principe : une règle non gardée côté serveur = une « chose impossible » qui devient possible via l'API.
-> Colonne **Vérifié** : `[ ]` à auditer, `[x]` confirmé gardé, `[!]` trou identifié à corriger.
+> Légende **Vérifié** : `[x]` gardé et confirmé · `[!]` trou connu accepté (non corrigé volontairement) · `[ ]` reste à faire.
 >
-> Cas tranchés : résultat figé une fois saisi · pas de message sur match annulé · re-demande autorisée après refus.
+> Cas tranchés : résultat figé une fois saisi · pas de message sur match annulé · re-demande autorisée après refus · un match individuel ne se crée que par un joueur, un collectif que par un club · les deux participants légitimes peuvent saisir le résultat.
+>
+> **État global : audit bouclé sur A, B, C, E, F. Reste : tests fonctionnels (en cours).**
 
 ---
 
@@ -12,99 +14,105 @@
 
 Statuts : `en_attente` → `confirme` → `termine` / `annule`.
 
-| # | Action | Autorisé si | Interdit si | Où garder | Vérifié |
-|---|---|---|---|---|---|
-| A1 | Rejoindre (créer camp 2) | statut `en_attente` ET date future ET sport déclaré | `confirme`/`termine`/`annule`, ou date passée | Service participation | [ ] |
-| A2 | Quitter le match | statut `en_attente` ou `confirme` ET date future | `termine`/`annule`, ou date passée | Service participation | [ ] |
-| A3 | Modifier le match (date/lieu/desc) | créateur ET statut `en_attente`/`confirme` ET date future | non-créateur, `termine`/`annule` | Voter + Service | [ ] |
-| A4 | Annuler/supprimer manuellement | créateur ET `en_attente`/`confirme` | non-créateur, déjà `termine`/`annule` | Voter + Service | [ ] |
-| A5 | Saisir un résultat | statut `termine` ET 2 camps confirmés ET pas de résultat (R3) | tout autre statut, 1 camp, résultat existant | MatchService::saisirResultat | [ ] |
-| A6 | Modifier un résultat saisi | **jamais (figé)** | toujours une fois saisi | MatchService | [ ] |
-| A7 | Envoyer un message | statut ≠ `annule` | match `annule` | MessageService/Controller | [ ] |
-| A8 | Passage auto `en_attente`→`annule` | date passée ET pas 2 camps confirmés | — | Commande cloturer-matchs-expires | [x] |
-| A9 | Passage auto `confirme`→`termine` | date passée ET 2 camps confirmés | — | Commande cloturer-matchs-expires | [x] |
+| # | Action | Règle | Où gardé | Vérifié |
+|---|---|---|---|---|
+| A1 | Rejoindre (créer camp 2) | statut `en_attente` + date future + sport déclaré | MatchService::creerCamp | [x] |
+| A2 | Quitter le match | statut non terminé/annulé + date future | MatchService::supprimerCamp | [x] |
+| A3 | Modifier (date/lieu/desc) | créateur + statut en_attente/confirmé + date future | GameVoter + MatchService | [x] |
+| A4 | Supprimer manuellement | créateur + statut en_attente/confirmé | GameVoter + MatchController | [x] |
+| A5 | Saisir un résultat | statut `termine` + 2 camps confirmés + pas de résultat (R3) | MatchService::saisirResultat | [x] |
+| A6 | Modifier un résultat saisi | interdit (figé) — endpoint supprimé | — (endpoint retiré) | [x] |
+| A7 | Envoyer un message | interdit si match annulé | MatchController::envoyerMessage | [x] |
+| A8 | Auto `en_attente`→`annule` | date passée + pas 2 camps confirmés | Commande + clôture à la volée | [x] |
+| A9 | Auto `confirme`→`termine` | date passée + 2 camps confirmés | Commande + clôture à la volée | [x] |
 
 ---
 
 ## B. Transitions d'état — EquipeJoueur (adhésion)
 
-Statuts : `en_attente` → `confirme` / `refuse`. Origine : `invitation_club` | `demande_joueur`. Rôle : `gestionnaire` | `joueur`.
+| # | Action | Règle | Où gardé | Vérifié |
+|---|---|---|---|---|
+| B1 | Accepter une invitation | statut en_attente + origine invitation_club + par le joueur invité | EquipeService::repondreAdhesion | [x] |
+| B2 | Accepter une demande | statut en_attente + origine demande_joueur + par le club gestionnaire | EquipeService::repondreAdhesion | [x] |
+| B3 | Refuser (invitation ou demande) | statut en_attente + par le destinataire légitime | EquipeService | [x] |
+| B4 | Annuler (invitation ou demande) | statut en_attente + par l'émetteur | EquipeService::supprimerAdhesion | [!] |
+| B5 | Quitter / retirer un membre | statut confirmé + rôle joueur (jamais gestionnaire) | supprimerAdhesion() + garde-fou | [x] |
+| B6 | Re-demander après un refus | autorisé (réactivation du record refusé) | EquipeService::inviter/demander | [x] |
 
-| # | Action | Autorisé si | Interdit si | Où garder | Vérifié |
-|---|---|---|---|---|---|
-| B1 | Accepter une invitation | statut `en_attente`, origine `invitation_club`, par le joueur invité | déjà `confirme`/`refuse`, autre utilisateur | Service adhésion + Voter | [ ] |
-| B2 | Accepter une demande | statut `en_attente`, origine `demande_joueur`, par le club gestionnaire | déjà traité, autre club | Service adhésion + Voter | [ ] |
-| B3 | Refuser (invitation ou demande) | statut `en_attente`, par le destinataire légitime | déjà traité | Service adhésion + Voter | [ ] |
-| B4 | Annuler (invitation ou demande) | statut `en_attente`, par l'émetteur | déjà traité | Service adhésion + Voter | [ ] |
-| B5 | Quitter / retirer un membre | statut `confirme` ET rôle `joueur` | rôle `gestionnaire`, statut ≠ confirmé | supprimerAdhesion() + garde-fou | [x] |
-| B6 | Re-demander après un refus | **autorisé** (nouvelle demande) | — | Service adhésion | [ ] |
+> **B4 `[!]`** : trou théorique accepté — le destinataire peut supprimer (DELETE) une invitation au lieu de la refuser (PATCH), sans laisser de trace. Impact nul (les refus ne servent à rien de spécial, le front n'expose pas ce DELETE). Choix assumé de ne pas corriger.
 
 ---
 
-## C. Validations de données (à la création / modification)
+## C. Validations de données
 
-| # | Règle | Détail | Où garder | Vérifié |
-|---|---|---|---|---|
-| C1 | Score dans les bornes | individuel 0–5, collectif 0–200, ≥ 0 | MatchService (saisie résultat) | [x] |
-| C2 | Niveau cohérent avec sport (R4) | le niveau doit appartenir au sport (Game/Equipe/UtilisateurNiveau) | Services concernés + contrainte | [ ] |
-| C3 | Camp = équipe XOR joueur (R5) | collectif → equipe obligatoire/joueur null ; individuel → l'inverse | Service participation | [ ] |
-| C4 | Club → sports collectifs uniquement | un club ne déclare/crée que du collectif | ProfilController + CreerEquipe | [x] |
-| C5 | Prénom conditionnel | requis si `joueur`, optionnel si `club` | Register (validation) | [x] |
-| C6 | Un match a 2 camps possibles max | pas de 3e camp | Service participation | [ ] |
-| C7 | Inscription : au moins 1 sport déclaré | interdit de créer un compte sans sport (sinon site vide) | Register (validation) | [!] |
+| # | Règle | Où gardé | Vérifié |
+|---|---|---|---|
+| C1 | Score dans les bornes (indiv. 0–5, collectif 0–200, ≥ 0) | MatchService::validerScoresResultat | [x] |
+| C2 | Niveau cohérent avec sport (R4) | Profil, Equipe, Match (modifier aligné) | [x] |
+| C3 | Camp = équipe XOR joueur (R5) | MatchService::creerCamp | [x] |
+| C4 | Club → sports collectifs uniquement | ProfilController + CreerEquipe + Register | [x] |
+| C5 | Prénom requis si joueur | RegistrationController::inscrire | [x] |
+| C6 | Un match a 2 camps max | MatchService::creerCamp | [x] |
+| C7 | Inscription : au moins 1 sport déclaré | RegistrationController::inscrire | [x] |
 
 ---
 
 ## D. Filtrage / visibilité (étapes 3a + 3b)
 
-| # | Règle | Détail | Où garder | Vérifié |
-|---|---|---|---|---|
-| D1 | Matchs limités aux sports déclarés | création + recherche + disponibles | GameRepository + MatchController | [x] |
-| D2 | Création match : sport déclaré | 422 si sport non déclaré | MatchController::creer | [x] |
-| D3 | Équipes limitées aux sports déclarés | « trouver une équipe » | EquipeController::lister | [x] |
-| D4 | Invitation club→joueur : sport déclaré par le joueur | recherche de joueurs + validation | EquipeService::inviterJoueur | [x] |
-| D5 | Demande joueur→club : sport déclaré | validation | EquipeService::demanderAdhesion | [x] |
-| D6 | Recherche de joueurs filtrée sur le sport de l'équipe | back | UtilisateurRepository::rechercherJoueurs | [x] |
-| D7 | Recherche de matchs : ne montrer que les disponibles ? | *décision de conception en attente* | RechercheView + back | [ ] |
+| # | Règle | Où gardé | Vérifié |
+|---|---|---|---|
+| D1 | Matchs limités aux sports déclarés | GameRepository + MatchController | [x] |
+| D2 | Création match : sport déclaré | MatchController::creer | [x] |
+| D3 | Équipes limitées aux sports déclarés | EquipeController::lister | [x] |
+| D4 | Invitation club→joueur : sport déclaré par le joueur | EquipeService::inviterJoueur | [x] |
+| D5 | Demande joueur→club : sport déclaré | EquipeService::demanderAdhesion | [x] |
+| D6 | Recherche de joueurs filtrée sur le sport de l'équipe | UtilisateurRepository::rechercherJoueurs | [x] |
+| D7 | Recherche de matchs = uniquement les rejoignables | RechercheView (statut disponible forcé) | [x] |
+
+> **D7 tranché** : la recherche ne montre que les matchs rejoignables (en_attente + date future + une place libre + sport déclaré). La consultation des autres matchs se fait via « Mes matchs » et l'accueil.
 
 ---
 
 ## E. Règles structurelles
 
-| # | Règle | Détail | Où garder | Vérifié |
-|---|---|---|---|---|
-| E1 | 1 équipe confirmée max par sport par joueur | à l'adhésion (invitation + demande) | EquipeService::verifierUneEquipeParSport | [ ] |
-| E2 | Club créateur = gestionnaire auto | à la création d'équipe | EquipeService/CreerEquipe | [x] |
-| E3 | Résultat : 1 seul par match | contrainte OneToOne + check R3c | entité + service | [ ] |
+| # | Règle | Où gardé | Vérifié |
+|---|---|---|---|
+| E1 | 1 équipe confirmée max par sport par joueur | EquipeService::verifierUneEquipeParSport | [x] |
+| E2 | Club créateur = gestionnaire auto | EquipeService::creer | [x] |
+| E3 | Résultat : 1 seul par match | contrainte OneToOne + check R3c | [x] |
 
 ---
 
-## F. Permissions — Voters Symfony (§6 des specs) — NON IMPLÉMENTÉ
+## F. Permissions — Voters Symfony (§6 des specs)
 
-> Aujourd'hui les endpoints ne sont pas finement protégés par des Voters. Chantier à part.
+Firewall JWT sur tout `/api/*` (sauf login/register/sports). Permissions fines via checks + **GameVoter** (formalisé). EquipeVoter : à formaliser (les checks manuels sont en place et fonctionnels en attendant).
 
-| # | Action | Club | Joueur | Vérifié |
+| # | Action | Règle | Où gardé | Vérifié |
 |---|---|---|---|---|
-| F1 | Créer une équipe | ✅ | ❌ | [ ] |
-| F2 | Gérer membres (inviter/retirer) | ✅ ses équipes | ❌ | [ ] |
-| F3 | Créer un match collectif | ✅ | ❌ | [ ] |
-| F4 | Créer un match individuel | ❌ | ✅ | [ ] |
-| F5 | Accepter/refuser invitation de match | ✅ son équipe | ✅ lui-même | [ ] |
-| F6 | Saisir un résultat | ✅ ses équipes | ✅ ses matchs | [ ] |
-| F7 | Consulter / suivre | ✅ | ✅ | [ ] |
+| F1 | Créer une équipe | club uniquement | EquipeController + Service | [x] |
+| F2 | Gérer membres (inviter/retirer) | club, ses équipes | EquipeController + Service | [x] |
+| F3 | Créer un match collectif | club uniquement | MatchController::creer (403) | [x] |
+| F4 | Créer un match individuel | joueur uniquement | MatchController::creer (403) | [x] |
+| F5 | Accepter/refuser invitation de match | club de l'équipe / joueur concerné | GameVoter (GAME_REPONDRE_CAMP) | [x] |
+| F6 | Saisir un résultat | participant légitime (créateur, joueur d'un camp, club d'un camp) | GameVoter (GAME_SAISIR_RESULTAT) | [x] |
+| F7 | Consulter / suivre | tout utilisateur connecté | Firewall JWT | [x] |
+
+> **GameVoter** créé et branché (GAME_MODIFIER, GAME_SUPPRIMER, GAME_SAISIR_RESULTAT, GAME_REPONDRE_CAMP).
+> **EquipeVoter** : à formaliser pour finir la centralisation (F1/F2). Les permissions équipe sont déjà gardées par des checks manuels corrects — la formalisation en Voter est de la mise au propre, pas un trou de sécurité.
 
 ---
 
-## Méthode d'audit
+## État d'avancement de l'audit
 
-1. Faire vérifier par Claude Code, section par section : pour chaque ligne `[ ]`, confirmer que la garde existe **côté back** (pas juste front). Marquer `[x]` si gardé, `[!]` si trou.
-2. Corriger les trous `[!]` par lots (un lot = une section), tester après chaque lot, commit.
-3. Figer chaque règle par un **test fonctionnel** PHPUnit (« l'action interdite échoue »).
-4. Les Voters (section F) = chantier dédié, à planifier séparément.
+- **A à E** : bouclés, toutes les règles gardées côté back.
+- **F** : GameVoter fait ; EquipeVoter reste à formaliser (checks manuels fonctionnels en attendant).
+- **Tests fonctionnels** : setup en cours ; objectif = couvrir largement ces règles (« l'action interdite échoue »).
 
-## Trous déjà connus (au moment de la rédaction)
-- **C7** : création de compte sans sport possible → à interdire.
-- **A7** : messages sur match annulé → à bloquer.
-- **A1/A2** : participation modifiable sur match annulé/terminé → à figer (bug prioritaire signalé).
-- **D7** : décision de conception (recherche = disponibles seulement ?) à trancher.
-- **Section F entière** : Voters non implémentés.
+## Trous connus assumés
+- **B4** : DELETE d'invitation par le destinataire (au lieu de PATCH refus) — impact nul, non corrigé volontairement.
+- **EquipeVoter** non formalisé — permissions gardées par checks manuels, à mettre au propre.
+
+## Reste hors audit (chantiers séparés)
+- Nettoyage des migrations (ne se rejouent pas de zéro — utiliser schema:create).
+- RGPD / mentions légales / sécurité technique (headers, CORS, secrets, HTTPS).
+- Mise en production.
