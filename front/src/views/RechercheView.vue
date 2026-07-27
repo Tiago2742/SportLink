@@ -19,7 +19,6 @@ const erreur = ref('')
 const filtres = ref({
   sportId:  route.query.sportId  ? Number(route.query.sportId)  : '' as number | '',
   niveauId: route.query.niveauId ? Number(route.query.niveauId) : '' as number | '',
-  statut: (route.query.statut as string) || 'disponible',
   lieu: (route.query.localisation as string) || '',
 })
 
@@ -51,10 +50,9 @@ async function charger() {
   chargement.value = true
   erreur.value = ''
   try {
-    const params: Record<string, string> = {}
+    const params: Record<string, string> = { statut: 'disponible' }
     if (filtres.value.sportId  !== '') params.sportId  = String(filtres.value.sportId)
     if (filtres.value.niveauId !== '') params.niveauId = String(filtres.value.niveauId)
-    if (filtres.value.statut)          params.statut   = filtres.value.statut
     if (filtres.value.lieu)            params.lieu     = filtres.value.lieu
     matchs.value = await chargerMatchs(auth.token!, params)
     pageCourante.value = 1
@@ -147,25 +145,13 @@ async function rejoindreMatch(matchId: number) {
         </div>
 
         <div class="filtre-section">
-          <label class="filtre-label">Statut</label>
-          <select v-model="filtres.statut" class="champ">
-            <option value="disponible">Disponibles</option>
-            <option value="">Tous</option>
-            <option value="en_attente">En attente</option>
-            <option value="confirme">Confirmé</option>
-            <option value="termine">Terminé</option>
-            <option value="annule">Annulé</option>
-          </select>
-        </div>
-
-        <div class="filtre-section">
           <label class="filtre-label">Localisation</label>
           <input v-model="filtres.lieu" type="text" class="champ" placeholder="Ville ou terrain" />
         </div>
 
         <button
           class="btn btn-secondaire btn-pleine-largeur"
-          @click="filtres = { sportId: '', niveauId: '', statut: 'disponible', lieu: '' }"
+          @click="filtres = { sportId: '', niveauId: '', lieu: '' }"
         >
           Réinitialiser
         </button>
