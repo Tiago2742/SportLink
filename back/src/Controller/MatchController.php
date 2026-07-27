@@ -154,6 +154,11 @@ class MatchController extends AbstractController
                 if (!$niveauRequis) {
                     return $this->json(['erreur' => 'Niveau introuvable.'], 404);
                 }
+                // C2/R4 — le niveau doit appartenir au sport du match (ou au nouveau sport si changé)
+                $sportRef = $sport ?? $match->getSport();
+                if ($niveauRequis->getSport() !== $sportRef) {
+                    return $this->json(['erreur' => 'Niveau invalide : il n\'appartient pas au sport de ce match (R4).'], 422);
+                }
             } else {
                 $effacerNiveau = true;
             }

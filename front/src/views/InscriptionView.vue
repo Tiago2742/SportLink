@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import LogoSportLink from '@/components/brand/LogoSportLink.vue'
@@ -23,8 +23,20 @@ const sports = ref<EntreeSportNiveau[]>([])
 const erreur = ref('')
 const chargement = ref(false)
 
+// Vider les sports déclarés quand le type change (évite les sports individuels bloqués pour un club)
+watch(() => form.value.type, () => {
+  sports.value = []
+})
+
 async function soumettre() {
   erreur.value = ''
+
+  // C7 — au moins 1 sport requis
+  if (sports.value.length === 0) {
+    erreur.value = 'Vous devez déclarer au moins un sport pour créer votre compte.'
+    return
+  }
+
   chargement.value = true
   try {
     const donnees: Record<string, unknown> = {
@@ -179,10 +191,14 @@ async function soumettre() {
 
         <div class="champ-groupe">
           <label>
-            Mes sports
-            <span class="label-optionnel">(optionnel)</span>
+            Mes sports <span class="obligatoire">*</span>
+            <span class="label-optionnel">(au moins 1 requis)</span>
           </label>
-          <SelecteurSportNiveau v-model="sports" :multiple="true" />
+          <SelecteurSportNiveau
+            v-model="sports"
+            :multiple="true"
+            :filtre-type="estClub ? 'collectif' : undefined"
+          />
         </div>
 
         <button

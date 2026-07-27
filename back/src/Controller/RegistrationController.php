@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Utilisateur;
 use App\Entity\UtilisateurNiveau;
+use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
@@ -71,7 +72,7 @@ class RegistrationController extends AbstractController
             : null);
         $utilisateur->setDateInscription(new \DateTime());
 
-        // Sports optionnels : [{sportId: N, niveauId: M}, ...]
+        // Sports : [{sportId: N, niveauId: M}, ...] — au moins 1 requis (C7)
         foreach ($donnees['sports'] ?? [] as $entree) {
             if (empty($entree['sportId']) || empty($entree['niveauId'])) {
                 continue;
@@ -80,6 +81,11 @@ class RegistrationController extends AbstractController
             $sport = $sportRepo->find((int) $entree['sportId']);
             if (!$sport) {
                 continue;
+            }
+
+            // C4 — un club ne déclare que des sports collectifs
+            if ($typeEnum === TypeUtilisateur::Club && $sport->getType() !== TypeSport::Collectif) {
+                return $this->json(['erreur' => 'Un club ne peut déclarer que des sports collectifs.'], 400);
             }
 
             $niveau = $niveauRepo->find((int) $entree['niveauId']);
@@ -92,6 +98,11 @@ class RegistrationController extends AbstractController
             $un->setSport($sport);
             $un->setNiveau($niveau);
             $utilisateur->addNiveau($un);
+        }
+
+        // C7 — au moins 1 sport valide requis
+        if ($utilisateur->getNiveaux()->isEmpty()) {
+            return $this->json(['erreur' => 'Vous devez déclarer au moins un sport pour créer votre compte.'], 400);
         }
 
         $erreurs = $validator->validate($utilisateur);

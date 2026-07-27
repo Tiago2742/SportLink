@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import LogoSportLink from '@/components/brand/LogoSportLink.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const motDePasse = ref('')
 const erreur = ref('')
 const chargement = ref(false)
+
+const messageSessionExpiree = computed(() =>
+  route.query.sessionExpiree === '1' ? 'Session expirée, reconnectez-vous.' : '',
+)
 
 async function soumettre() {
   erreur.value = ''
@@ -41,6 +46,7 @@ async function soumettre() {
       </div>
 
       <form class="auth-form" @submit.prevent="soumettre">
+        <div v-if="messageSessionExpiree" class="auth-info">{{ messageSessionExpiree }}</div>
         <div v-if="erreur" class="auth-erreur">{{ erreur }}</div>
 
         <div class="champ-groupe">
@@ -203,6 +209,16 @@ async function soumettre() {
 }
 
 /* Erreur avec shake */
+.auth-info {
+  background: #fff8e1;
+  color: #e65100;
+  border: 1px solid rgba(230, 81, 0, 0.22);
+  border-radius: 8px;
+  padding: var(--espace-s) var(--espace-m);
+  font-size: 0.88rem;
+  margin-bottom: var(--espace-m);
+}
+
 .auth-erreur {
   background: var(--couleur-refuse-fond);
   color: var(--couleur-refuse);

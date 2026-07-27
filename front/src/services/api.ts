@@ -5,6 +5,13 @@ interface ErreurApi extends Error {
   donnees: unknown
 }
 
+// Handler enregistré par main.ts (évite tout import circulaire api ↔ auth/router)
+let _onSessionExpiree: (() => void) | null = null
+
+export function setOnSessionExpiree(handler: () => void) {
+  _onSessionExpiree = handler
+}
+
 async function requete(
   methode: string,
   chemin: string,
@@ -30,6 +37,11 @@ async function requete(
   const json = await reponse.json().catch(() => null)
 
   if (!reponse.ok) {
+    // 401 sur /login_check = mauvais identifiants (erreur normale, pas de déconnexion)
+    if (reponse.status === 401 && chemin !== '/login_check') {
+      _onSessionExpiree?.()
+    }
+
     const erreur = new Error(
       (json as any)?.erreur || (json as any)?.message || `Erreur ${reponse.status}`,
     ) as ErreurApi
