@@ -125,12 +125,12 @@ abstract class BaseTestFonctionnel extends WebTestCase
         $this->em->persist($match);
 
         $camp1 = new MatchCamp();
-        $camp1->setGame($match);
         $camp1->setRole(RoleMatchCamp::Camp1);
         $camp1->setStatut(StatutMatchCamp::Confirme);
         if ($sportRef->getType() === TypeSport::Individuel) {
             $camp1->setJoueur($createur);
         }
+        $match->addCamp($camp1);
         $this->em->persist($camp1);
 
         $this->em->flush();
