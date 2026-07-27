@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Equipe;
+use App\Enum\OrigineMembreEquipe;
 use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeJoueurRepository;
@@ -214,6 +215,16 @@ class EquipeController extends AbstractController
             return $this->json(['erreur' => 'Membre introuvable dans cette équipe.'], 404);
         }
 
+        // Guard 403 : seul le destinataire légitime peut répondre
+        $moi = $this->getUser();
+        $accesRefuse = $membre->getOrigine() === OrigineMembreEquipe::InvitationClub
+            ? $membre->getUtilisateur() !== $moi
+            : ($moi->getType() !== TypeUtilisateur::Club || $membre->getEquipe()->getClub() !== $moi);
+
+        if ($accesRefuse) {
+            return $this->json(['erreur' => 'Accès refusé.'], 403);
+        }
+
         $donnees = json_decode($request->getContent(), true);
         if (!\is_array($donnees) || empty($donnees['statut'])) {
             return $this->json(['erreur' => 'Le champ "statut" est requis.'], 400);
@@ -226,7 +237,7 @@ class EquipeController extends AbstractController
         }
 
         try {
-            $membre = $this->equipeService->repondreAdhesion($membre, $nouveauStatut, $this->getUser());
+            $membre = $this->equipeService->repondreAdhesion($membre, $nouveauStatut, $moi);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
         }

@@ -5,6 +5,8 @@ namespace App\Controller;
 use App\Entity\Game;
 use App\Enum\StatutGame;
 use App\Enum\StatutMatchCamp;
+use App\Enum\TypeSport;
+use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeRepository;
 use App\Repository\GameRepository;
 use App\Repository\MatchCampRepository;
@@ -85,6 +87,14 @@ class MatchController extends AbstractController
         $sport = $this->sportRepository->find((int) $donnees['sportId']);
         if (!$sport) {
             return $this->json(['erreur' => 'Sport introuvable.'], 404);
+        }
+
+        // F3a/F3b — cohérence type sport / type utilisateur
+        if ($sport->getType() === TypeSport::Individuel && $this->getUser()->getType() !== TypeUtilisateur::Joueur) {
+            return $this->json(['erreur' => 'Un match individuel ne peut être créé que par un compte joueur.'], 403);
+        }
+        if ($sport->getType() === TypeSport::Collectif && $this->getUser()->getType() !== TypeUtilisateur::Club) {
+            return $this->json(['erreur' => 'Un match collectif ne peut être créé que par un compte club.'], 403);
         }
 
         $sportIds = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($this->getUser()->getId());
@@ -363,7 +373,7 @@ class MatchController extends AbstractController
     #[Route('/{id}/resultat', name: 'api_matchs_saisir_resultat', methods: ['POST'])]
     public function saisirResultat(Request $request, Game $match): JsonResponse
     {
-        if ($match->getCreateur() !== $this->getUser()) {
+        if (!$this->matchService->peutSaisirResultat($match, $this->getUser())) {
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 

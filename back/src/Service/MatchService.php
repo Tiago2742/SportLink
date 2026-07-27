@@ -470,6 +470,28 @@ class MatchService
         }
     }
 
+    /**
+     * Vérifie si l'utilisateur peut saisir le résultat du match :
+     * le créateur, le joueur d'un camp (individuel) ou le club de l'équipe d'un camp (collectif).
+     */
+    public function peutSaisirResultat(Game $match, Utilisateur $utilisateur): bool
+    {
+        if ($match->getCreateur() === $utilisateur) {
+            return true;
+        }
+
+        foreach ($match->getCamps() as $camp) {
+            if ($camp->getJoueur() === $utilisateur) {
+                return true;
+            }
+            if ($camp->getEquipe()?->getClub() === $utilisateur) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function estParticipant(Game $match, Utilisateur $utilisateur): bool
     {
         if ($match->getCreateur() === $utilisateur) {
