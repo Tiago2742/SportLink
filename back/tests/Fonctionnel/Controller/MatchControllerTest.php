@@ -345,4 +345,190 @@ class MatchControllerTest extends BaseTestFonctionnel
 
         $this->assertStatut(422);
     }
+
+    // =========================================================================
+    // C1 — Validation des scores
+    // =========================================================================
+
+    public function testScoreNegatifRefuse(): void
+    {
+        $tennis  = $this->getSport('Tennis');
+        $joueur1 = $this->creerUtilisateur('j1.c1a@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $joueur2 = $this->creerUtilisateur('j2.c1a@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        $match = $this->creerMatchTermineDeuxCamps($joueur1, $joueur2, $tennis);
+
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/resultat", $this->obtenirToken($joueur1), [
+            'scoreCamp1' => -1,
+            'scoreCamp2' => 2,
+        ]);
+
+        $this->assertStatut(422);
+    }
+
+    public function testScoreIndividuelTropEleveRefuse(): void
+    {
+        $tennis  = $this->getSport('Tennis');
+        $joueur1 = $this->creerUtilisateur('j1.c1b@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $joueur2 = $this->creerUtilisateur('j2.c1b@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        $match = $this->creerMatchTermineDeuxCamps($joueur1, $joueur2, $tennis);
+
+        // Tennis : max 5 par camp ; 6 dépasse la borne
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/resultat", $this->obtenirToken($joueur1), [
+            'scoreCamp1' => 6,
+            'scoreCamp2' => 3,
+        ]);
+
+        $this->assertStatut(422);
+    }
+
+    public function testScoreCollectifTropEleveRefuse(): void
+    {
+        $football = $this->getSport('Football');
+        $club     = $this->creerUtilisateur('club.c1c@test.fr', TypeUtilisateur::Club, $football);
+
+        // La validation du score se fait avant le contrôle du nombre de camps :
+        // un match avec un seul camp suffit pour déclencher le rejet de score > 200.
+        $match = $this->creerMatchAvecStatut($club, $football, StatutGame::Termine);
+
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/resultat", $this->obtenirToken($club), [
+            'scoreCamp1' => 201,
+            'scoreCamp2' => 0,
+        ]);
+
+        $this->assertStatut(422);
+    }
+
+    public function testScoreCollectifValideAccepte(): void
+    {
+        $football = $this->getSport('Football');
+        $club1    = $this->creerUtilisateur('club1.c1d@test.fr', TypeUtilisateur::Club, $football);
+        $club2    = $this->creerUtilisateur('club2.c1d@test.fr', TypeUtilisateur::Club, $football);
+        $equipe1  = $this->creerEquipe($club1, $football, 'AS C1d A');
+        $equipe2  = $this->creerEquipe($club2, $football, 'AS C1d B');
+
+        $match = new Game();
+        $match->setSport($football);
+        $match->setDateMatch(new \DateTime('-1 day'));
+        $match->setLieu('Stade C1d');
+        $match->setStatut(StatutGame::Termine);
+        $match->setCreateur($club1);
+        $this->em->persist($match);
+
+        $camp1 = new MatchCamp();
+        $camp1->setRole(RoleMatchCamp::Camp1);
+        $camp1->setStatut(StatutMatchCamp::Confirme);
+        $camp1->setEquipe($equipe1);
+        $match->addCamp($camp1);
+        $this->em->persist($camp1);
+
+        $camp2 = new MatchCamp();
+        $camp2->setRole(RoleMatchCamp::Camp2);
+        $camp2->setStatut(StatutMatchCamp::Confirme);
+        $camp2->setEquipe($equipe2);
+        $match->addCamp($camp2);
+        $this->em->persist($camp2);
+
+        $this->em->flush();
+
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/resultat", $this->obtenirToken($club1), [
+            'scoreCamp1' => 2,
+            'scoreCamp2' => 1,
+        ]);
+
+        $this->assertStatut(201);
+    }
+
+    // =========================================================================
+    // C2 — Niveau incompatible avec le sport du match
+    // =========================================================================
+
+    public function testCreerMatchNiveauIncompatibleRefuse(): void
+    {
+        $tennis   = $this->getSport('Tennis');
+        $football = $this->getSport('Football');
+        $joueur   = $this->creerUtilisateur('joueur.c2a@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $niveauFoot = $this->getPremierNiveau($football);
+
+        // Tenter de créer un match Tennis en spécifiant un niveau Football (R4)
+        $this->requeteAuth('POST', '/api/matchs', $this->obtenirToken($joueur), [
+            'sportId'       => $tennis->getId(),
+            'niveauRequisId' => $niveauFoot->getId(),
+            'dateMatch'     => (new \DateTime('+30 days'))->format('Y-m-d H:i'),
+            'lieu'          => 'Court test',
+        ]);
+
+        $this->assertStatut(422);
+    }
+
+    public function testModifierMatchNiveauIncompatibleRefuse(): void
+    {
+        $tennis   = $this->getSport('Tennis');
+        $football = $this->getSport('Football');
+        $joueur   = $this->creerUtilisateur('joueur.c2b@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $niveauFoot = $this->getPremierNiveau($football);
+
+        $match = $this->creerMatch($joueur, $tennis, '+30 days');
+
+        // Tenter de modifier le match en spécifiant un niveau Football (R4)
+        $this->requeteAuth('PUT', "/api/matchs/{$match->getId()}", $this->obtenirToken($joueur), [
+            'niveauRequisId' => $niveauFoot->getId(),
+        ]);
+
+        $this->assertStatut(422);
+    }
+
+    // =========================================================================
+    // C3 — XOR équipe/joueur à l'ajout d'un camp
+    // =========================================================================
+
+    public function testAjouterCampEquipeEtJoueurSimultanementRefuse(): void
+    {
+        $tennis  = $this->getSport('Tennis');
+        $joueur1 = $this->creerUtilisateur('j1.c3@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $joueur2 = $this->creerUtilisateur('j2.c3@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        $match = $this->creerMatch($joueur1, $tennis, '+30 days');
+
+        // Fournir equipeId ET joueurId simultanément — le XOR est contrôlé en premier,
+        // avant toute lookup ; equipeId=999 n'a donc pas besoin d'exister.
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur2), [
+            'equipeId' => 999,
+            'joueurId' => $joueur2->getId(),
+        ]);
+
+        $this->assertStatut(422);
+    }
+
+    // =========================================================================
+    // C6 — Troisième camp refusé sur un match déjà complet
+    // =========================================================================
+
+    public function testTroisiemeCampRefuse(): void
+    {
+        $tennis  = $this->getSport('Tennis');
+        $joueur1 = $this->creerUtilisateur('j1.c6@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $joueur2 = $this->creerUtilisateur('j2.c6@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $joueur3 = $this->creerUtilisateur('j3.c6@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        // Match EnAttente avec camp_1 (via helper)
+        $match = $this->creerMatch($joueur1, $tennis, '+30 days');
+
+        // Ajout direct de camp_2 sans passer par le service (statut reste EnAttente)
+        $camp2 = new MatchCamp();
+        $camp2->setRole(RoleMatchCamp::Camp2);
+        $camp2->setStatut(StatutMatchCamp::Invite);
+        $camp2->setJoueur($joueur2);
+        $match->addCamp($camp2);
+        $this->em->persist($camp2);
+        $this->em->flush();
+
+        // Joueur3 tente d'ajouter un 3e camp — le match en a déjà 2 (C6)
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur3), [
+            'joueurId' => $joueur3->getId(),
+        ]);
+
+        $this->assertStatut(422);
+    }
 }
