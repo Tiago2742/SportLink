@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Game;
+use App\Enum\StatutGame;
 use App\Enum\StatutMatchCamp;
 use App\Repository\EquipeRepository;
 use App\Repository\GameRepository;
@@ -67,6 +68,8 @@ class MatchController extends AbstractController
             );
         }
 
+        $this->matchService->cloturerMatchsExpires($matchs);
+
         return $this->json($matchs, 200, [], ['groups' => self::GROUPES_LIST]);
     }
 
@@ -121,6 +124,8 @@ class MatchController extends AbstractController
     #[Route('/{id}', name: 'api_matchs_afficher', methods: ['GET'])]
     public function afficher(Game $match): JsonResponse
     {
+        $this->matchService->cloturerMatchsExpires([$match]);
+
         return $this->json($match, 200, [], ['groups' => self::GROUPES_READ]);
     }
 
@@ -172,6 +177,8 @@ class MatchController extends AbstractController
                 $description,
                 $effacerDescription,
             );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
         } catch (\Exception) {
             return $this->json(['erreur' => 'Format de date invalide. Utilisez : YYYY-MM-DD HH:MM'], 400);
         }
@@ -186,7 +193,11 @@ class MatchController extends AbstractController
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
-        $this->matchService->supprimer($match);
+        try {
+            $this->matchService->supprimer($match);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
 
         return $this->json(null, 204);
     }
@@ -196,6 +207,12 @@ class MatchController extends AbstractController
     #[Route('/{id}/camps', name: 'api_matchs_ajouter_camp', methods: ['POST'])]
     public function ajouterCamp(Request $request, Game $match): JsonResponse
     {
+        // A1 — Sport déclaré par le rejoignant
+        $sportIds = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($this->getUser()->getId());
+        if (!in_array($match->getSport()->getId(), $sportIds, true)) {
+            return $this->json(['erreur' => 'Vous n\'avez pas déclaré ce sport dans votre profil.'], 422);
+        }
+
         $donnees  = json_decode($request->getContent(), true);
         $equipeId = isset($donnees['equipeId']) ? (int) $donnees['equipeId'] : null;
         $joueurId = isset($donnees['joueurId']) ? (int) $donnees['joueurId'] : null;
@@ -275,7 +292,11 @@ class MatchController extends AbstractController
             return $this->json(['erreur' => 'Accès refusé.'], 403);
         }
 
-        $this->matchService->supprimerCamp($camp);
+        try {
+            $this->matchService->supprimerCamp($camp);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
 
         return $this->json(null, 204);
     }
@@ -302,6 +323,11 @@ class MatchController extends AbstractController
     {
         if (!$this->matchService->estParticipant($match, $this->getUser())) {
             return $this->json(['erreur' => 'Réservé aux participants confirmés du match.'], 403);
+        }
+
+        // A7 — Messages interdits sur un match annulé
+        if ($match->getStatut() === StatutGame::Annule) {
+            return $this->json(['erreur' => 'Impossible d\'envoyer un message sur un match annulé.'], 422);
         }
 
         $donnees = json_decode($request->getContent(), true);
@@ -355,29 +381,4 @@ class MatchController extends AbstractController
         return $this->json($resultat, 201, [], ['groups' => ['resultat:read']]);
     }
 
-    #[Route('/{id}/resultat', name: 'api_matchs_modifier_resultat', methods: ['PUT'])]
-    public function modifierResultat(Request $request, Game $match): JsonResponse
-    {
-        if ($match->getCreateur() !== $this->getUser()) {
-            return $this->json(['erreur' => 'Accès refusé.'], 403);
-        }
-
-        $donnees = json_decode($request->getContent(), true);
-
-        if (!isset($donnees['scoreCamp1'], $donnees['scoreCamp2'])) {
-            return $this->json(['erreur' => 'Les champs "scoreCamp1" et "scoreCamp2" sont requis.'], 400);
-        }
-
-        try {
-            $resultat = $this->matchService->modifierResultat(
-                $match,
-                (int) $donnees['scoreCamp1'],
-                (int) $donnees['scoreCamp2'],
-            );
-        } catch (\InvalidArgumentException $e) {
-            return $this->json(['erreur' => $e->getMessage()], 422);
-        }
-
-        return $this->json($resultat, 200, [], ['groups' => ['resultat:read']]);
-    }
 }

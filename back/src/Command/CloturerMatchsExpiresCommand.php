@@ -4,7 +4,7 @@ namespace App\Command;
 
 use App\Enum\StatutGame;
 use App\Repository\GameRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\MatchService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -18,31 +18,22 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class CloturerMatchsExpiresCommand extends Command
 {
     public function __construct(
-        private GameRepository         $gameRepository,
-        private EntityManagerInterface $em,
+        private GameRepository $gameRepository,
+        private MatchService   $matchService,
     ) {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io = new SymfonyStyle($input, $output);
+        $io     = new SymfonyStyle($input, $output);
+        $matchs = $this->gameRepository->trouverMatchsExpires();
 
-        $matchs   = $this->gameRepository->trouverMatchsExpires();
-        $annules  = 0;
-        $termines = 0;
+        // Compter les transitions avant de déléguer au service
+        $annules  = count(array_filter($matchs, fn ($m) => $m->getStatut() === StatutGame::EnAttente));
+        $termines = count(array_filter($matchs, fn ($m) => $m->getStatut() === StatutGame::Confirme));
 
-        foreach ($matchs as $match) {
-            if ($match->getStatut() === StatutGame::EnAttente) {
-                $match->setStatut(StatutGame::Annule);
-                $annules++;
-            } elseif ($match->getStatut() === StatutGame::Confirme) {
-                $match->setStatut(StatutGame::Termine);
-                $termines++;
-            }
-        }
-
-        $this->em->flush();
+        $this->matchService->cloturerMatchsExpires($matchs);
 
         $io->success(sprintf(
             '%d match(s) annulé(s), %d match(s) clôturé(s) en terminé.',

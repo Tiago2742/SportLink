@@ -132,16 +132,25 @@ const dejaInscrit = computed(() =>
   match.value ? utilisateurEstInscrit(match.value, auth.utilisateur?.id) : false,
 )
 
+const dateMatchPassee = computed(() =>
+  match.value ? new Date(match.value.dateMatch) <= new Date() : false,
+)
+
 const peutRejoindre = computed(
   () =>
     !dejaInscrit.value &&
     !matchComplet.value &&
-    match.value?.statut !== 'termine' &&
-    match.value?.statut !== 'annule',
+    match.value?.statut === 'en_attente' &&
+    !dateMatchPassee.value,
 )
 
 const peutQuitter = computed(
-  () => monCamp.value && !estCreateur.value && match.value?.statut !== 'termine',
+  () =>
+    !!monCamp.value &&
+    !estCreateur.value &&
+    match.value?.statut !== 'termine' &&
+    match.value?.statut !== 'annule' &&
+    !dateMatchPassee.value,
 )
 
 async function rejoindreMatch() {
@@ -273,7 +282,11 @@ function formaterHeure(dateStr: string) {
           <BadgeStatut :statut="match.statut" />
         </div>
         <div class="entete-actions">
-          <button v-if="estCreateur" class="btn btn-danger btn-petit" @click="supprimerLe">
+          <button
+            v-if="estCreateur && match?.statut !== 'termine' && match?.statut !== 'annule'"
+            class="btn btn-danger btn-petit"
+            @click="supprimerLe"
+          >
             Supprimer
           </button>
         </div>
@@ -337,7 +350,7 @@ function formaterHeure(dateStr: string) {
                 </div>
               </div>
             </template>
-            <template v-else-if="estCreateur && !saisieResultat">
+            <template v-else-if="estCreateur && !saisieResultat && match?.statut === 'termine'">
               <p class="resultat-vide">Pas encore de résultat.</p>
               <button class="btn btn-secondaire" @click="saisieResultat = true">
                 Saisir le résultat
@@ -405,7 +418,7 @@ function formaterHeure(dateStr: string) {
             </div>
             <p v-else class="messages-vide">Aucun message. Soyez le premier à écrire !</p>
 
-            <div class="message-saisie">
+            <div v-if="match?.statut !== 'annule'" class="message-saisie">
               <input
                 v-model="nouveauMessage"
                 type="text"
@@ -417,6 +430,7 @@ function formaterHeure(dateStr: string) {
                 Envoyer
               </button>
             </div>
+            <p v-else class="messages-vide">Ce match est annulé — la messagerie est fermée.</p>
           </section>
         </div>
 

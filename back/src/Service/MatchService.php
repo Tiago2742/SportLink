@@ -103,6 +103,15 @@ class MatchService
         ?string $description = null,
         bool $effacerDescription = false,
     ): Game {
+        // A3 — Statut et date
+        if (in_array($match->getStatut(), [StatutGame::Termine, StatutGame::Annule], true)) {
+            $libelle = $match->getStatut() === StatutGame::Termine ? 'terminé' : 'annulé';
+            throw new \InvalidArgumentException("Impossible de modifier ce match : il est déjà {$libelle}.");
+        }
+        if ($match->getDateMatch() <= new \DateTime()) {
+            throw new \InvalidArgumentException('Impossible de modifier ce match : la date est déjà passée.');
+        }
+
         if ($sport !== null)                   $match->setSport($sport);
         if ($niveauRequis !== null)            $match->setNiveauRequis($niveauRequis);
         elseif ($effacerNiveau)                $match->setNiveauRequis(null);
@@ -118,6 +127,12 @@ class MatchService
 
     public function supprimer(Game $match): void
     {
+        // A4 — Statut
+        if (in_array($match->getStatut(), [StatutGame::Termine, StatutGame::Annule], true)) {
+            $libelle = $match->getStatut() === StatutGame::Termine ? 'terminé' : 'annulé';
+            throw new \InvalidArgumentException("Impossible de supprimer ce match : il est déjà {$libelle}.");
+        }
+
         $this->em->remove($match);
         $this->em->flush();
     }
@@ -138,6 +153,18 @@ class MatchService
         if ($equipeId === null && $joueurId === null) {
             throw new \InvalidArgumentException(
                 'Fournissez soit "equipeId" (sport collectif) soit "joueurId" (sport individuel).'
+            );
+        }
+
+        // A1 — Statut et date
+        if ($match->getStatut() !== StatutGame::EnAttente) {
+            throw new \InvalidArgumentException(
+                'Impossible de rejoindre ce match : il n\'est plus en attente de participants.'
+            );
+        }
+        if ($match->getDateMatch() <= new \DateTime()) {
+            throw new \InvalidArgumentException(
+                'Impossible de rejoindre ce match : la date est déjà passée.'
             );
         }
 
@@ -266,6 +293,16 @@ class MatchService
     public function supprimerCamp(MatchCamp $camp): void
     {
         $match = $camp->getGame();
+
+        // A2 — Statut et date
+        if (in_array($match->getStatut(), [StatutGame::Termine, StatutGame::Annule], true)) {
+            $libelle = $match->getStatut() === StatutGame::Termine ? 'terminé' : 'annulé';
+            throw new \InvalidArgumentException("Impossible de quitter ce match : il est déjà {$libelle}.");
+        }
+        if ($match->getDateMatch() <= new \DateTime()) {
+            throw new \InvalidArgumentException('Impossible de quitter ce match : la date est déjà passée.');
+        }
+
         $this->em->remove($camp);
         $this->actualiserStatutMatch($match);
         $this->em->flush();
@@ -298,6 +335,58 @@ class MatchService
         $this->em->flush();
 
         return $message;
+    }
+
+    // -------------------------------------------------------------------------
+    // Clôture automatique (à la volée + commande)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Transite le match vers annulé ou terminé si sa date est passée.
+     * Pas de flush — à appeler en boucle, flush groupé à la charge de l'appelant.
+     *
+     * @return bool true si le statut a changé
+     */
+    public function cloturerSiExpire(Game $match): bool
+    {
+        if ($match->getDateMatch() > new \DateTime()) {
+            return false;
+        }
+
+        if ($match->getStatut() === StatutGame::EnAttente) {
+            $match->setStatut(StatutGame::Annule);
+            return true;
+        }
+
+        if ($match->getStatut() === StatutGame::Confirme) {
+            $match->setStatut(StatutGame::Termine);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Clôture en batch une liste de matchs : un seul flush() groupé si nécessaire.
+     *
+     * @param  Game[] $matchs
+     * @return int    nombre de matchs dont le statut a changé
+     */
+    public function cloturerMatchsExpires(array $matchs): int
+    {
+        $count = 0;
+
+        foreach ($matchs as $match) {
+            if ($this->cloturerSiExpire($match)) {
+                $count++;
+            }
+        }
+
+        if ($count > 0) {
+            $this->em->flush();
+        }
+
+        return $count;
     }
 
     // -------------------------------------------------------------------------
@@ -347,23 +436,6 @@ class MatchService
         $resultat->setScoreCamp2($scoreCamp2);
 
         $this->em->persist($resultat);
-        $this->em->flush();
-
-        return $resultat;
-    }
-
-    public function modifierResultat(Game $match, int $scoreCamp1, int $scoreCamp2): Resultat
-    {
-        $resultat = $match->getResultat();
-        if (!$resultat) {
-            throw new \InvalidArgumentException('Ce match n\'a pas encore de résultat. Utilisez POST pour le créer.');
-        }
-
-        $this->validerScoresResultat($match, $scoreCamp1, $scoreCamp2);
-
-        $resultat->setScoreCamp1($scoreCamp1);
-        $resultat->setScoreCamp2($scoreCamp2);
-
         $this->em->flush();
 
         return $resultat;
