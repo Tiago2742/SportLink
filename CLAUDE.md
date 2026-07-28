@@ -44,6 +44,20 @@ SportLink/
 - **Perf API (Windows)** : ne jamais activer \`opcache.validate_timestamps=1\` sur le volume \`./back\` (≈10 s/requête). \`vendor\` est dans le volume Docker \`back_vendor\`. Après \`docker compose up\` : \`docker compose exec php composer install\`. Code PHP modifié → \`docker compose restart php\`. Idéal long terme : cloner le projet dans le filesystem WSL2 (\`~/...\`), pas sous \`C:\\Users\`.
 - DATABASE_URL : \`mysql://sportlink:sportlink@db:3306/sportlink?serverVersion=8.0&charset=utf8mb4\` (host = \`db\` en interne Docker)
 - phpMyAdmin / clients Windows : host \`localhost\`, port 3306, \`sportlink\`/\`sportlink\`
+- **Reset base dev (base vierge OU ancienne)** — une seule procédure, toujours la même (la migration consolidée est un CREATE FROM SCRATCH, pas de chemin incremental) :
+  ```bash
+  docker compose exec php php bin/console doctrine:database:drop --force
+  docker compose exec php php bin/console doctrine:database:create
+  docker compose exec php php bin/console doctrine:migrations:migrate --no-interaction
+  docker compose exec php php bin/console doctrine:fixtures:load --group=dev --no-interaction
+  ```
+- **Reset base test** : utilise `doctrine:schema:create --env=test` (pas `migrations:migrate`) — base vierge uniquement, schéma généré depuis les entités :
+  ```bash
+  docker compose exec php php bin/console doctrine:database:drop --force --env=test
+  docker compose exec php php bin/console doctrine:database:create --env=test
+  docker compose exec php php bin/console doctrine:schema:create --env=test
+  docker compose exec php php bin/console doctrine:fixtures:load --env=test --group=test --no-interaction
+  ```
 
 ## 5. Conventions de code
 
