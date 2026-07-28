@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Utilisateur;
 use App\Enum\TypeUtilisateur;
 use App\Repository\UtilisateurRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,7 +20,9 @@ class JoueurController extends AbstractController
     #[Route('/recherche', name: 'api_joueurs_recherche', methods: ['GET'])]
     public function rechercher(Request $request): JsonResponse
     {
-        if ($this->getUser()->getType() !== TypeUtilisateur::Club) {
+        /** @var Utilisateur $moi */
+        $moi = $this->getUser();
+        if ($moi->getType() !== TypeUtilisateur::Club) {
             return $this->json(['erreur' => 'Réservé aux comptes club.'], 403);
         }
 
@@ -31,6 +34,6 @@ class JoueurController extends AbstractController
         $sportId = $request->query->getInt('sportId') ?: null;
         $joueurs = $this->utilisateurRepository->rechercherJoueurs((string) $q, 15, $sportId);
 
-        return $this->json($joueurs, 200, [], ['groups' => ['utilisateur:read']]);
+        return $this->json($joueurs, 200, [], ['groups' => ['utilisateur:public']]);
     }
 }

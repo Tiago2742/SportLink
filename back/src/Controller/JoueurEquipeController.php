@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Utilisateur;
 use App\Enum\TypeUtilisateur;
 use App\Service\EquipeService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -14,7 +15,7 @@ class JoueurEquipeController extends AbstractController
     private const GROUPES_ESPACE = [
         'equipe_joueur:read',
         'equipe_joueur:invitation',
-        'utilisateur:embed',
+        'utilisateur:public',
         'equipe:list',
         'sport:read',
         'niveau:read',
@@ -27,6 +28,7 @@ class JoueurEquipeController extends AbstractController
     #[Route('/espace-equipes', name: 'api_joueur_espace_equipes', methods: ['GET'])]
     public function espaceEquipes(): JsonResponse
     {
+        /** @var Utilisateur $moi */
         $moi = $this->getUser();
         if ($moi->getType() !== TypeUtilisateur::Joueur) {
             return $this->json(['erreur' => 'Réservé aux comptes joueur.'], 403);

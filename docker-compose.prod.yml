@@ -1,0 +1,49 @@
+# docker-compose.prod.yml — Production
+# Usage : docker compose -f docker-compose.prod.yml up -d
+#
+# AVANT DE LANCER :
+#   1. Copier back/.env.prod.example → back/.env.local (ou définir les variables ci-dessous
+#      via les secrets de votre hôte / CI-CD)
+#   2. Builder l'image : docker compose -f docker-compose.prod.yml build
+#   3. Lancer les migrations : docker compose -f docker-compose.prod.yml exec php php bin/console doctrine:migrations:migrate --no-interaction
+#   4. Générer le cache : docker compose -f docker-compose.prod.yml exec php php bin/console cache:warmup
+
+services:
+  php:
+    build:
+      context: ./back
+      target: prod           # à adapter si votre Dockerfile a un multi-stage build
+    container_name: sportlink_api_prod
+    restart: unless-stopped
+    # Pas de volume monté sur ./back : le code est figé dans l'image (pratique prod standard)
+    volumes:
+      - php_var_prod:/var/www/html/var
+    ports:
+      - "8000:80"
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      # Les secrets ci-dessous NE DOIVENT PAS être définis ici en clair.
+      # Utilisez les secrets Docker, un fichier .env.local monté via volume,
+      # ou les variables d'environnement de votre hôte / CI-CD.
+      # Voir back/.env.prod.example pour la liste complète.
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: sportlink_db_prod
+    restart: unless-stopped
+    environment:
+      # Remplacer par des secrets réels — ne jamais laisser "root" en prod
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sportlink}
+      MYSQL_USER: ${MYSQL_USER:-sportlink}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data_prod:/var/lib/mysql
+    # Ne pas exposer le port 3306 publiquement en prod (retirer le mapping)
+
+volumes:
+  db_data_prod:
+  php_var_prod:

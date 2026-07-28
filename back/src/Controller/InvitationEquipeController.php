@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Utilisateur;
 use App\Enum\TypeUtilisateur;
 use App\Service\EquipeService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,6 +19,7 @@ class InvitationEquipeController extends AbstractController
     #[Route('', name: 'api_invitations_equipes_lister', methods: ['GET'])]
     public function lister(): JsonResponse
     {
+        /** @var Utilisateur $moi */
         $moi = $this->getUser();
         if ($moi->getType() !== TypeUtilisateur::Joueur) {
             return $this->json(['erreur' => 'Réservé aux comptes joueur.'], 403);
@@ -29,7 +31,7 @@ class InvitationEquipeController extends AbstractController
             'groups' => [
                 'equipe_joueur:read',
                 'equipe_joueur:invitation',
-                'utilisateur:embed',
+                'utilisateur:public',
                 'equipe:list',
                 'sport:read',
                 'niveau:read',

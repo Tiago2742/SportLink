@@ -29,9 +29,9 @@ class EquipeController extends AbstractController
         private UtilisateurNiveauRepository  $utilisateurNiveauRepository,
     ) {}
 
-    private const GROUPES_LIST = ['equipe:list', 'utilisateur:embed', 'sport:read', 'niveau:read'];
-    private const GROUPES_READ = ['equipe:read', 'utilisateur:embed', 'sport:read', 'niveau:read', 'equipe_joueur:read'];
-    private const GROUPES_MEMBRE = ['equipe_joueur:read', 'utilisateur:embed'];
+    private const GROUPES_LIST = ['equipe:list', 'utilisateur:public', 'sport:read', 'niveau:read'];
+    private const GROUPES_READ = ['equipe:read', 'utilisateur:public', 'sport:read', 'niveau:read', 'equipe_joueur:read'];
+    private const GROUPES_MEMBRE = ['equipe_joueur:read', 'utilisateur:public'];
 
     #[Route('', name: 'api_equipes_lister', methods: ['GET'])]
     public function lister(Request $request): JsonResponse

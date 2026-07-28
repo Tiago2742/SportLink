@@ -38,10 +38,10 @@ class MatchController extends AbstractController
     // ---- Groupes de sérialisation réutilisés --------------------------------
 
     private const GROUPES_LIST = [
-        'game:list', 'utilisateur:read', 'sport:read', 'niveau:read',
+        'game:list', 'utilisateur:public', 'sport:read', 'niveau:read',
         'match_camp:read', 'equipe:list',
     ];
-    private const GROUPES_READ = ['game:read', 'utilisateur:read', 'sport:read', 'niveau:read',
+    private const GROUPES_READ = ['game:read', 'utilisateur:public', 'sport:read', 'niveau:read',
                                   'match_camp:read', 'equipe:list', 'resultat:read'];
 
     // ---- CRUD match ---------------------------------------------------------
