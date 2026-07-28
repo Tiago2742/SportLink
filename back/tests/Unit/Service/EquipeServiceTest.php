@@ -11,6 +11,7 @@ use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeJoueurRepository;
+use App\Repository\UtilisateurNiveauRepository;
 use App\Repository\UtilisateurRepository;
 use App\Service\EquipeService;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -25,6 +26,7 @@ class EquipeServiceTest extends TestCase
     private EntityManagerInterface&MockObject $em;
     private UtilisateurRepository&MockObject $utilisateurRepository;
     private EquipeJoueurRepository&MockObject $equipeJoueurRepository;
+    private UtilisateurNiveauRepository&MockObject $utilisateurNiveauRepository;
     private EquipeService $service;
 
     protected function setUp(): void
@@ -32,10 +34,12 @@ class EquipeServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->utilisateurRepository = $this->createMock(UtilisateurRepository::class);
         $this->equipeJoueurRepository = $this->createMock(EquipeJoueurRepository::class);
+        $this->utilisateurNiveauRepository = $this->createMock(UtilisateurNiveauRepository::class);
         $this->service = new EquipeService(
             $this->em,
             $this->utilisateurRepository,
             $this->equipeJoueurRepository,
+            $this->utilisateurNiveauRepository,
         );
     }
 
@@ -57,12 +61,18 @@ class EquipeServiceTest extends TestCase
     {
         $club = $this->creerClub();
         $joueur = $this->creerJoueur();
+        $this->setId($joueur, 1);
 
         $membreExistant = new EquipeJoueur();
         $membreExistant->setUtilisateur($joueur);
         $membreExistant->setStatut(\App\Enum\StatutMembreEquipe::Confirme);
 
         $equipe = $this->creerEquipeAvecMembres([$membreExistant], $club);
+        // Le service (R : sport déclaré) interroge UtilisateurNiveauRepository avant
+        // de vérifier l'appartenance existante : le joueur doit déclarer le sport de
+        // l'équipe pour atteindre la branche "déjà membre".
+        $this->setId($equipe->getSport(), 10);
+        $this->utilisateurNiveauRepository->method('findSportIdsByUtilisateur')->willReturn([10]);
 
         $this->utilisateurRepository->method('find')->willReturn($joueur);
 
@@ -76,12 +86,17 @@ class EquipeServiceTest extends TestCase
     {
         $club = $this->creerClub();
         $joueur = $this->creerJoueur();
+        $this->setId($joueur, 2);
         $equipe = new Equipe();
         $equipe->setClub($club);
         $sport = new Sport();
         $sport->setType(TypeSport::Collectif);
+        $this->setId($sport, 20);
         $equipe->setSport($sport);
 
+        // Le sport doit être déclaré par le joueur (vérifié via UtilisateurNiveauRepository)
+        // avant que la demande d'adhésion ne soit acceptée.
+        $this->utilisateurNiveauRepository->method('findSportIdsByUtilisateur')->willReturn([20]);
         $this->equipeJoueurRepository->method('aAdhesionActiveSurSport')->willReturn(false);
         $this->em->expects($this->once())->method('persist')->with($this->isInstanceOf(EquipeJoueur::class));
         $this->em->expects($this->once())->method('flush');
@@ -195,6 +210,13 @@ class EquipeServiceTest extends TestCase
         $this->em->expects($this->once())->method('flush');
 
         $this->service->supprimer($equipe);
+    }
+
+    /** Force l'id (auto-généré normalement) d'une entité fraîchement construite en test. */
+    private function setId(object $entite, int $id): void
+    {
+        $ref = new \ReflectionProperty($entite, 'id');
+        $ref->setValue($entite, $id);
     }
 
     private function creerClub(): Utilisateur

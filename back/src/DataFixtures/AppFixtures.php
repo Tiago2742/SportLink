@@ -22,11 +22,12 @@ use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Reference\SportNiveaux;
 use Doctrine\Bundle\FixturesBundle\Fixture;
+use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
 use Doctrine\Persistence\ObjectManager;
 use Faker\Factory as FakerFactory;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class AppFixtures extends Fixture
+class AppFixtures extends Fixture implements FixtureGroupInterface
 {
     private const BATCH_SIZE = 100;
     private int $count = 0;
@@ -35,6 +36,11 @@ class AppFixtures extends Fixture
     public function __construct(
         private readonly UserPasswordHasherInterface $hasher,
     ) {}
+
+    public static function getGroups(): array
+    {
+        return ['dev'];
+    }
 
     /** Persist + flush par batch (sans clear : les références restent valides). */
     private function save(object $entity): void
