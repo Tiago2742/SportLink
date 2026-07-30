@@ -1,0 +1,10 @@
+framework:
+    rate_limiter:
+        login_global:
+            policy: 'sliding_window'
+            limit: 10000
+            interval: '60 seconds'
+        login_local:
+            policy: 'sliding_window'
+            limit: 10000
+            interval: '60 seconds'

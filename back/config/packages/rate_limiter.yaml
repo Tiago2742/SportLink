@@ -1,0 +1,12 @@
+framework:
+    rate_limiter:
+        # Limite par IP uniquement (attaques en largeur) — seuil plus souple
+        login_global:
+            policy: 'sliding_window'
+            limit: 20
+            interval: '60 seconds'
+        # Limite par IP + email (attaque ciblée) — seuil strict
+        login_local:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '60 seconds'
