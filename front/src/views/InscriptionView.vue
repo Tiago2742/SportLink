@@ -20,6 +20,12 @@ const form = ref({
 
 const estClub = computed(() => form.value.type === 'club')
 
+const reglesMdp = computed(() => ({
+  longueur: form.value.password.length >= 8,
+  lettre:   /[a-zA-Z]/.test(form.value.password),
+  chiffre:  /[0-9]/.test(form.value.password),
+}))
+
 const sports = ref<EntreeSportNiveau[]>([])
 const erreur = ref('')
 const chargement = ref(false)
@@ -178,6 +184,11 @@ async function soumettre() {
             required
             autocomplete="new-password"
           />
+          <ul v-if="form.password" class="mdp-regles">
+            <li :class="reglesMdp.longueur ? 'regle--ok' : 'regle--ko'">8 caractères minimum</li>
+            <li :class="reglesMdp.lettre   ? 'regle--ok' : 'regle--ko'">Au moins une lettre</li>
+            <li :class="reglesMdp.chiffre  ? 'regle--ok' : 'regle--ko'">Au moins un chiffre</li>
+          </ul>
         </div>
 
         <div class="champ-groupe">
@@ -430,6 +441,41 @@ async function soumettre() {
 .type-btn:hover:not(.type-btn--actif) {
   background: var(--couleur-fond);
   color: var(--couleur-texte);
+}
+
+/* ── Indicateur de politique de mot de passe ── */
+.mdp-regles {
+  list-style: none;
+  padding: 0;
+  margin: 0.3rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.mdp-regles li {
+  font-size: 0.78rem;
+  padding-left: 1.1rem;
+  position: relative;
+}
+
+.mdp-regles li::before {
+  content: '✗';
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+}
+
+.regle--ok {
+  color: var(--couleur-primaire-foncee, #388e3c);
+}
+
+.regle--ok::before {
+  content: '✓' !important;
+}
+
+.regle--ko {
+  color: var(--couleur-texte-discret);
 }
 
 /* ── Consentement RGPD ── */

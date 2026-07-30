@@ -46,6 +46,15 @@ class RegistrationController extends AbstractController
             }
         }
 
+        // Politique de mot de passe : 8 chars min, ≥1 lettre, ≥1 chiffre
+        $mdp = (string) $donnees['password'];
+        if (strlen($mdp) < 8 || !preg_match('/[a-zA-Z]/', $mdp) || !preg_match('/[0-9]/', $mdp)) {
+            return $this->json(
+                ['erreur' => 'Le mot de passe doit contenir au moins 8 caractères, une lettre et un chiffre.'],
+                400
+            );
+        }
+
         // RGPD — consentement explicite obligatoire
         if (empty($donnees['consentement'])) {
             return $this->json(['erreur' => 'Vous devez accepter la politique de confidentialité.'], 400);

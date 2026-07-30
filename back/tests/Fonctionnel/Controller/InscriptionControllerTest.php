@@ -131,6 +131,63 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $this->assertStringContainsString('collectif', $this->reponseJson()['erreur']);
     }
 
+    public function testMotDePasseTropCourt_RetourneErreur400(): void
+    {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
+        $this->requete('POST', '/api/register', [
+            'email'        => 'mdp.court@test.fr',
+            'password'     => 'Ab1',
+            'nom'          => 'Martin',
+            'prenom'       => 'Paul',
+            'type'         => 'joueur',
+            'consentement' => true,
+            'sports'       => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('8', $this->reponseJson()['erreur']);
+    }
+
+    public function testMotDePasseSansChiffre_RetourneErreur400(): void
+    {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
+        $this->requete('POST', '/api/register', [
+            'email'        => 'mdp.sanchiffre@test.fr',
+            'password'     => 'Abcdefgh',
+            'nom'          => 'Martin',
+            'prenom'       => 'Paul',
+            'type'         => 'joueur',
+            'consentement' => true,
+            'sports'       => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('chiffre', $this->reponseJson()['erreur']);
+    }
+
+    public function testMotDePasseSansLettre_RetourneErreur400(): void
+    {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
+        $this->requete('POST', '/api/register', [
+            'email'        => 'mdp.sanslettre@test.fr',
+            'password'     => '12345678',
+            'nom'          => 'Martin',
+            'prenom'       => 'Paul',
+            'type'         => 'joueur',
+            'consentement' => true,
+            'sports'       => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('lettre', $this->reponseJson()['erreur']);
+    }
+
     public function testInscriptionSansConsentement_RetourneErreur400(): void
     {
         $football = $this->getSport('Football');
