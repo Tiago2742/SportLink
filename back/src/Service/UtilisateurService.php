@@ -8,6 +8,9 @@ use App\Entity\UtilisateurNiveau;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class UtilisateurService
@@ -16,6 +19,9 @@ class UtilisateurService
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $hasher,
         private EquipeRepository $equipeRepo,
+        private RequestStack $requestStack,
+        #[Autowire(service: 'monolog.logger.security')]
+        private LoggerInterface $logger,
     ) {}
 
     /**
@@ -58,5 +64,10 @@ class UtilisateurService
         $user->setRoles([]);
 
         $this->em->flush();
+
+        $this->logger->info('account_anonymized', [
+            'user_id' => $id,
+            'ip'      => $this->requestStack->getCurrentRequest()?->getClientIp(),
+        ]);
     }
 }
