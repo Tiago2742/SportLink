@@ -24,6 +24,7 @@ class MatchService
         private EntityManagerInterface $em,
         private EquipeRepository       $equipeRepository,
         private UtilisateurRepository  $utilisateurRepository,
+        private GeocodageService       $geocodage,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -44,6 +45,11 @@ class MatchService
         $match->setNiveauRequis($niveauRequis);
         $match->setDateMatch(new \DateTime($dateMatch));
         $match->setLieu($lieu);
+        if ($lieu !== null && $lieu !== '') {
+            $coords = $this->geocodage->geocoder($lieu);
+            $match->setLatitude($coords['latitude'] ?? null);
+            $match->setLongitude($coords['longitude'] ?? null);
+        }
         $match->setDescription($description);
         $match->setStatut(StatutGame::EnAttente);
         $match->setCreateur($createur);
@@ -116,7 +122,17 @@ class MatchService
         if ($niveauRequis !== null)            $match->setNiveauRequis($niveauRequis);
         elseif ($effacerNiveau)                $match->setNiveauRequis(null);
         if ($dateMatch !== null)               $match->setDateMatch(new \DateTime($dateMatch));
-        if ($lieu !== null)                    $match->setLieu($lieu);
+        if ($lieu !== null) {
+            $match->setLieu($lieu);
+            if ($lieu !== '') {
+                $coords = $this->geocodage->geocoder($lieu);
+                $match->setLatitude($coords['latitude'] ?? null);
+                $match->setLongitude($coords['longitude'] ?? null);
+            } else {
+                $match->setLatitude(null);
+                $match->setLongitude(null);
+            }
+        }
         if ($description !== null)             $match->setDescription($description);
         elseif ($effacerDescription)           $match->setDescription(null);
 
