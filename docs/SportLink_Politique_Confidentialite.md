@@ -8,7 +8,7 @@
 
 Le responsable du traitement des données est :
 - **Éditeur** : DUVAL Tiago
-- **Contact** : Tiago.duval5@gmail.com
+- **Contact** : tiago.duval5@gmail.com
 
 ## 2. Données collectées
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -19,6 +19,7 @@ import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composable
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 import { ArrowLeft, Calendar, FileText, MapPin, Target, User } from 'lucide-vue-next'
+import L from 'leaflet'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -42,6 +43,24 @@ const equipesDuClub = ref<{ id: number; nom: string }[]>([])
 const equipeSelectionnee = ref<number | ''>('')
 const chargementEquipes = ref(false)
 
+const mapConteneur = ref<HTMLElement | null>(null)
+let carteInstance: L.Map | null = null
+
+function initCarte(lat: number, lng: number, lieu: string | null) {
+  if (!mapConteneur.value || carteInstance) return
+  carteInstance = L.map(mapConteneur.value, { scrollWheelZoom: false })
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(carteInstance)
+  L.marker([lat, lng]).addTo(carteInstance).bindPopup(lieu ?? 'Lieu du match').openPopup()
+  carteInstance.setView([lat, lng], 14)
+}
+
+onUnmounted(() => {
+  carteInstance?.remove()
+  carteInstance = null
+})
+
 onMounted(charger)
 
 async function charger() {
@@ -64,6 +83,13 @@ async function charger() {
     erreur.value = e.statut === 404 ? 'Match introuvable.' : 'Erreur de chargement.'
   } finally {
     chargement.value = false
+  }
+
+  // La section carte n'est dans le DOM qu'après chargement = false (v-else-if="match").
+  // On attend le prochain tick pour que Vue ait rendu le DOM avant d'initialiser Leaflet.
+  if (match.value?.latitude != null && match.value?.longitude != null) {
+    await nextTick()
+    initCarte(match.value.latitude, match.value.longitude, match.value.lieu)
   }
 }
 
@@ -319,6 +345,15 @@ function formaterHeure(dateStr: string) {
                 <span>{{ match.description }}</span>
               </li>
             </ul>
+          </section>
+
+          <!-- Carte du lieu -->
+          <section
+            v-if="match.latitude != null && match.longitude != null"
+            class="carte section-carte"
+          >
+            <h2 class="section-h2">Localisation</h2>
+            <div ref="mapConteneur" class="carte-lieu"></div>
           </section>
 
           <!-- Résultat -->
@@ -1022,6 +1057,17 @@ button:disabled {
 /* ══════════════════════════════════════
    ANIMATIONS
 ══════════════════════════════════════ */
+.section-carte {
+  padding: var(--espace-l);
+  overflow: visible;
+}
+
+.carte-lieu {
+  height: 260px;
+  border-radius: var(--rayon-carte);
+  overflow: hidden;
+}
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }

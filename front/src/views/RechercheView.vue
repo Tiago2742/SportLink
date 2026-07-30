@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerMatchs, ajouterCamp } from '@/services/api'
@@ -7,6 +7,7 @@ import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
 import { Search } from 'lucide-vue-next'
+import L from 'leaflet'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -15,6 +16,10 @@ const router = useRouter()
 const matchs = ref<any[]>([])
 const chargement = ref(true)
 const erreur = ref('')
+
+const mapConteneur = ref<HTMLElement | null>(null)
+let carteRecherche: L.Map | null = null
+let grpMarqueurs: L.LayerGroup | null = null
 
 const filtres = ref({
   sportId:  route.query.sportId  ? Number(route.query.sportId)  : '' as number | '',
@@ -93,11 +98,58 @@ const matchsTries = computed(() => {
   })
 })
 
+const matchsGeocodes = computed(() =>
+  matchsTries.value.filter((m: any) => m.latitude != null && m.longitude != null),
+)
+
+const aCarteActive = computed(() => matchsGeocodes.value.length > 0)
+
 const totalPages = computed(() => Math.ceil(matchsTries.value.length / parPage))
 
 const matchsPage = computed(() =>
   matchsTries.value.slice((pageCourante.value - 1) * parPage, pageCourante.value * parPage),
 )
+
+function initCarteRecherche() {
+  if (!mapConteneur.value || carteRecherche) return
+  carteRecherche = L.map(mapConteneur.value, { scrollWheelZoom: false })
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  }).addTo(carteRecherche)
+  grpMarqueurs = L.layerGroup().addTo(carteRecherche)
+  mettreAJourMarqueurs(matchsGeocodes.value)
+}
+
+function mettreAJourMarqueurs(geocodes: any[]) {
+  if (!carteRecherche || !grpMarqueurs) return
+  grpMarqueurs.clearLayers()
+  if (geocodes.length === 0) return
+  geocodes.forEach((m: any) => {
+    L.marker([m.latitude, m.longitude])
+      .addTo(grpMarqueurs!)
+      .bindPopup(
+        `<strong>${m.sport?.nom ?? 'Match'}</strong><br>${m.lieu ?? ''}<br>` +
+        `<a href="/matchs/${m.id}" style="color:#4caf50;font-weight:600;font-size:0.85em">Voir le match →</a>`,
+      )
+  })
+  const bounds = L.latLngBounds(geocodes.map((m: any) => [m.latitude, m.longitude] as L.LatLngTuple))
+  carteRecherche.fitBounds(bounds, { padding: [30, 30] })
+}
+
+watch(matchsGeocodes, (geocodes) => {
+  if (geocodes.length === 0) return
+  if (!carteRecherche) {
+    initCarteRecherche()
+  } else {
+    mettreAJourMarqueurs(geocodes)
+  }
+}, { flush: 'post' })
+
+onUnmounted(() => {
+  carteRecherche?.remove()
+  carteRecherche = null
+  grpMarqueurs = null
+})
 
 async function rejoindreMatch(matchId: number) {
   if (!auth.utilisateur) return
@@ -196,6 +248,11 @@ async function rejoindreMatch(matchId: number) {
             <option value="desc">Trier par date (plus récent)</option>
           </select>
         </div>
+
+        <!-- Carte des matchs géolocalisés -->
+        <section v-if="aCarteActive" class="section-carte-matchs">
+          <div ref="mapConteneur" class="carte-leaflet"></div>
+        </section>
 
         <!-- États -->
         <div v-if="chargement" class="chargement">Chargement des matchs...</div>
@@ -571,6 +628,17 @@ async function rejoindreMatch(matchId: number) {
 .page-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.section-carte-matchs {
+  margin-bottom: var(--espace-l);
+}
+
+.carte-leaflet {
+  height: 320px;
+  border-radius: var(--rayon-carte);
+  overflow: hidden;
+  border: 1.5px solid #dde8dd;
 }
 
 @media (max-width: 900px) {
