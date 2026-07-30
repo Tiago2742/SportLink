@@ -37,6 +37,14 @@ class Game
     #[Groups(['game:list', 'game:read'])]
     private ?string $lieu = null;
 
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:list', 'game:read'])]
+    private ?float $latitude = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:list', 'game:read'])]
+    private ?float $longitude = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['game:read'])]
     private ?string $description = null;
@@ -115,6 +123,28 @@ class Game
     public function setLieu(?string $lieu): static
     {
         $this->lieu = $lieu;
+        return $this;
+    }
+
+    public function getLatitude(): ?float
+    {
+        return $this->latitude;
+    }
+
+    public function setLatitude(?float $latitude): static
+    {
+        $this->latitude = $latitude;
+        return $this;
+    }
+
+    public function getLongitude(): ?float
+    {
+        return $this->longitude;
+    }
+
+    public function setLongitude(?float $longitude): static
+    {
+        $this->longitude = $longitude;
         return $this;
     }
 
