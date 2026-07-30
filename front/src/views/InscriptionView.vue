@@ -15,6 +15,7 @@ const form = ref({
   prenom: '',
   type: 'joueur',
   localisation: '',
+  consentement: false,
 })
 
 const estClub = computed(() => form.value.type === 'club')
@@ -52,6 +53,7 @@ async function soumettre() {
     } else {
       donnees.prenom = form.value.prenom.trim()
     }
+    donnees.consentement = form.value.consentement
     await auth.sInscrire(donnees as Record<string, unknown> & { email: string; password: string })
     router.push('/')
   } catch (e: any) {
@@ -201,11 +203,27 @@ async function soumettre() {
           />
         </div>
 
+        <!-- RGPD — consentement obligatoire -->
+        <div class="champ-consentement">
+          <label class="consentement-label">
+            <input
+              v-model="form.consentement"
+              type="checkbox"
+              class="consentement-case"
+            />
+            <span>
+              J'accepte la
+              <a href="/politique-confidentialite" target="_blank" rel="noopener">politique de confidentialité</a>
+              <span class="obligatoire"> *</span>
+            </span>
+          </label>
+        </div>
+
         <button
           type="submit"
           class="btn-submit"
           :class="{ 'btn-submit--loading': chargement }"
-          :disabled="chargement"
+          :disabled="chargement || !form.consentement"
         >
           {{ chargement ? 'Création en cours…' : 'Créer mon compte' }}
         </button>
@@ -412,6 +430,36 @@ async function soumettre() {
 .type-btn:hover:not(.type-btn--actif) {
   background: var(--couleur-fond);
   color: var(--couleur-texte);
+}
+
+/* ── Consentement RGPD ── */
+.champ-consentement {
+  margin-bottom: 0.2rem;
+}
+
+.consentement-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  cursor: pointer;
+  font-size: 0.83rem;
+  color: var(--couleur-texte);
+  line-height: 1.5;
+}
+
+.consentement-case {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--couleur-primaire);
+  cursor: pointer;
+}
+
+.consentement-label a {
+  color: var(--couleur-primaire);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ── Bouton submit ── */

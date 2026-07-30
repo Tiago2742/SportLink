@@ -15,12 +15,13 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $niveau   = $this->getPremierNiveau($football);
 
         $this->requete('POST', '/api/register', [
-            'email'    => 'nouveau@test.fr',
-            'password' => 'Test1234!',
-            'nom'      => 'Martin',
-            'prenom'   => 'Paul',
-            'type'     => 'joueur',
-            'sports'   => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+            'email'         => 'nouveau@test.fr',
+            'password'      => 'Test1234!',
+            'nom'           => 'Martin',
+            'prenom'        => 'Paul',
+            'type'          => 'joueur',
+            'consentement'  => true,
+            'sports'        => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
         ]);
 
         $this->assertStatut(201);
@@ -49,11 +50,12 @@ class InscriptionControllerTest extends BaseTestFonctionnel
 
         // La vérification de doublon se fait avant le traitement des sports → 409 sans sports
         $this->requete('POST', '/api/register', [
-            'email'    => 'existant@test.fr',
-            'password' => 'AutreMdp1!',
-            'nom'      => 'Dupont',
-            'prenom'   => 'Jean',
-            'type'     => 'joueur',
+            'email'        => 'existant@test.fr',
+            'password'     => 'AutreMdp1!',
+            'nom'          => 'Dupont',
+            'prenom'       => 'Jean',
+            'type'         => 'joueur',
+            'consentement' => true,
         ]);
 
         $this->assertStatut(409);
@@ -66,11 +68,12 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $niveau   = $this->getPremierNiveau($football);
 
         $this->requete('POST', '/api/register', [
-            'email'   => 'club.nouveau@test.fr',
-            'password' => 'Test1234!',
-            'nom'     => 'AS Test Club',
-            'type'    => 'club',
-            'sports'  => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+            'email'        => 'club.nouveau@test.fr',
+            'password'     => 'Test1234!',
+            'nom'          => 'AS Test Club',
+            'type'         => 'club',
+            'consentement' => true,
+            'sports'       => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
         ]);
 
         $this->assertStatut(201);
@@ -83,10 +86,11 @@ class InscriptionControllerTest extends BaseTestFonctionnel
     {
         // La vérification du prénom se fait avant le traitement des sports → 400 sans sports
         $this->requete('POST', '/api/register', [
-            'email'    => 'joueur.sans.prenom@test.fr',
-            'password' => 'Test1234!',
-            'nom'      => 'Martin',
-            'type'     => 'joueur',
+            'email'        => 'joueur.sans.prenom@test.fr',
+            'password'     => 'Test1234!',
+            'nom'          => 'Martin',
+            'type'         => 'joueur',
+            'consentement' => true,
         ]);
 
         $this->assertStatut(400);
@@ -96,11 +100,12 @@ class InscriptionControllerTest extends BaseTestFonctionnel
     public function testInscriptionSansSport_RetourneErreur400(): void
     {
         $this->requete('POST', '/api/register', [
-            'email'    => 'sans.sport@test.fr',
-            'password' => 'Test1234!',
-            'nom'      => 'Martin',
-            'prenom'   => 'Paul',
-            'type'     => 'joueur',
+            'email'        => 'sans.sport@test.fr',
+            'password'     => 'Test1234!',
+            'nom'          => 'Martin',
+            'prenom'       => 'Paul',
+            'type'         => 'joueur',
+            'consentement' => true,
             // pas de champ sports
         ]);
 
@@ -114,15 +119,54 @@ class InscriptionControllerTest extends BaseTestFonctionnel
         $niveau = $this->getPremierNiveau($tennis);
 
         $this->requete('POST', '/api/register', [
-            'email'    => 'club.tennis@test.fr',
-            'password' => 'Test1234!',
-            'nom'      => 'Club Tennis',
-            'type'     => 'club',
-            'sports'   => [['sportId' => $tennis->getId(), 'niveauId' => $niveau->getId()]],
+            'email'        => 'club.tennis@test.fr',
+            'password'     => 'Test1234!',
+            'nom'          => 'Club Tennis',
+            'type'         => 'club',
+            'consentement' => true,
+            'sports'       => [['sportId' => $tennis->getId(), 'niveauId' => $niveau->getId()]],
         ]);
 
         $this->assertStatut(400);
         $this->assertStringContainsString('collectif', $this->reponseJson()['erreur']);
+    }
+
+    public function testInscriptionSansConsentement_RetourneErreur400(): void
+    {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
+        $this->requete('POST', '/api/register', [
+            'email'    => 'sans.consent@test.fr',
+            'password' => 'Test1234!',
+            'nom'      => 'Martin',
+            'prenom'   => 'Paul',
+            'type'     => 'joueur',
+            // consentement absent
+            'sports'   => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('confidentialité', $this->reponseJson()['erreur']);
+    }
+
+    public function testConsentementFalse_RetourneErreur400(): void
+    {
+        $football = $this->getSport('Football');
+        $niveau   = $this->getPremierNiveau($football);
+
+        $this->requete('POST', '/api/register', [
+            'email'        => 'consent.false@test.fr',
+            'password'     => 'Test1234!',
+            'nom'          => 'Martin',
+            'prenom'       => 'Paul',
+            'type'         => 'joueur',
+            'consentement' => false,
+            'sports'       => [['sportId' => $football->getId(), 'niveauId' => $niveau->getId()]],
+        ]);
+
+        $this->assertStatut(400);
+        $this->assertStringContainsString('confidentialité', $this->reponseJson()['erreur']);
     }
 
     // ---- /api/login_check ---------------------------------------------------

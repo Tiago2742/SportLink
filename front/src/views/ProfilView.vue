@@ -8,12 +8,13 @@ import {
   mettreAJourLogo,
   ajouterSportNiveau,
   modifierNiveauSport,
+  supprimerCompte,
 } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import IconeSection from '@/components/ui/IconeSection.vue'
 import SelecteurSportNiveau from '@/components/form/SelecteurSportNiveau.vue'
 import type { EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
-import { Calendar, Image, KeyRound, Lock, Pencil, Trophy, User, Users } from 'lucide-vue-next'
+import { AlertTriangle, Calendar, Image, KeyRound, Lock, Pencil, Trash2, Trophy, Users } from 'lucide-vue-next'
 
 const auth    = useAuthStore()
 const router  = useRouter()
@@ -169,6 +170,34 @@ async function onAjoutSport(liste: EntreeSportNiveau[]) {
     erreurSport.value = e.message || 'Impossible d\'ajouter ce sport.'
   } finally {
     ajoutEnCours.value = false
+  }
+}
+
+// ── Suppression de compte ─────────────────────────────────────────────────────
+const showModaleSupression  = ref(false)
+const suppressionEnCours    = ref(false)
+const suppressionErreur     = ref('')
+
+function ouvrirModaleSupression() {
+  suppressionErreur.value = ''
+  showModaleSupression.value = true
+}
+function fermerModaleSupression() {
+  if (suppressionEnCours.value) return
+  showModaleSupression.value = false
+}
+
+async function confirmerSuppression() {
+  if (suppressionEnCours.value) return
+  suppressionEnCours.value = true
+  suppressionErreur.value  = ''
+  try {
+    await supprimerCompte(auth.token!)
+    auth.seDeconnecter()
+    router.push('/connexion')
+  } catch (e: any) {
+    suppressionErreur.value = e.message || 'Une erreur est survenue.'
+    suppressionEnCours.value = false
   }
 }
 
@@ -397,6 +426,18 @@ function formaterDate(dateStr: string) {
               Changer mot de passe
             </button>
             <p class="bientot">Fonctionnalité à venir</p>
+
+            <div class="zone-danger">
+              <p class="zone-danger-titre">Zone de danger</p>
+              <p class="section-desc">
+                La suppression efface définitivement vos données personnelles.
+                Votre historique de matchs reste conservé de manière anonymisée.
+              </p>
+              <button class="btn btn-danger" @click="ouvrirModaleSupression">
+                <Trash2 :size="15" aria-hidden="true" />
+                Supprimer mon compte
+              </button>
+            </div>
           </section>
 
           <section v-if="profil?.type === 'club'" class="carte section-sec">
@@ -455,6 +496,47 @@ function formaterDate(dateStr: string) {
       </template>
     </div>
   </div>
+
+  <!-- ── Modale de confirmation de suppression ── -->
+  <Teleport to="body">
+    <div
+      v-if="showModaleSupression"
+      class="overlay-suppr"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modale-suppr-titre"
+      @click.self="fermerModaleSupression"
+    >
+      <div class="modale-suppr">
+        <div class="modale-suppr-icone">
+          <AlertTriangle :size="28" />
+        </div>
+        <h2 id="modale-suppr-titre" class="modale-suppr-titre">Supprimer mon compte</h2>
+        <p class="modale-suppr-texte">
+          Cette action est <strong>irréversible</strong>. Vos données personnelles
+          (nom, prénom, localisation, sports déclarés) seront définitivement effacées.
+          Votre historique de matchs et vos messages seront conservés de manière anonymisée.
+        </p>
+        <div v-if="suppressionErreur" class="alerte alerte-erreur">{{ suppressionErreur }}</div>
+        <div class="modale-suppr-actions">
+          <button
+            class="btn btn-danger"
+            :disabled="suppressionEnCours"
+            @click="confirmerSuppression"
+          >
+            {{ suppressionEnCours ? 'Suppression en cours…' : 'Oui, supprimer mon compte' }}
+          </button>
+          <button
+            class="btn btn-secondaire"
+            :disabled="suppressionEnCours"
+            @click="fermerModaleSupression"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1012,5 +1094,126 @@ button:disabled {
   .btn-modifier { width: 100%; justify-content: center; }
   .logo-form { width: 100%; }
   .sport-ligne-info { flex-wrap: wrap; }
+}
+
+/* ══════════════════════════════════════
+   ZONE DE DANGER
+══════════════════════════════════════ */
+.zone-danger {
+  margin-top: var(--espace-l);
+  padding-top: var(--espace-m);
+  border-top: 1px solid #fde8e8;
+}
+
+.zone-danger-titre {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #c0392b;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: var(--espace-xs);
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #fff0f0;
+  color: #c0392b;
+  border: 1.5px solid #f5c6c6;
+  border-radius: var(--rayon-bouton);
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s cubic-bezier(0.22,1,0.36,1), border-color 0.18s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #ffe0e0;
+  border-color: #c0392b;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════
+   MODALE SUPPRESSION
+══════════════════════════════════════ */
+.overlay-suppr {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 900;
+  padding: var(--espace-m);
+  animation: fadeIn 0.18s ease both;
+}
+
+.modale-suppr {
+  background: #fff;
+  border-radius: 16px;
+  padding: var(--espace-xl);
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  animation: slideUp 0.22s cubic-bezier(0.22,1,0.36,1) both;
+}
+
+.modale-suppr-icone {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #fff0f0;
+  color: #c0392b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--espace-m);
+}
+
+.modale-suppr-titre {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+  margin-bottom: var(--espace-s);
+}
+
+.modale-suppr-texte {
+  font-size: 0.88rem;
+  color: var(--couleur-texte-discret);
+  line-height: 1.6;
+  margin-bottom: var(--espace-l);
+}
+
+.modale-suppr-texte strong {
+  color: #c0392b;
+}
+
+.modale-suppr-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-s);
+}
+
+.modale-suppr-actions .btn-danger,
+.modale-suppr-actions .btn-secondaire {
+  width: 100%;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 </style>

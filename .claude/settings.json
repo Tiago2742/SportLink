@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(docker compose exec php php bin/console debug:event-dispatcher kernel.response 2>&1)",
+      "PowerShell(docker compose exec php php bin/phpunit tests/Fonctionnel/Controller/ProfilSuppressionTest.php --testdox 2>&1)"
+    ]
+  }
+}

@@ -9,10 +9,12 @@ use App\Enum\TypeUtilisateur;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
 use App\Repository\UtilisateurNiveauRepository;
+use App\Service\UtilisateurService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/profil')]
@@ -24,6 +26,19 @@ class ProfilController extends AbstractController
     public function profil(): JsonResponse
     {
         return $this->json($this->getUser(), 200, [], ['groups' => self::GROUPS]);
+    }
+
+    #[Route('', methods: ['DELETE'])]
+    public function supprimerCompte(UtilisateurService $utilisateurService): Response
+    {
+        /** @var Utilisateur $user */
+        $user = $this->getUser();
+        try {
+            $utilisateurService->anonymiser($user);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
+        return new Response(null, 204);
     }
 
     // ── LOGO (clubs uniquement) ───────────────────────────────────────────────

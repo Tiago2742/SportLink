@@ -197,3 +197,6 @@ export const chargerEspaceEquipesJoueur = (token: string): Promise<EspaceEquipes
 
 export const rechercherJoueurs = (token: string, q: string, sportId?: number) =>
   requete('GET', '/joueurs/recherche' + construireParams({ q, ...(sportId ? { sportId } : {}) }), null, token)
+
+export const supprimerCompte = (token: string) =>
+  requete('DELETE', '/profil', null, token)

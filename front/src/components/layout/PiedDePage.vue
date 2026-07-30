@@ -1,7 +1,19 @@
+<script setup lang="ts">
+import { RouterLink } from 'vue-router'
+</script>
+
 <template>
   <footer class="pied-de-page">
     <div class="pied-interieur">
-      <p>© 2026 SportLink — <a href="#">Mentions légales</a> — <a href="#">Contact</a></p>
+      <p>
+        © 2026 SportLink
+        <span class="sep">—</span>
+        <RouterLink to="/mentions-legales">Mentions légales</RouterLink>
+        <span class="sep">—</span>
+        <RouterLink to="/politique-confidentialite">Politique de confidentialité</RouterLink>
+        <span class="sep">—</span>
+        <a href="mailto:tiago.duval5@gmail.com">Contact</a>
+      </p>
     </div>
   </footer>
 </template>
@@ -32,6 +44,10 @@
 
 .pied-interieur a:hover {
   text-decoration: underline;
-  background: none;
+}
+
+.sep {
+  margin: 0 0.45rem;
+  opacity: 0.4;
 }
 </style>

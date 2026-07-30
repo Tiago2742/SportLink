@@ -87,6 +87,16 @@ const router = createRouter({
       meta: { requiertAuth: true },
     },
     {
+      path: '/politique-confidentialite',
+      name: 'politique-confidentialite',
+      component: () => import('@/views/PolitiqueConfidentialiteView.vue'),
+    },
+    {
+      path: '/mentions-legales',
+      name: 'mentions-legales',
+      component: () => import('@/views/MentionsLegalesView.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },

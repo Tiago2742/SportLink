@@ -46,6 +46,11 @@ class RegistrationController extends AbstractController
             }
         }
 
+        // RGPD — consentement explicite obligatoire
+        if (empty($donnees['consentement'])) {
+            return $this->json(['erreur' => 'Vous devez accepter la politique de confidentialité.'], 400);
+        }
+
         if ($typeEnum === TypeUtilisateur::Joueur) {
             $prenom = isset($donnees['prenom']) ? trim((string) $donnees['prenom']) : '';
             if ($prenom === '') {
