@@ -111,7 +111,9 @@ class MatchController extends AbstractController
             }
         }
 
-        $equipeId = !empty($donnees['equipeId']) ? (int) $donnees['equipeId'] : null;
+        $equipeId  = !empty($donnees['equipeId']) ? (int) $donnees['equipeId'] : null;
+        $latitude  = isset($donnees['latitude'])  ? (float) $donnees['latitude']  : null;
+        $longitude = isset($donnees['longitude']) ? (float) $donnees['longitude'] : null;
 
         try {
             $match = $this->matchService->creer(
@@ -122,6 +124,8 @@ class MatchController extends AbstractController
                 $this->getUser(),
                 $donnees['description'] ?? null,
                 $equipeId,
+                $latitude,
+                $longitude,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['erreur' => $e->getMessage()], 422);
@@ -180,6 +184,9 @@ class MatchController extends AbstractController
             $effacerDescription = $donnees['description'] === null;
         }
 
+        $latitude  = isset($donnees['latitude'])  ? (float) $donnees['latitude']  : null;
+        $longitude = isset($donnees['longitude']) ? (float) $donnees['longitude'] : null;
+
         try {
             $match = $this->matchService->modifier(
                 $match,
@@ -188,6 +195,8 @@ class MatchController extends AbstractController
                 $effacerNiveau,
                 $donnees['dateMatch'] ?? null,
                 $donnees['lieu'] ?? null,
+                $latitude,
+                $longitude,
                 $description,
                 $effacerDescription,
             );

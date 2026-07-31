@@ -24,7 +24,6 @@ class MatchService
         private EntityManagerInterface $em,
         private EquipeRepository       $equipeRepository,
         private UtilisateurRepository  $utilisateurRepository,
-        private GeocodageService       $geocodage,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -39,6 +38,8 @@ class MatchService
         Utilisateur $createur,
         ?string $description = null,
         ?int $equipeId = null,
+        ?float $latitude = null,
+        ?float $longitude = null,
     ): Game {
         $match = new Game();
         $match->setSport($sport);
@@ -46,9 +47,9 @@ class MatchService
         $match->setDateMatch(new \DateTime($dateMatch));
         $match->setLieu($lieu);
         if ($lieu !== null && $lieu !== '') {
-            $coords = $this->geocodage->geocoder($lieu);
-            $match->setLatitude($coords['latitude'] ?? null);
-            $match->setLongitude($coords['longitude'] ?? null);
+            [$lat, $lng] = $this->validerCoordonnees($latitude, $longitude);
+            $match->setLatitude($lat);
+            $match->setLongitude($lng);
         }
         $match->setDescription($description);
         $match->setStatut(StatutGame::EnAttente);
@@ -106,6 +107,8 @@ class MatchService
         bool $effacerNiveau = false,
         ?string $dateMatch = null,
         ?string $lieu = null,
+        ?float $latitude = null,
+        ?float $longitude = null,
         ?string $description = null,
         bool $effacerDescription = false,
     ): Game {
@@ -125,9 +128,9 @@ class MatchService
         if ($lieu !== null) {
             $match->setLieu($lieu);
             if ($lieu !== '') {
-                $coords = $this->geocodage->geocoder($lieu);
-                $match->setLatitude($coords['latitude'] ?? null);
-                $match->setLongitude($coords['longitude'] ?? null);
+                [$lat, $lng] = $this->validerCoordonnees($latitude, $longitude);
+                $match->setLatitude($lat);
+                $match->setLongitude($lng);
             } else {
                 $match->setLatitude(null);
                 $match->setLongitude(null);
@@ -460,6 +463,15 @@ class MatchService
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /** Valide que lat/lng sont dans les plages géographiques légales. Retourne [null, null] si invalides. */
+    private function validerCoordonnees(?float $lat, ?float $lng): array
+    {
+        if ($lat === null || $lng === null || $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+            return [null, null];
+        }
+        return [$lat, $lng];
+    }
 
     private function validerScoresResultat(Game $match, int $scoreCamp1, int $scoreCamp2): void
     {

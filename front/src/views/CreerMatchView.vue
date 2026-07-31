@@ -6,6 +6,7 @@ import { creerMatch, chargerEquipes } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import type { NiveauRef } from '@/services/api'
 import { CircleCheck, Users, Zap } from 'lucide-vue-next'
+import ChampLieuAutoComplete from '@/components/form/ChampLieuAutoComplete.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -22,6 +23,8 @@ const form = ref({
   equipeId:       '' as number | '',
   dateMatch:      '',
   lieu:           '',
+  latitude:       null as number | null,
+  longitude:      null as number | null,
   niveauRequisId: '' as number | '',
   description:    '',
 })
@@ -88,6 +91,8 @@ async function soumettre() {
       sportId:        form.value.sportId,
       dateMatch:      form.value.dateMatch,
       lieu:           form.value.lieu,
+      latitude:       form.value.latitude,
+      longitude:      form.value.longitude,
       niveauRequisId: form.value.niveauRequisId !== '' ? form.value.niveauRequisId : undefined,
       description:    form.value.description || undefined,
       equipeId:       form.value.equipeId !== '' ? form.value.equipeId : undefined,
@@ -217,13 +222,11 @@ function annuler() {
 
               <div class="champ-groupe">
                 <label for="lieu">Lieu <span class="obligatoire">*</span></label>
-                <input
-                  id="lieu"
-                  v-model="form.lieu"
-                  type="text"
-                  class="champ"
-                  placeholder="Adresse ou terrain"
-                  required
+                <ChampLieuAutoComplete
+                  v-model:lieu="form.lieu"
+                  v-model:latitude="form.latitude"
+                  v-model:longitude="form.longitude"
+                  :required="true"
                 />
               </div>
 
