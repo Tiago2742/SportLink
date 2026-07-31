@@ -103,14 +103,6 @@ class MatchController extends AbstractController
             return $this->json(['erreur' => "Vous n'avez pas déclaré ce sport dans votre profil."], 422);
         }
 
-        $niveauRequis = null;
-        if (!empty($donnees['niveauRequisId'])) {
-            $niveauRequis = $this->niveauRepository->find((int) $donnees['niveauRequisId']);
-            if (!$niveauRequis || $niveauRequis->getSport() !== $sport) {
-                return $this->json(['erreur' => 'Niveau invalide ou non rattaché à ce sport.'], 422);
-            }
-        }
-
         $equipeId  = !empty($donnees['equipeId']) ? (int) $donnees['equipeId'] : null;
         $latitude  = isset($donnees['latitude'])  ? (float) $donnees['latitude']  : null;
         $longitude = isset($donnees['longitude']) ? (float) $donnees['longitude'] : null;
@@ -118,7 +110,6 @@ class MatchController extends AbstractController
         try {
             $match = $this->matchService->creer(
                 $sport,
-                $niveauRequis,
                 $donnees['dateMatch'],
                 $donnees['lieu'] ?? null,
                 $this->getUser(),

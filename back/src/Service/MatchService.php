@@ -15,15 +15,17 @@ use App\Enum\StatutMatchCamp;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Repository\EquipeRepository;
+use App\Repository\UtilisateurNiveauRepository;
 use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 class MatchService
 {
     public function __construct(
-        private EntityManagerInterface $em,
-        private EquipeRepository       $equipeRepository,
-        private UtilisateurRepository  $utilisateurRepository,
+        private EntityManagerInterface      $em,
+        private EquipeRepository            $equipeRepository,
+        private UtilisateurRepository       $utilisateurRepository,
+        private UtilisateurNiveauRepository $utilisateurNiveauRepository,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -32,7 +34,6 @@ class MatchService
 
     public function creer(
         Sport $sport,
-        ?Niveau $niveauRequis,
         string $dateMatch,
         ?string $lieu,
         Utilisateur $createur,
@@ -41,10 +42,28 @@ class MatchService
         ?float $latitude = null,
         ?float $longitude = null,
     ): Game {
+        // Guard : la date doit être dans le futur (comparaison POSIX, timezone-safe)
+        $dateMatchDT = new \DateTimeImmutable($dateMatch);
+        if ($dateMatchDT->getTimestamp() <= (new \DateTimeImmutable())->getTimestamp()) {
+            throw new \InvalidArgumentException('La date du match doit être dans le futur.');
+        }
+
+        // Déduction automatique du niveau requis
+        $niveauRequis = null;
+        if ($sport->getType() === TypeSport::Individuel) {
+            $univ = $this->utilisateurNiveauRepository->findOneBy([
+                'utilisateur' => $createur,
+                'sport'       => $sport,
+            ]);
+            $niveauRequis = $univ?->getNiveau();
+        } elseif ($equipeId !== null) {
+            $niveauRequis = $this->equipeRepository->find($equipeId)?->getNiveau();
+        }
+
         $match = new Game();
         $match->setSport($sport);
         $match->setNiveauRequis($niveauRequis);
-        $match->setDateMatch(new \DateTime($dateMatch));
+        $match->setDateMatch(\DateTime::createFromImmutable($dateMatchDT));
         $match->setLieu($lieu);
         if ($lieu !== null && $lieu !== '') {
             [$lat, $lng] = $this->validerCoordonnees($latitude, $longitude);
@@ -124,7 +143,13 @@ class MatchService
         if ($sport !== null)                   $match->setSport($sport);
         if ($niveauRequis !== null)            $match->setNiveauRequis($niveauRequis);
         elseif ($effacerNiveau)                $match->setNiveauRequis(null);
-        if ($dateMatch !== null)               $match->setDateMatch(new \DateTime($dateMatch));
+        if ($dateMatch !== null) {
+            $nouvelleDateDT = new \DateTimeImmutable($dateMatch);
+            if ($nouvelleDateDT->getTimestamp() <= (new \DateTimeImmutable())->getTimestamp()) {
+                throw new \InvalidArgumentException('La nouvelle date du match doit être dans le futur.');
+            }
+            $match->setDateMatch(\DateTime::createFromImmutable($nouvelleDateDT));
+        }
         if ($lieu !== null) {
             $match->setLieu($lieu);
             if ($lieu !== '') {

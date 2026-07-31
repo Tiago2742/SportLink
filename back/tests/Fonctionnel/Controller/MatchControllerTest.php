@@ -444,24 +444,6 @@ class MatchControllerTest extends BaseTestFonctionnel
     // C2 — Niveau incompatible avec le sport du match
     // =========================================================================
 
-    public function testCreerMatchNiveauIncompatibleRefuse(): void
-    {
-        $tennis   = $this->getSport('Tennis');
-        $football = $this->getSport('Football');
-        $joueur   = $this->creerUtilisateur('joueur.c2a@test.fr', TypeUtilisateur::Joueur, $tennis);
-        $niveauFoot = $this->getPremierNiveau($football);
-
-        // Tenter de créer un match Tennis en spécifiant un niveau Football (R4)
-        $this->requeteAuth('POST', '/api/matchs', $this->obtenirToken($joueur), [
-            'sportId'       => $tennis->getId(),
-            'niveauRequisId' => $niveauFoot->getId(),
-            'dateMatch'     => (new \DateTime('+30 days'))->format('Y-m-d H:i'),
-            'lieu'          => 'Court test',
-        ]);
-
-        $this->assertStatut(422);
-    }
-
     public function testModifierMatchNiveauIncompatibleRefuse(): void
     {
         $tennis   = $this->getSport('Tennis');
@@ -477,6 +459,67 @@ class MatchControllerTest extends BaseTestFonctionnel
         ]);
 
         $this->assertStatut(422);
+    }
+
+    // =========================================================================
+    // C7 — Date future obligatoire + niveau déduit automatiquement
+    // =========================================================================
+
+    public function testCreerMatchDatePasseeRefuse(): void
+    {
+        $tennis = $this->getSport('Tennis');
+        $joueur = $this->creerUtilisateur('joueur.c7a@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        $this->requeteAuth('POST', '/api/matchs', $this->obtenirToken($joueur), [
+            'sportId'   => $tennis->getId(),
+            'dateMatch' => (new \DateTime('-1 day'))->format('Y-m-d H:i'),
+            'lieu'      => 'Court test',
+        ]);
+
+        $this->assertStatut(422);
+        $this->assertStringContainsString('futur', $this->reponseJson()['erreur']);
+    }
+
+    public function testNiveauDeduiteJoueurIndividuel(): void
+    {
+        $tennis = $this->getSport('Tennis');
+        $joueur = $this->creerUtilisateur('joueur.c7b@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        $this->requeteAuth('POST', '/api/matchs', $this->obtenirToken($joueur), [
+            'sportId'   => $tennis->getId(),
+            'dateMatch' => (new \DateTime('+30 days'))->format('Y-m-d H:i'),
+            'lieu'      => 'Court central',
+        ]);
+
+        $this->assertStatut(201);
+        $reponse = $this->reponseJson();
+        $this->assertNotNull($reponse['niveauRequis'], 'Le niveau requis doit être déduit du profil du joueur.');
+        $niveauAttendu = $this->getPremierNiveau($tennis);
+        $this->assertSame($niveauAttendu->getId(), $reponse['niveauRequis']['id']);
+    }
+
+    public function testNiveauDeduiteEquipeCollectif(): void
+    {
+        $football = $this->getSport('Football');
+        $club     = $this->creerUtilisateur('club.c7c@test.fr', TypeUtilisateur::Club, $football);
+        $equipe   = $this->creerEquipe($club, $football, 'AS Niveau FC');
+
+        // Ajouter un niveau à l'équipe (non défini par défaut dans creerEquipe)
+        $niveauFoot = $this->getPremierNiveau($football);
+        $equipe->setNiveau($niveauFoot);
+        $this->em->flush();
+
+        $this->requeteAuth('POST', '/api/matchs', $this->obtenirToken($club), [
+            'sportId'   => $football->getId(),
+            'equipeId'  => $equipe->getId(),
+            'dateMatch' => (new \DateTime('+30 days'))->format('Y-m-d H:i'),
+            'lieu'      => 'Stade municipal',
+        ]);
+
+        $this->assertStatut(201);
+        $reponse = $this->reponseJson();
+        $this->assertNotNull($reponse['niveauRequis'], 'Le niveau requis doit être déduit du niveau de l\'équipe.');
+        $this->assertSame($niveauFoot->getId(), $reponse['niveauRequis']['id']);
     }
 
     // =========================================================================

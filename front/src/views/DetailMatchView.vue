@@ -332,9 +332,9 @@ function formaterHeure(dateStr: string) {
                 <span class="info-icone" aria-hidden="true"><MapPin :size="18" stroke-width="2.25" /></span>
                 {{ match.lieu }}
               </li>
-              <li v-if="match.niveauRequis">
+              <li>
                 <span class="info-icone" aria-hidden="true"><Target :size="18" stroke-width="2.25" /></span>
-                Niveau : {{ match.niveauRequis?.libelle }}
+                Niveau : {{ match.niveauRequis?.libelle ?? 'Tous niveaux' }}
               </li>
               <li>
                 <span class="info-icone" aria-hidden="true"><User :size="18" stroke-width="2.25" /></span>
@@ -345,6 +345,38 @@ function formaterHeure(dateStr: string) {
                 <span>{{ match.description }}</span>
               </li>
             </ul>
+          </section>
+
+          <!-- Confrontation : équipes ou joueurs engagés -->
+          <section class="carte section-camps">
+            <h2 class="section-h2">{{ sportCollectif ? 'Équipes engagées' : 'Joueurs engagés' }}</h2>
+            <div class="camps-matchup">
+              <div class="camp-bloc">
+                <span class="camp-label">Camp 1</span>
+                <template v-if="camp1?.equipe">
+                  <strong class="camp-principal">{{ camp1.equipe.nom }}</strong>
+                  <span class="camp-secondaire">{{ nomAffichage(camp1.equipe.club) }}</span>
+                </template>
+                <template v-else-if="camp1?.joueur">
+                  <strong class="camp-principal">{{ nomAffichage(camp1.joueur) }}</strong>
+                </template>
+                <span v-else class="camp-vide">—</span>
+              </div>
+
+              <span class="camps-vs" aria-hidden="true">VS</span>
+
+              <div class="camp-bloc camp-bloc-adversaire">
+                <span class="camp-label">Camp 2</span>
+                <template v-if="camp2?.equipe">
+                  <strong class="camp-principal">{{ camp2.equipe.nom }}</strong>
+                  <span class="camp-secondaire">{{ nomAffichage(camp2.equipe.club) }}</span>
+                </template>
+                <template v-else-if="camp2?.joueur">
+                  <strong class="camp-principal">{{ nomAffichage(camp2.joueur) }}</strong>
+                </template>
+                <span v-else class="camp-recherche">Recherche un adversaire…</span>
+              </div>
+            </div>
           </section>
 
           <!-- Carte du lieu -->
@@ -719,10 +751,75 @@ function formaterHeure(dateStr: string) {
 }
 
 .section-infos,
+.section-camps,
 .section-resultat,
 .section-messages,
 .section-participation {
   padding: var(--espace-l);
+}
+
+/* ══════════════════════════════════════
+   CONFRONTATION (équipes / joueurs)
+══════════════════════════════════════ */
+.camps-matchup {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--espace-m);
+  padding: var(--espace-s) 0;
+}
+
+.camp-bloc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.camp-bloc-adversaire {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.camp-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--couleur-texte-discret);
+}
+
+.camp-principal {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+  line-height: 1.2;
+}
+
+.camp-secondaire {
+  font-size: 0.8rem;
+  color: var(--couleur-texte-discret);
+}
+
+.camp-recherche {
+  font-size: 0.85rem;
+  color: var(--couleur-texte-discret);
+  font-style: italic;
+}
+
+.camp-vide {
+  font-size: 0.85rem;
+  color: var(--couleur-texte-discret);
+}
+
+.camps-vs {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--couleur-primaire);
+  background: var(--couleur-primaire-tres-claire);
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--rayon-badge);
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
 }
 
 .section-h2 {
