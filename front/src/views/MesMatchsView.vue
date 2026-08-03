@@ -2,7 +2,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMesMatchs, chargerMesMatchsEquipes } from '@/services/api'
+import { chargerMesMatchs, chargerMesMatchsEquipes, chargerMesStats } from '@/services/api'
+import type { MesStats, StatBloc } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import BadgeCompteur from '@/components/ui/BadgeCompteur.vue'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
@@ -13,6 +14,7 @@ const router = useRouter()
 
 const matchs = ref<any[]>([])
 const matchsEquipes = ref<any[]>([])
+const mesStats = ref<MesStats | null>(null)
 const chargement = ref(true)
 const erreur = ref('')
 const filtreStatut = ref('')
@@ -26,14 +28,21 @@ async function charger() {
   const userId = auth.utilisateur?.id
   try {
     if (auth.utilisateur?.type === 'joueur') {
-      const [individuels, equipes] = await Promise.all([
+      const [individuels, equipes, stats] = await Promise.all([
         userId ? chargerMesMatchs(auth.token!) : Promise.resolve([]),
         userId ? chargerMesMatchsEquipes(auth.token!) : Promise.resolve([]),
+        chargerMesStats(auth.token!),
       ])
       matchs.value = individuels
       matchsEquipes.value = equipes
+      mesStats.value = stats
     } else {
-      matchs.value = userId ? await chargerMesMatchs(auth.token!) : []
+      const [liste, stats] = await Promise.all([
+        userId ? chargerMesMatchs(auth.token!) : Promise.resolve([]),
+        chargerMesStats(auth.token!),
+      ])
+      matchs.value = liste
+      mesStats.value = stats
     }
   } catch {
     erreur.value = 'Impossible de charger vos matchs.'
@@ -120,6 +129,61 @@ function formaterDate(dateStr: string) {
           <p class="sous-titre">Matchs que vous organisez ou auxquels vous participez</p>
         </div>
         <RouterLink to="/creer-match" class="btn btn-primaire">+ Créer un match</RouterLink>
+      </div>
+
+      <!-- ── Stats ── -->
+      <div v-if="mesStats" class="stats-grille" :class="{ 'stats-grille--deux': mesStats.equipes !== null }">
+        <div class="stats-bloc">
+          <p class="stats-bloc-titre">{{ mesStats.equipes !== null ? 'Matchs individuels' : 'Bilan' }}</p>
+          <div class="stats-compteurs">
+            <div class="stat-item">
+              <span class="stat-val">{{ mesStats.individuels.joues }}</span>
+              <span class="stat-lbl">Joués</span>
+            </div>
+            <div class="stat-item stat-item--victoire">
+              <span class="stat-val">{{ mesStats.individuels.victoires }}</span>
+              <span class="stat-lbl">Victoires</span>
+            </div>
+            <div class="stat-item stat-item--nul">
+              <span class="stat-val">{{ mesStats.individuels.nuls }}</span>
+              <span class="stat-lbl">Nuls</span>
+            </div>
+            <div class="stat-item stat-item--defaite">
+              <span class="stat-val">{{ mesStats.individuels.defaites }}</span>
+              <span class="stat-lbl">Défaites</span>
+            </div>
+            <div class="stat-item stat-item--ratio">
+              <span class="stat-val">{{ mesStats.individuels.joues > 0 ? mesStats.individuels.ratio + ' %' : '—' }}</span>
+              <span class="stat-lbl">Victoires</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="mesStats.equipes !== null" class="stats-bloc">
+          <p class="stats-bloc-titre">Matchs d'équipe</p>
+          <div class="stats-compteurs">
+            <div class="stat-item">
+              <span class="stat-val">{{ mesStats.equipes.joues }}</span>
+              <span class="stat-lbl">Joués</span>
+            </div>
+            <div class="stat-item stat-item--victoire">
+              <span class="stat-val">{{ mesStats.equipes.victoires }}</span>
+              <span class="stat-lbl">Victoires</span>
+            </div>
+            <div class="stat-item stat-item--nul">
+              <span class="stat-val">{{ mesStats.equipes.nuls }}</span>
+              <span class="stat-lbl">Nuls</span>
+            </div>
+            <div class="stat-item stat-item--defaite">
+              <span class="stat-val">{{ mesStats.equipes.defaites }}</span>
+              <span class="stat-lbl">Défaites</span>
+            </div>
+            <div class="stat-item stat-item--ratio">
+              <span class="stat-val">{{ mesStats.equipes.joues > 0 ? mesStats.equipes.ratio + ' %' : '—' }}</span>
+              <span class="stat-lbl">Victoires</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── Onglets joueur ── -->
@@ -682,6 +746,91 @@ function formaterDate(dateStr: string) {
   font-size: 0.88rem;
   color: var(--couleur-texte-discret);
   max-width: 280px;
+}
+
+/* ══════════════════════════════════════
+   STATS
+══════════════════════════════════════ */
+.stats-grille {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--espace-m);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.stats-grille--deux {
+  grid-template-columns: 1fr 1fr;
+}
+
+.stats-bloc {
+  background: white;
+  border: 1.5px solid #dde8dd;
+  border-radius: var(--rayon-carte);
+  padding: var(--espace-l);
+  position: relative;
+  overflow: hidden;
+}
+
+.stats-bloc::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--degrade-primaire);
+}
+
+.stats-bloc-titre {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--couleur-texte-discret);
+  margin-bottom: var(--espace-m);
+}
+
+.stats-compteurs {
+  display: flex;
+  gap: var(--espace-l);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 44px;
+}
+
+.stat-val {
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--couleur-titre);
+}
+
+.stat-lbl {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--couleur-texte-discret);
+}
+
+.stat-item--victoire .stat-val { color: #2e7d32; }
+.stat-item--nul      .stat-val { color: #795548; }
+.stat-item--defaite  .stat-val { color: #c0392b; }
+
+.stat-item--ratio {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.stat-item--ratio .stat-val {
+  font-size: 1.35rem;
+  color: var(--couleur-primaire-foncee, #388e3c);
 }
 
 /* ══════════════════════════════════════

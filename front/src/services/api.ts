@@ -238,3 +238,20 @@ export const deposerAvis = (
 
 export const chargerProfilPublic = (token: string, id: number) =>
   requete('GET', `/profils/${id}`, null, token)
+
+// Stats matchs
+export interface StatBloc {
+  joues:     number
+  victoires: number
+  defaites:  number
+  nuls:      number
+  ratio:     number
+}
+
+export interface MesStats {
+  individuels: StatBloc
+  equipes:     StatBloc | null
+}
+
+export const chargerMesStats = (token: string): Promise<MesStats> =>
+  requete('GET', '/stats', null, token)

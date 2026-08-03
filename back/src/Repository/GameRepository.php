@@ -159,4 +159,67 @@ class GameRepository extends ServiceEntityRepository
 
         return $qb->orderBy('g.dateMatch', 'ASC')->getQuery()->getResult();
     }
+
+    /**
+     * Matchs terminés avec résultat pour le participant direct (joueur / club).
+     * Utilisé par StatMatchService — join explicite sur resultat pour éviter
+     * le chargement lazy de la relation inverse OneToOne.
+     *
+     * @return Game[]
+     */
+    public function trouverTerminesAvecResultatPourParticipant(int $utilisateurId): array
+    {
+        $qb = $this->createQueryBuilder('g')
+            ->distinct()
+            ->addSelect('s', 'n', 'c', 'camps', 'res')
+            ->leftJoin('g.sport', 's')
+            ->leftJoin('g.niveauRequis', 'n')
+            ->leftJoin('g.createur', 'c')
+            ->leftJoin('g.camps', 'camps')
+            ->innerJoin('g.resultat', 'res')
+            ->andWhere('g.statut = :statut')
+            ->setParameter('statut', 'termine');
+
+        $qb->andWhere($qb->expr()->orX(
+            'c.id = :userId',
+            'EXISTS (SELECT 1 FROM App\Entity\MatchCamp mcj JOIN mcj.joueur u WHERE mcj.game = g AND u.id = :userId)',
+            'EXISTS (SELECT 1 FROM App\Entity\MatchCamp mce JOIN mce.equipe eq JOIN eq.club cl WHERE mce.game = g AND cl.id = :userId)',
+        ))
+            ->setParameter('userId', $utilisateurId);
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Matchs terminés avec résultat pour les équipes dont le joueur est membre confirmé.
+     * Utilisé par StatMatchService.
+     *
+     * @return Game[]
+     */
+    public function trouverTerminesAvecResultatPourEquipesJoueur(int $joueurId): array
+    {
+        return $this->createQueryBuilder('g')
+            ->distinct()
+            ->addSelect('s', 'n', 'c', 'camps', 'res')
+            ->leftJoin('g.sport', 's')
+            ->leftJoin('g.niveauRequis', 'n')
+            ->leftJoin('g.createur', 'c')
+            ->leftJoin('g.camps', 'camps')
+            ->innerJoin('g.resultat', 'res')
+            ->andWhere('g.statut = :statut')
+            ->setParameter('statut', 'termine')
+            ->andWhere('EXISTS (
+                SELECT 1 FROM App\Entity\MatchCamp mc
+                JOIN mc.equipe e
+                JOIN e.membres ej
+                JOIN ej.utilisateur u
+                WHERE mc.game = g
+                AND u.id = :joueurId
+                AND ej.statut = :statutMembre
+            )')
+            ->setParameter('joueurId', $joueurId)
+            ->setParameter('statutMembre', 'confirme')
+            ->getQuery()
+            ->getResult();
+    }
 }
