@@ -118,6 +118,10 @@ export const repondreCamp = (token: string, matchId: number, campId: number, sta
 export const mettreAJourLogo = (token: string, logo: string | null) =>
   requete('PATCH', '/profil/logo', { logo }, token)
 
+// Profil — mot de passe
+export const changerMotDePasse = (token: string, ancienMotDePasse: string, nouveauMotDePasse: string) =>
+  requete('PATCH', '/profil/mot-de-passe', { ancienMotDePasse, nouveauMotDePasse }, token)
+
 // Profil — sports/niveaux
 export const ajouterSportNiveau = (token: string, sportId: number, niveauId: number) =>
   requete('POST', '/profil/sports', { sportId, niveauId }, token)

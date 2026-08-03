@@ -3,19 +3,19 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
-  chargerMesMatchs,
   chargerEquipes,
   chargerProfil,
   mettreAJourLogo,
   ajouterSportNiveau,
   modifierNiveauSport,
   supprimerCompte,
+  changerMotDePasse,
 } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import IconeSection from '@/components/ui/IconeSection.vue'
 import SelecteurSportNiveau from '@/components/form/SelecteurSportNiveau.vue'
 import type { EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
-import { AlertTriangle, Calendar, Image, KeyRound, Lock, Pencil, Star, Trash2, Trophy, Users } from 'lucide-vue-next'
+import { AlertTriangle, Image, KeyRound, Lock, Pencil, Star, Trash2, Trophy, Users } from 'lucide-vue-next'
 
 const auth    = useAuthStore()
 const router  = useRouter()
@@ -23,7 +23,6 @@ const { niveauxPour } = useSports()
 
 const profil      = ref<any>(auth.utilisateur)
 const mesEquipes  = ref<any[]>([])
-const mesMatchs   = ref<any[]>([])
 const chargement  = ref(true)
 
 // ── Édition profil ────────────────────────────────────────────────────────────
@@ -47,14 +46,12 @@ onMounted(async () => {
   const userId = auth.utilisateur?.id
   if (!userId) { chargement.value = false; return }
   try {
-    const [profilFrais, matchs, equipes] = await Promise.all([
+    const [profilFrais, equipes] = await Promise.all([
       chargerProfil(auth.token!),
-      chargerMesMatchs(auth.token!),
       chargerEquipes(auth.token!, { clubId: userId }),
     ])
-    profil.value = profilFrais
+    profil.value     = profilFrais
     auth.rafraichirProfil(profilFrais)
-    mesMatchs.value  = matchs
     mesEquipes.value = equipes
   } finally {
     chargement.value = false
@@ -79,13 +76,6 @@ const nomComplet = computed(() =>
 
 const typeLabel = computed(() =>
   profil.value?.type === 'club' ? 'Club / Association' : 'Joueur',
-)
-
-const matchsAvenir = computed(() =>
-  mesMatchs.value.filter((m) => new Date(m.dateMatch) >= new Date()),
-)
-const matchsPasses = computed(() =>
-  mesMatchs.value.filter((m) => new Date(m.dateMatch) < new Date()),
 )
 
 // IDs des sports déjà déclarés par l'utilisateur
@@ -177,6 +167,56 @@ async function onAjoutSport(liste: EntreeSportNiveau[]) {
   }
 }
 
+// ── Changement de mot de passe ───────────────────────────────────────────────
+const modeChangementMdp  = ref(false)
+const formMdp            = ref({ ancien: '', nouveau: '', confirmation: '' })
+const erreurMdp          = ref('')
+const succesMdp          = ref(false)
+const enregistreMdp      = ref(false)
+
+const reglesMdp = computed(() => ({
+  longueur: formMdp.value.nouveau.length >= 8,
+  lettre:   /[a-zA-Z]/.test(formMdp.value.nouveau),
+  chiffre:  /[0-9]/.test(formMdp.value.nouveau),
+}))
+const mdpValide  = computed(() => Object.values(reglesMdp.value).every(Boolean))
+const confirmOk  = computed(() =>
+  formMdp.value.confirmation !== '' && formMdp.value.nouveau === formMdp.value.confirmation
+)
+const peutSoumettre = computed(() => formMdp.value.ancien !== '' && mdpValide.value && confirmOk.value)
+
+function ouvrirChangementMdp() {
+  formMdp.value = { ancien: '', nouveau: '', confirmation: '' }
+  erreurMdp.value  = ''
+  succesMdp.value  = false
+  modeChangementMdp.value = true
+}
+
+function annulerChangementMdp() {
+  modeChangementMdp.value = false
+  erreurMdp.value = ''
+}
+
+async function soumettreChangementMdp() {
+  if (!peutSoumettre.value || enregistreMdp.value) return
+  enregistreMdp.value = true
+  erreurMdp.value     = ''
+  succesMdp.value     = false
+  try {
+    await changerMotDePasse(auth.token!, formMdp.value.ancien, formMdp.value.nouveau)
+    succesMdp.value = true
+    formMdp.value   = { ancien: '', nouveau: '', confirmation: '' }
+    setTimeout(() => {
+      modeChangementMdp.value = false
+      succesMdp.value         = false
+    }, 2500)
+  } catch (e: any) {
+    erreurMdp.value = e?.body?.erreur ?? e?.message ?? 'Une erreur est survenue.'
+  } finally {
+    enregistreMdp.value = false
+  }
+}
+
 // ── Suppression de compte ─────────────────────────────────────────────────────
 const showModaleSupression  = ref(false)
 const suppressionEnCours    = ref(false)
@@ -223,7 +263,7 @@ function formaterDate(dateStr: string) {
         <div>
           <span class="page-eyebrow">Mon profil</span>
           <h1 class="page-titre">{{ nomComplet || 'Mon profil' }}</h1>
-          <p class="sous-titre">Gérez vos informations personnelles et vos activités sportives</p>
+          <p class="sous-titre">Gérez votre identité, vos sports et les paramètres de votre compte</p>
         </div>
       </div>
 
@@ -310,6 +350,58 @@ function formaterDate(dateStr: string) {
                 <Pencil :size="15" aria-hidden="true" />
                 Modifier
               </button>
+            </div>
+
+            <!-- Réputation — intégrée à l'identité -->
+            <div class="profil-sep" aria-hidden="true"></div>
+            <div class="profil-reputation">
+              <div class="rep-entete">
+                <IconeSection :icone="Star" label="Réputation" />
+                <span class="rep-titre">Réputation</span>
+                <span v-if="profil?.reputation?.total" class="section-badge">
+                  {{ profil.reputation.total }} avis
+                </span>
+              </div>
+              <template v-if="profil?.reputation">
+                <div class="reputation-grille">
+                  <div class="reputation-critere">
+                    <span class="reputation-label">Ponctualité</span>
+                    <div class="reputation-score">
+                      <span class="reputation-note">{{ profil.reputation.ponctualite.toFixed(1) }}</span>
+                      <div class="etoiles" aria-hidden="true">
+                        <span v-for="i in 5" :key="i" class="etoile"
+                          :class="{ 'etoile--active': i <= Math.round(profil.reputation.ponctualite) }">★</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="reputation-critere">
+                    <span class="reputation-label">Fair-play</span>
+                    <div class="reputation-score">
+                      <span class="reputation-note">{{ profil.reputation.fairPlay.toFixed(1) }}</span>
+                      <div class="etoiles" aria-hidden="true">
+                        <span v-for="i in 5" :key="i" class="etoile"
+                          :class="{ 'etoile--active': i <= Math.round(profil.reputation.fairPlay) }">★</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="reputation-critere">
+                    <span class="reputation-label">Niveau conforme</span>
+                    <div class="reputation-score">
+                      <span class="reputation-note">{{ profil.reputation.niveauConforme.toFixed(1) }}</span>
+                      <div class="etoiles" aria-hidden="true">
+                        <span v-for="i in 5" :key="i" class="etoile"
+                          :class="{ 'etoile--active': i <= Math.round(profil.reputation.niveauConforme) }">★</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p class="reputation-total">
+                  Basé sur {{ profil.reputation.total }} évaluation{{ profil.reputation.total > 1 ? 's' : '' }}
+                </p>
+              </template>
+              <p v-else class="section-desc rep-vide">
+                Aucune évaluation reçue pour le moment — les avis apparaîtront ici après vos matchs terminés.
+              </p>
             </div>
           </template>
 
@@ -416,83 +508,87 @@ function formaterDate(dateStr: string) {
           </div>
         </section>
 
-        <!-- ── Carte Réputation ── -->
-        <section class="carte section-reputation">
+        <!-- ── BLOC 3 : Sécurité & Compte ── -->
+        <section class="carte section-securite">
           <div class="section-titre-icone">
-            <IconeSection :icone="Star" label="Réputation" />
-            <h2>Réputation</h2>
-            <span v-if="profil?.reputation?.total" class="section-badge">
-              {{ profil.reputation.total }} avis
-            </span>
+            <IconeSection :icone="Lock" label="Sécurité" />
+            <h2>Sécurité & Compte</h2>
           </div>
+            <!-- Formulaire changement de mot de passe -->
+            <template v-if="!modeChangementMdp">
+              <p class="section-desc">Modifiez votre mot de passe pour sécuriser votre compte.</p>
+              <button class="btn btn-primaire" @click="ouvrirChangementMdp">
+                <KeyRound :size="16" aria-hidden="true" />
+                Changer mot de passe
+              </button>
+            </template>
 
-          <template v-if="profil?.reputation">
-            <div class="reputation-grille">
-              <div class="reputation-critere">
-                <span class="reputation-label">Ponctualité</span>
-                <div class="reputation-score">
-                  <span class="reputation-note">{{ profil.reputation.ponctualite.toFixed(1) }}</span>
-                  <div class="etoiles" aria-hidden="true">
-                    <span
-                      v-for="i in 5" :key="i"
-                      class="etoile"
-                      :class="{ 'etoile--active': i <= Math.round(profil.reputation.ponctualite) }"
-                    >★</span>
-                  </div>
-                </div>
+            <template v-else>
+              <div v-if="succesMdp" class="alerte alerte-succes mdp-succes">
+                Mot de passe modifié avec succès !
               </div>
-              <div class="reputation-critere">
-                <span class="reputation-label">Fair-play</span>
-                <div class="reputation-score">
-                  <span class="reputation-note">{{ profil.reputation.fairPlay.toFixed(1) }}</span>
-                  <div class="etoiles" aria-hidden="true">
-                    <span
-                      v-for="i in 5" :key="i"
-                      class="etoile"
-                      :class="{ 'etoile--active': i <= Math.round(profil.reputation.fairPlay) }"
-                    >★</span>
-                  </div>
+              <template v-else>
+                <div v-if="erreurMdp" class="alerte alerte-erreur">{{ erreurMdp }}</div>
+
+                <div class="champ-groupe">
+                  <label for="mdp-ancien">Ancien mot de passe</label>
+                  <input
+                    id="mdp-ancien"
+                    v-model="formMdp.ancien"
+                    type="password"
+                    class="champ"
+                    autocomplete="current-password"
+                    @keyup.enter="soumettreChangementMdp"
+                  />
                 </div>
-              </div>
-              <div class="reputation-critere">
-                <span class="reputation-label">Niveau conforme</span>
-                <div class="reputation-score">
-                  <span class="reputation-note">{{ profil.reputation.niveauConforme.toFixed(1) }}</span>
-                  <div class="etoiles" aria-hidden="true">
-                    <span
-                      v-for="i in 5" :key="i"
-                      class="etoile"
-                      :class="{ 'etoile--active': i <= Math.round(profil.reputation.niveauConforme) }"
-                    >★</span>
-                  </div>
+
+                <div class="champ-groupe">
+                  <label for="mdp-nouveau">Nouveau mot de passe</label>
+                  <input
+                    id="mdp-nouveau"
+                    v-model="formMdp.nouveau"
+                    type="password"
+                    class="champ"
+                    autocomplete="new-password"
+                    @keyup.enter="soumettreChangementMdp"
+                  />
+                  <ul v-if="formMdp.nouveau" class="mdp-regles">
+                    <li :class="reglesMdp.longueur ? 'regle--ok' : 'regle--ko'">8 caractères minimum</li>
+                    <li :class="reglesMdp.lettre   ? 'regle--ok' : 'regle--ko'">Au moins une lettre</li>
+                    <li :class="reglesMdp.chiffre  ? 'regle--ok' : 'regle--ko'">Au moins un chiffre</li>
+                  </ul>
                 </div>
-              </div>
-            </div>
-            <p class="reputation-total">
-              Basé sur {{ profil.reputation.total }} évaluation{{ profil.reputation.total > 1 ? 's' : '' }}
-            </p>
-          </template>
 
-          <template v-else>
-            <p class="section-desc">Aucune évaluation reçue pour le moment.</p>
-            <p class="reputation-sous-desc">Les évaluations apparaîtront ici après vos matchs terminés.</p>
-          </template>
-        </section>
+                <div class="champ-groupe">
+                  <label for="mdp-confirm">Confirmer le nouveau mot de passe</label>
+                  <input
+                    id="mdp-confirm"
+                    v-model="formMdp.confirmation"
+                    type="password"
+                    class="champ"
+                    :class="{ 'champ--erreur': formMdp.confirmation && !confirmOk }"
+                    autocomplete="new-password"
+                    @keyup.enter="soumettreChangementMdp"
+                  />
+                  <p v-if="formMdp.confirmation && !confirmOk" class="mdp-non-conforme">
+                    Les mots de passe ne correspondent pas.
+                  </p>
+                </div>
 
-        <!-- ── Grid secondaire (sécurité + équipes) ── -->
-        <div class="profil-grille-sec">
-
-          <section class="carte section-sec">
-            <div class="section-titre-icone">
-              <IconeSection :icone="Lock" label="Sécurité" />
-              <h2>Sécurité</h2>
-            </div>
-            <p class="section-desc">Modifiez votre mot de passe pour sécuriser votre compte.</p>
-            <button class="btn btn-primaire" disabled>
-              <KeyRound :size="16" aria-hidden="true" />
-              Changer mot de passe
-            </button>
-            <p class="bientot">Fonctionnalité à venir</p>
+                <div class="mdp-actions">
+                  <button
+                    class="btn btn-primaire btn-sm"
+                    :disabled="!peutSoumettre || enregistreMdp"
+                    @click="soumettreChangementMdp"
+                  >
+                    {{ enregistreMdp ? 'Enregistrement…' : 'Enregistrer' }}
+                  </button>
+                  <button class="btn btn-secondaire btn-sm" @click="annulerChangementMdp">
+                    Annuler
+                  </button>
+                </div>
+              </template>
+            </template>
 
             <div class="zone-danger">
               <p class="zone-danger-titre">Zone de danger</p>
@@ -505,59 +601,24 @@ function formaterDate(dateStr: string) {
                 Supprimer mon compte
               </button>
             </div>
-          </section>
+        </section>
 
-          <section v-if="profil?.type === 'club'" class="carte section-sec">
-            <div class="section-titre-icone">
-              <IconeSection :icone="Users" label="Mes équipes" />
-              <h2>Mes équipes</h2>
-              <span v-if="mesEquipes.length > 0" class="section-badge">{{ mesEquipes.length }}</span>
-            </div>
-            <p class="section-desc">
-              {{
-                mesEquipes.length === 0
-                  ? 'Aucune équipe créée pour le moment.'
-                  : `${mesEquipes.length} équipe${mesEquipes.length > 1 ? 's' : ''} enregistrée${mesEquipes.length > 1 ? 's' : ''}.`
-              }}
-            </p>
-            <RouterLink to="/mes-equipes" class="btn btn-primaire">
-              Gérer mes équipes
-            </RouterLink>
-          </section>
-
-        </div>
-
-        <!-- ── Carte matchs ── -->
-        <section class="carte section-matchs">
+        <section v-if="profil?.type === 'club'" class="carte section-equipes-club">
           <div class="section-titre-icone">
-            <IconeSection :icone="Calendar" label="Mes matchs" />
-            <h2>Mes matchs</h2>
-            <span v-if="mesMatchs.length > 0" class="section-badge">{{ mesMatchs.length }}</span>
+            <IconeSection :icone="Users" label="Mes équipes" />
+            <h2>Mes équipes</h2>
+            <span v-if="mesEquipes.length > 0" class="section-badge">{{ mesEquipes.length }}</span>
           </div>
-
-          <div v-if="mesMatchs.length === 0" class="vide-section">
-            Aucun match créé pour le moment.
-          </div>
-
-          <div v-else class="liste-matchs-profil">
-            <div
-              v-for="match in [...matchsAvenir, ...matchsPasses].slice(0, 6)"
-              :key="match.id"
-              class="item-match"
-              @click="router.push(`/matchs/${match.id}`)"
-            >
-              <div class="match-info">
-                <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
-                <span>{{ formaterDate(match.dateMatch) }}</span>
-              </div>
-              <span
-                class="statut-match"
-                :class="new Date(match.dateMatch) >= new Date() ? 'avenir' : 'passe'"
-              >
-                {{ new Date(match.dateMatch) >= new Date() ? 'À venir' : 'Terminé' }}
-              </span>
-            </div>
-          </div>
+          <p class="section-desc">
+            {{
+              mesEquipes.length === 0
+                ? 'Aucune équipe créée pour le moment.'
+                : `${mesEquipes.length} équipe${mesEquipes.length > 1 ? 's' : ''} enregistrée${mesEquipes.length > 1 ? 's' : ''}.`
+            }}
+          </p>
+          <RouterLink to="/mes-equipes" class="btn btn-primaire">
+            Gérer mes équipes
+          </RouterLink>
         </section>
 
       </template>
@@ -1013,17 +1074,12 @@ function formaterDate(dateStr: string) {
 }
 
 /* ══════════════════════════════════════
-   GRID SECONDAIRE
+   BLOC 3 — SÉCURITÉ & COMPTE
 ══════════════════════════════════════ */
-.profil-grille-sec {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--espace-m);
-  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
-}
-
-.section-sec {
+.section-securite,
+.section-equipes-club {
   padding: var(--espace-l);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
 }
 
 /* ── En-têtes de section ── */
@@ -1067,79 +1123,80 @@ function formaterDate(dateStr: string) {
   margin-top: var(--espace-s);
 }
 
+/* ── Formulaire changement de mot de passe ── */
+.champ-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: var(--espace-m);
+}
+
+.champ-groupe label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--couleur-texte-discret);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.champ--erreur {
+  border-color: #e53935 !important;
+}
+
+.mdp-non-conforme {
+  font-size: 0.78rem;
+  color: #e53935;
+  margin-top: 0.2rem;
+}
+
+.mdp-succes {
+  margin-bottom: var(--espace-m);
+}
+
+.mdp-actions {
+  display: flex;
+  gap: var(--espace-s);
+  margin-top: var(--espace-m);
+}
+
+.mdp-regles {
+  list-style: none;
+  padding: 0;
+  margin: 0.35rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.mdp-regles li {
+  font-size: 0.78rem;
+  padding-left: 1.1rem;
+  position: relative;
+}
+
+.mdp-regles li::before {
+  content: '✗';
+  position: absolute;
+  left: 0;
+}
+
+.regle--ok {
+  color: var(--couleur-primaire-foncee, #388e3c);
+}
+
+.regle--ok::before {
+  content: '✓' !important;
+}
+
+.regle--ko {
+  color: var(--couleur-texte-discret);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* ══════════════════════════════════════
-   SECTION MATCHS
-══════════════════════════════════════ */
-.section-matchs {
-  padding: var(--espace-l);
-  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
-}
-
-.vide-section {
-  color: var(--couleur-texte-discret);
-  font-size: 0.88rem;
-  text-align: center;
-  padding: var(--espace-l);
-}
-
-.liste-matchs-profil {
-  display: flex;
-  flex-direction: column;
-}
-
-.item-match {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.7rem var(--espace-m);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-  border-bottom: 1px solid var(--couleur-bordure);
-}
-
-.item-match:last-child { border-bottom: none; }
-.item-match:hover { background: var(--couleur-primaire-tres-claire); }
-
-.match-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.match-info strong {
-  font-size: 0.9rem;
-  color: var(--couleur-titre);
-  font-weight: 600;
-}
-
-.match-info span {
-  font-size: 0.8rem;
-  color: var(--couleur-texte-discret);
-}
-
-.statut-match {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--rayon-badge);
-  white-space: nowrap;
-}
-
-.statut-match.avenir {
-  background: var(--couleur-accent-fond);
-  color: var(--couleur-accent-texte);
-}
-
-.statut-match.passe {
-  background: var(--couleur-fond);
-  color: var(--couleur-texte-discret);
-}
 
 /* ══════════════════════════════════════
    ANIMATIONS
@@ -1164,11 +1221,35 @@ button:disabled {
 }
 
 /* ══════════════════════════════════════
-   SECTION RÉPUTATION
+   RÉPUTATION (intégrée dans identité)
 ══════════════════════════════════════ */
-.section-reputation {
-  padding: var(--espace-l);
-  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.11s both;
+.profil-sep {
+  border: none;
+  border-top: 1px solid var(--couleur-bordure);
+  margin: var(--espace-l) 0 var(--espace-m);
+}
+
+.profil-reputation {
+  padding-top: 0;
+}
+
+.rep-entete {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: var(--espace-m);
+}
+
+.rep-titre {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+  flex: 1;
+}
+
+.rep-vide {
+  margin-bottom: 0;
+  font-style: italic;
 }
 
 .reputation-grille {
@@ -1230,13 +1311,6 @@ button:disabled {
   color: var(--couleur-texte-discret);
   text-align: right;
   font-style: italic;
-}
-
-.reputation-sous-desc {
-  font-size: 0.82rem;
-  color: var(--couleur-texte-discret);
-  font-style: italic;
-  margin-top: 0.25rem;
 }
 
 /* ══════════════════════════════════════

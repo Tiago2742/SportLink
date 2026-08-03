@@ -35,6 +35,29 @@ class ProfilController extends AbstractController
         return $this->json($user, 200, [], ['groups' => self::GROUPS]);
     }
 
+    #[Route('/mot-de-passe', methods: ['PATCH'])]
+    public function changerMotDePasse(Request $request, UtilisateurService $utilisateurService): Response
+    {
+        /** @var Utilisateur $user */
+        $user = $this->getUser();
+        $data = json_decode($request->getContent(), true);
+
+        $ancien  = (string) ($data['ancienMotDePasse'] ?? '');
+        $nouveau = (string) ($data['nouveauMotDePasse'] ?? '');
+
+        if ($ancien === '' || $nouveau === '') {
+            return $this->json(['erreur' => 'Les champs ancienMotDePasse et nouveauMotDePasse sont requis.'], 400);
+        }
+
+        try {
+            $utilisateurService->changerMotDePasse($user, $ancien, $nouveau);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['erreur' => $e->getMessage()], 422);
+        }
+
+        return new Response(null, 204);
+    }
+
     #[Route('', methods: ['DELETE'])]
     public function supprimerCompte(UtilisateurService $utilisateurService): Response
     {

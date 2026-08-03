@@ -25,6 +25,27 @@ class UtilisateurService
     ) {}
 
     /**
+     * Vérifie l'ancien mot de passe et applique le nouveau après hachage.
+     *
+     * @throws \InvalidArgumentException si l'ancien mot de passe est incorrect ou si le nouveau ne respecte pas la politique
+     */
+    public function changerMotDePasse(Utilisateur $user, string $ancien, string $nouveau): void
+    {
+        if (!$this->hasher->isPasswordValid($user, $ancien)) {
+            throw new \InvalidArgumentException('Ancien mot de passe incorrect.');
+        }
+
+        if (strlen($nouveau) < 8 || !preg_match('/[a-zA-Z]/', $nouveau) || !preg_match('/[0-9]/', $nouveau)) {
+            throw new \InvalidArgumentException(
+                'Le mot de passe doit contenir au moins 8 caractères, une lettre et un chiffre.'
+            );
+        }
+
+        $user->setPassword($this->hasher->hashPassword($user, $nouveau));
+        $this->em->flush();
+    }
+
+    /**
      * Anonymise le compte : efface les données personnelles et invalide les accès.
      * L'entité est conservée pour préserver l'intégrité référentielle (matchs, messages).
      *
