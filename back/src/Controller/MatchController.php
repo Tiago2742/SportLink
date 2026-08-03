@@ -8,6 +8,8 @@ use App\Security\Voter\GameVoter;
 use App\Enum\StatutMatchCamp;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
+use App\Repository\AvisRepository;
+use App\Repository\DemandeMatchRepository;
 use App\Repository\EquipeRepository;
 use App\Repository\GameRepository;
 use App\Repository\MatchCampRepository;
@@ -26,6 +28,8 @@ class MatchController extends AbstractController
 {
     public function __construct(
         private MatchService                  $matchService,
+        private AvisRepository                $avisRepository,
+        private DemandeMatchRepository        $demandeMatchRepository,
         private EquipeRepository              $equipeRepository,
         private GameRepository                $gameRepository,
         private MatchCampRepository           $matchCampRepository,
@@ -52,6 +56,7 @@ class MatchController extends AbstractController
         $statut              = $request->query->get('statut');
         $disponibleSeulement = $statut === 'disponible';
         $mesMatchs           = $request->query->getBoolean('mesMatchs');
+        $mesMatchsEquipes    = $request->query->getBoolean('mesMatchsEquipes');
         $sportIds            = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($this->getUser()->getId());
 
         if ($mesMatchs) {
@@ -59,6 +64,11 @@ class MatchController extends AbstractController
                 $this->getUser()->getId(),
                 $disponibleSeulement ? null : ($statut ?: null),
             );
+        } elseif ($mesMatchsEquipes) {
+            if ($this->getUser()->getType() !== TypeUtilisateur::Joueur) {
+                return $this->json([], 200, [], ['groups' => self::GROUPES_LIST]);
+            }
+            $matchs = $this->gameRepository->trouverPourEquipesJoueur($this->getUser()->getId());
         } else {
             $matchs = $this->gameRepository->trouverAvecFiltres(
                 $request->query->getInt('sportId') ?: null,
@@ -72,6 +82,18 @@ class MatchController extends AbstractController
         }
 
         $this->matchService->cloturerMatchsExpires($matchs);
+
+        // Enrichit chaque match avec le statut de demande de l'utilisateur courant
+        if (!empty($matchs)) {
+            $gameIds    = array_map(static fn(Game $m) => $m->getId(), $matchs);
+            $demandesMap = $this->demandeMatchRepository->findStatutParUtilisateurEtGames(
+                $this->getUser(),
+                $gameIds,
+            );
+            foreach ($matchs as $match) {
+                $match->setMonStatutDemande($demandesMap[$match->getId()] ?? null);
+            }
+        }
 
         return $this->json($matchs, 200, [], ['groups' => self::GROUPES_LIST]);
     }
@@ -131,6 +153,16 @@ class MatchController extends AbstractController
     public function afficher(Game $match): JsonResponse
     {
         $this->matchService->cloturerMatchsExpires([$match]);
+
+        $avisExistant = $this->avisRepository->findParNotantEtGame($this->getUser(), $match);
+        if ($avisExistant !== null) {
+            $match->setMonAvis([
+                'ponctualite'    => $avisExistant->getPonctualite(),
+                'fairPlay'       => $avisExistant->getFairPlay(),
+                'niveauConforme' => $avisExistant->getNiveauConforme(),
+                'dateCreation'   => $avisExistant->getDateCreation()?->format('c'),
+            ]);
+        }
 
         return $this->json($match, 200, [], ['groups' => self::GROUPES_READ]);
     }
@@ -219,6 +251,10 @@ class MatchController extends AbstractController
     #[Route('/{id}/camps', name: 'api_matchs_ajouter_camp', methods: ['POST'])]
     public function ajouterCamp(Request $request, Game $match): JsonResponse
     {
+        if ($this->getUser() !== $match->getCreateur()) {
+            return $this->json(['erreur' => 'Seul le créateur peut gérer les camps via ce flux. Utilisez POST /api/matchs/{id}/demandes pour rejoindre un match.'], 403);
+        }
+
         // A1 — Sport déclaré par le rejoignant
         $sportIds = $this->utilisateurNiveauRepository->findSportIdsByUtilisateur($this->getUser()->getId());
         if (!in_array($match->getSport()->getId(), $sportIds, true)) {

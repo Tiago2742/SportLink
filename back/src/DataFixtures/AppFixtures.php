@@ -2,6 +2,7 @@
 
 namespace App\DataFixtures;
 
+use App\Entity\Avis;
 use App\Entity\Equipe;
 use App\Entity\EquipeJoueur;
 use App\Entity\Game;
@@ -510,6 +511,9 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
             StatutGame::Annule,
         ];
 
+        /** @var array<array{game: Game, occ1: Utilisateur, occ2: Utilisateur}> $avisACreer */
+        $avisACreer = [];
+
         for ($i = 0; $i < 185; $i++) {
             $statut    = $faker->randomElement($statutPool);
             $collectif = $faker->boolean(60);
@@ -555,6 +559,8 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
             }
 
             $nbCamps = 0;
+            $occ1    = null;
+            $occ2    = null;
 
             if ($collectif) {
                 // ── R5 : equipe obligatoire ──
@@ -568,6 +574,7 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
                    ->setStatut(StatutMatchCamp::Confirme)->setEquipe($eq1);
                 $this->save($c1);
                 $nbCamps++;
+                $occ1 = $eq1->getClub();
 
                 // Camp 2 : absent pour annule ou ~40 % des en_attente (rejoignables)
                 $ajouterCamp2 = $statut !== StatutGame::Annule
@@ -586,6 +593,7 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
                            ->setStatut($stat2)->setEquipe($eq2);
                         $this->save($c2);
                         $nbCamps++;
+                        $occ2 = $eq2->getClub();
                     }
                 }
             } else {
@@ -600,6 +608,7 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
                    ->setStatut(StatutMatchCamp::Confirme)->setJoueur($j1);
                 $this->save($c1);
                 $nbCamps++;
+                $occ1 = $j1;
 
                 // Camp 2 : absent pour annule ou ~45 % des en_attente
                 $ajouterCamp2 = $statut !== StatutGame::Annule
@@ -617,6 +626,7 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
                            ->setStatut($stat2)->setJoueur($j2);
                         $this->save($c2);
                         $nbCamps++;
+                        $occ2 = $j2;
                     }
                 }
             }
@@ -628,6 +638,10 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
                 $r->setScoreCamp1($faker->numberBetween(0, $collectif ? 10 : 5));
                 $r->setScoreCamp2($faker->numberBetween(0, $collectif ? 10 : 5));
                 $this->save($r);
+
+                if ($occ1 !== null && $occ2 !== null && $occ1 !== $occ2) {
+                    $avisACreer[] = ['game' => $g, 'occ1' => $occ1, 'occ2' => $occ2];
+                }
             }
 
             // Messages sur ~40 % des matchs (1 à 4 par match)
@@ -694,6 +708,185 @@ class AppFixtures extends Fixture implements FixtureGroupInterface
             $c1->setGame($g)->setRole(RoleMatchCamp::Camp1)
                ->setStatut(StatutMatchCamp::Confirme)->setJoueur($jTest);
             $this->save($c1);
+        }
+
+        $manager->flush();
+
+        // ═══════════════════════════════════════════════════════
+        // 11. AVIS — RÉPUTATION
+        //     a) Matchs terminés dédiés aux comptes de test
+        //        (garantit des moyennes visibles sur leurs profils)
+        //     b) Avis sur les matchs terminés générés en §9
+        // ═══════════════════════════════════════════════════════
+
+        $notesVariees = [
+            [5, 5, 4], [4, 5, 3], [5, 4, 4], [3, 4, 5], [4, 3, 5],
+            [5, 3, 4], [3, 5, 3], [4, 4, 3], [5, 4, 5], [3, 3, 4],
+            [4, 5, 5], [2, 4, 4], [4, 3, 3], [5, 5, 3], [3, 4, 3],
+            [4, 4, 5], [3, 5, 4], [5, 3, 3], [2, 3, 5], [4, 5, 4],
+        ];
+
+        // ── 11a. Matchs individuels terminés — joueurs de test ──
+        //        Notes fixes et variées pour des moyennes lisibles
+        $matchsTestInd = [
+            //   [j1,       j2,      sport,       notes j1→j2, notes j2→j1]
+            [$jean,    $marc,    'Tennis',    [5, 5, 4], [4, 4, 3]],
+            [$thomas,  $marie,   'Tennis',    [4, 3, 5], [5, 4, 3]],
+            [$lea,     $jean,    'Tennis',    [3, 4, 4], [5, 5, 3]],
+            [$marc,    $thomas,  'Badminton', [4, 5, 4], [3, 4, 5]],
+            [$antoine, $marie,   'Badminton', [5, 4, 3], [4, 3, 4]],
+            [$jean,    $antoine, 'Tennis',    [4, 5, 5], [3, 5, 4]],
+        ];
+
+        foreach ($matchsTestInd as [$j1t, $j2t, $sNomT, $n1, $n2]) {
+            $nivsArr = array_values($niveaux[$sNomT]);
+
+            $gT = new Game();
+            $gT->setSport($sports[$sNomT]);
+            $gT->setDateMatch($faker->dateTimeBetween('-90 days', '-2 days'));
+            $gT->setLieu($faker->randomElement($lieuxBase) . ', ' . $faker->city());
+            $gT->setStatut(StatutGame::Termine);
+            $gT->setNiveauRequis($nivsArr[array_rand($nivsArr)]);
+            $gT->setCreateur($j1t);
+            $this->save($gT);
+
+            $c1T = new MatchCamp();
+            $c1T->setGame($gT)->setRole(RoleMatchCamp::Camp1)
+                ->setStatut(StatutMatchCamp::Confirme)->setJoueur($j1t);
+            $this->save($c1T);
+
+            $c2T = new MatchCamp();
+            $c2T->setGame($gT)->setRole(RoleMatchCamp::Camp2)
+                ->setStatut(StatutMatchCamp::Confirme)->setJoueur($j2t);
+            $this->save($c2T);
+
+            $rT = new Resultat();
+            $rT->setGame($gT);
+            $rT->setScoreCamp1($faker->numberBetween(0, 3));
+            $rT->setScoreCamp2($faker->numberBetween(0, 3));
+            $this->save($rT);
+
+            $a1 = new Avis();
+            $a1->setNotant($j1t);
+            $a1->setEvalue($j2t);
+            $a1->setGame($gT);
+            $a1->setPonctualite($n1[0]);
+            $a1->setFairPlay($n1[1]);
+            $a1->setNiveauConforme($n1[2]);
+            $a1->setDateCreation(new \DateTimeImmutable());
+            $this->save($a1);
+
+            $a2 = new Avis();
+            $a2->setNotant($j2t);
+            $a2->setEvalue($j1t);
+            $a2->setGame($gT);
+            $a2->setPonctualite($n2[0]);
+            $a2->setFairPlay($n2[1]);
+            $a2->setNiveauConforme($n2[2]);
+            $a2->setDateCreation(new \DateTimeImmutable());
+            $this->save($a2);
+        }
+
+        // ── 11b. Matchs collectifs terminés — clubs de test ──
+        $matchsTestCol = [];
+
+        if (!empty($eqC1F) && !empty($eqC2F)) {
+            $matchsTestCol[] = [$eqC1F[0], $eqC2F[0], 'Football', $clubs[0], $clubs[1], [5, 4, 5], [4, 5, 3]];
+        }
+        if (count($eqC1F) >= 2 && count($eqC2F) >= 2) {
+            $matchsTestCol[] = [$eqC1F[1], $eqC2F[1], 'Football', $clubs[0], $clubs[1], [4, 3, 4], [5, 4, 4]];
+        }
+
+        // club3 vs une équipe Volleyball d'un autre club
+        $eqVollAutres = array_values(array_filter(
+            $equipesSport['Volleyball'],
+            fn (Equipe $e) => $e->getClub() !== $clubs[2],
+        ));
+        if (!empty($eqC3V) && !empty($eqVollAutres)) {
+            $eqAdvVoll = $eqVollAutres[0];
+            $matchsTestCol[] = [$eqC3V[0], $eqAdvVoll, 'Volleyball', $clubs[2], $eqAdvVoll->getClub(), [4, 5, 4], [3, 4, 5]];
+        }
+
+        foreach ($matchsTestCol as [$eq1T, $eq2T, $sNomT, $club1T, $club2T, $n1, $n2]) {
+            $nivsArr = array_values($niveaux[$sNomT]);
+
+            $gT = new Game();
+            $gT->setSport($sports[$sNomT]);
+            $gT->setDateMatch($faker->dateTimeBetween('-90 days', '-2 days'));
+            $gT->setLieu($faker->randomElement($lieuxBase) . ', ' . $faker->city());
+            $gT->setStatut(StatutGame::Termine);
+            $gT->setNiveauRequis($nivsArr[0]);
+            $gT->setCreateur($club1T);
+            $this->save($gT);
+
+            $c1T = new MatchCamp();
+            $c1T->setGame($gT)->setRole(RoleMatchCamp::Camp1)
+                ->setStatut(StatutMatchCamp::Confirme)->setEquipe($eq1T);
+            $this->save($c1T);
+
+            $c2T = new MatchCamp();
+            $c2T->setGame($gT)->setRole(RoleMatchCamp::Camp2)
+                ->setStatut(StatutMatchCamp::Confirme)->setEquipe($eq2T);
+            $this->save($c2T);
+
+            $rT = new Resultat();
+            $rT->setGame($gT);
+            $rT->setScoreCamp1($faker->numberBetween(0, 5));
+            $rT->setScoreCamp2($faker->numberBetween(0, 5));
+            $this->save($rT);
+
+            $a1 = new Avis();
+            $a1->setNotant($club1T);
+            $a1->setEvalue($club2T);
+            $a1->setGame($gT);
+            $a1->setPonctualite($n1[0]);
+            $a1->setFairPlay($n1[1]);
+            $a1->setNiveauConforme($n1[2]);
+            $a1->setDateCreation(new \DateTimeImmutable());
+            $this->save($a1);
+
+            $a2 = new Avis();
+            $a2->setNotant($club2T);
+            $a2->setEvalue($club1T);
+            $a2->setGame($gT);
+            $a2->setPonctualite($n2[0]);
+            $a2->setFairPlay($n2[1]);
+            $a2->setNiveauConforme($n2[2]);
+            $a2->setDateCreation(new \DateTimeImmutable());
+            $this->save($a2);
+        }
+
+        // ── 11c. Avis sur les matchs terminés générés en §9 (~70 %) ──
+        $nbNotes  = count($notesVariees);
+        $noteIdx  = 0;
+        foreach ($avisACreer as ['game' => $gA, 'occ1' => $occ1A, 'occ2' => $occ2A]) {
+            if ($faker->boolean(30)) {
+                continue; // ~30 % laissés sans avis pour du réalisme
+            }
+
+            $n1 = $notesVariees[$noteIdx % $nbNotes];
+            $n2 = $notesVariees[($noteIdx + 7) % $nbNotes];
+            $noteIdx++;
+
+            $a1 = new Avis();
+            $a1->setNotant($occ1A);
+            $a1->setEvalue($occ2A);
+            $a1->setGame($gA);
+            $a1->setPonctualite($n1[0]);
+            $a1->setFairPlay($n1[1]);
+            $a1->setNiveauConforme($n1[2]);
+            $a1->setDateCreation(new \DateTimeImmutable());
+            $this->save($a1);
+
+            $a2 = new Avis();
+            $a2->setNotant($occ2A);
+            $a2->setEvalue($occ1A);
+            $a2->setGame($gA);
+            $a2->setPonctualite($n2[0]);
+            $a2->setFairPlay($n2[1]);
+            $a2->setNiveauConforme($n2[2]);
+            $a2->setDateCreation(new \DateTimeImmutable());
+            $this->save($a2);
         }
 
         $manager->flush();

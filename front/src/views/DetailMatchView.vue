@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth'
 import {
   chargerMatch,
   supprimerMatch,
-  ajouterCamp,
   supprimerCamp,
   repondreCamp,
   chargerMessages,
@@ -13,10 +12,18 @@ import {
   chargerResultat,
   saisirResultat,
   chargerEquipes,
+  demanderRejoindreMatch,
+  chargerMaDemande,
+  chargerDemandesMatch,
+  repondreDemandeMatch,
+  annulerDemandeMatch,
+  deposerAvis,
 } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
+import FormAvis from '@/components/matchs/FormAvis.vue'
+import LienUtilisateur from '@/components/utilisateurs/LienUtilisateur.vue'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 import { ArrowLeft, Calendar, FileText, MapPin, Target, User } from 'lucide-vue-next'
 import L from 'leaflet'
@@ -42,6 +49,13 @@ const saisieResultat = ref(false)
 const equipesDuClub = ref<{ id: number; nom: string }[]>([])
 const equipeSelectionnee = ref<number | ''>('')
 const chargementEquipes = ref(false)
+
+const maDemande = ref<any>(null)
+const demandesEnAttente = ref<any[]>([])
+
+const avisEnvoi   = ref(false)
+const erreurAvis  = ref('')
+const formAvisOuvert = ref(false)
 
 const mapConteneur = ref<HTMLElement | null>(null)
 let carteInstance: L.Map | null = null
@@ -71,14 +85,21 @@ async function charger() {
 
     await chargerEquipesDuMatch(matchCharge)
 
-    const participant = utilisateurEstInscrit(matchCharge, auth.utilisateur?.id)
+    const estCreateurMatch = Number(matchCharge.createur?.id) === Number(auth.utilisateur?.id)
+    const estParticipant = utilisateurEstInscrit(matchCharge, auth.utilisateur?.id)
 
     const [res, msgs] = await Promise.all([
       chargerResultat(auth.token!, matchId).catch(() => null),
-      participant ? chargerMessages(auth.token!, matchId).catch(() => []) : Promise.resolve([]),
+      estParticipant ? chargerMessages(auth.token!, matchId).catch(() => []) : Promise.resolve([]),
     ])
     resultat.value = res
     messages.value = msgs ?? []
+
+    if (estCreateurMatch && matchCharge.statut === 'en_attente') {
+      demandesEnAttente.value = await chargerDemandesMatch(auth.token!, matchId, 'en_attente').catch(() => [])
+    } else if (!estCreateurMatch && !estParticipant) {
+      maDemande.value = await chargerMaDemande(auth.token!, matchId).catch(() => null)
+    }
   } catch (e: any) {
     erreur.value = e.statut === 404 ? 'Match introuvable.' : 'Erreur de chargement.'
   } finally {
@@ -162,12 +183,15 @@ const dateMatchPassee = computed(() =>
   match.value ? new Date(match.value.dateMatch) <= new Date() : false,
 )
 
+const aDemandeEnAttente = computed(() => maDemande.value?.statut === 'en_attente')
+
 const peutRejoindre = computed(
   () =>
     !dejaInscrit.value &&
     !matchComplet.value &&
     match.value?.statut === 'en_attente' &&
-    !dateMatchPassee.value,
+    !dateMatchPassee.value &&
+    !aDemandeEnAttente.value,
 )
 
 const peutQuitter = computed(
@@ -179,7 +203,7 @@ const peutQuitter = computed(
     !dateMatchPassee.value,
 )
 
-async function rejoindreMatch() {
+async function demanderRejoindreLeMatch() {
   if (!auth.utilisateur || !match.value) return
   try {
     if (sportCollectif.value) {
@@ -191,13 +215,41 @@ async function rejoindreMatch() {
         alert('Choisissez l\'équipe qui jouera ce match.')
         return
       }
-      await ajouterCamp(auth.token!, matchId, { equipeId: equipeSelectionnee.value as number })
+      maDemande.value = await demanderRejoindreMatch(auth.token!, matchId, equipeSelectionnee.value as number)
     } else {
-      await ajouterCamp(auth.token!, matchId, { joueurId: auth.utilisateur.id })
+      maDemande.value = await demanderRejoindreMatch(auth.token!, matchId)
     }
+  } catch (e: any) {
+    alert(e.message || 'Impossible d\'envoyer la demande.')
+  }
+}
+
+async function annulerLaDemande() {
+  if (!maDemande.value) return
+  if (!confirm('Annuler votre demande de participation ?')) return
+  try {
+    await annulerDemandeMatch(auth.token!, matchId, maDemande.value.id)
+    maDemande.value = { ...maDemande.value, statut: 'annulee' }
+  } catch (e: any) {
+    alert(e.message || 'Impossible d\'annuler la demande.')
+  }
+}
+
+async function accepterDemandeParticipation(demandeId: number) {
+  try {
+    await repondreDemandeMatch(auth.token!, matchId, demandeId, 'acceptee')
     await charger()
   } catch (e: any) {
-    alert(e.message || 'Impossible de rejoindre ce match.')
+    alert(e.message || 'Impossible d\'accepter la demande.')
+  }
+}
+
+async function refuserDemandeParticipation(demandeId: number) {
+  try {
+    await repondreDemandeMatch(auth.token!, matchId, demandeId, 'refusee')
+    demandesEnAttente.value = demandesEnAttente.value.filter((d: any) => d.id !== demandeId)
+  } catch (e: any) {
+    alert(e.message || 'Impossible de refuser la demande.')
   }
 }
 
@@ -265,6 +317,26 @@ async function soumettreResultat() {
     saisieResultat.value = false
   } catch (e: any) {
     alert(e.message || 'Impossible d\'enregistrer le résultat.')
+  }
+}
+
+const peutNoter = computed(() =>
+  match.value?.statut === 'termine' &&
+  (dejaInscrit.value || estCreateur.value) &&
+  match.value?.monAvis === null
+)
+
+async function soumettreAvis(donnees: { ponctualite: number; fairPlay: number; niveauConforme: number }) {
+  avisEnvoi.value  = true
+  erreurAvis.value = ''
+  try {
+    await deposerAvis(auth.token!, matchId, donnees)
+    match.value = { ...match.value, monAvis: donnees }
+    formAvisOuvert.value = false
+  } catch (e: any) {
+    erreurAvis.value = e.message || 'Impossible de soumettre l\'évaluation.'
+  } finally {
+    avisEnvoi.value = false
   }
 }
 
@@ -338,7 +410,7 @@ function formaterHeure(dateStr: string) {
               </li>
               <li>
                 <span class="info-icone" aria-hidden="true"><User :size="18" stroke-width="2.25" /></span>
-                Créé par {{ nomAffichage(match.createur) }}
+                Créé par <LienUtilisateur :utilisateur="match.createur" />
               </li>
               <li v-if="match.description" class="description-match">
                 <span class="info-icone" aria-hidden="true"><FileText :size="18" stroke-width="2.25" /></span>
@@ -355,10 +427,15 @@ function formaterHeure(dateStr: string) {
                 <span class="camp-label">Camp 1</span>
                 <template v-if="camp1?.equipe">
                   <strong class="camp-principal">{{ camp1.equipe.nom }}</strong>
-                  <span class="camp-secondaire">{{ nomAffichage(camp1.equipe.club) }}</span>
+                  <LienUtilisateur :utilisateur="camp1.equipe.club" class="camp-secondaire" />
                 </template>
                 <template v-else-if="camp1?.joueur">
-                  <strong class="camp-principal">{{ nomAffichage(camp1.joueur) }}</strong>
+                  <RouterLink
+                    v-if="camp1.joueur?.id"
+                    :to="`/profils/${camp1.joueur.id}`"
+                    class="camp-principal camp-lien"
+                  >{{ nomAffichage(camp1.joueur) }}</RouterLink>
+                  <strong v-else class="camp-principal">{{ nomAffichage(camp1.joueur) }}</strong>
                 </template>
                 <span v-else class="camp-vide">—</span>
               </div>
@@ -369,10 +446,15 @@ function formaterHeure(dateStr: string) {
                 <span class="camp-label">Camp 2</span>
                 <template v-if="camp2?.equipe">
                   <strong class="camp-principal">{{ camp2.equipe.nom }}</strong>
-                  <span class="camp-secondaire">{{ nomAffichage(camp2.equipe.club) }}</span>
+                  <LienUtilisateur :utilisateur="camp2.equipe.club" class="camp-secondaire" />
                 </template>
                 <template v-else-if="camp2?.joueur">
-                  <strong class="camp-principal">{{ nomAffichage(camp2.joueur) }}</strong>
+                  <RouterLink
+                    v-if="camp2.joueur?.id"
+                    :to="`/profils/${camp2.joueur.id}`"
+                    class="camp-principal camp-lien"
+                  >{{ nomAffichage(camp2.joueur) }}</RouterLink>
+                  <strong v-else class="camp-principal">{{ nomAffichage(camp2.joueur) }}</strong>
                 </template>
                 <span v-else class="camp-recherche">Recherche un adversaire…</span>
               </div>
@@ -465,6 +547,71 @@ function formaterHeure(dateStr: string) {
             </template>
           </section>
 
+          <!-- Évaluation adversaire -->
+          <section
+            v-if="match?.statut === 'termine' && (dejaInscrit || estCreateur)"
+            class="carte section-avis"
+          >
+            <h2 class="section-h2">Évaluer l'adversaire</h2>
+
+            <!-- Avis déjà déposé -->
+            <template v-if="match.monAvis">
+              <div class="avis-deja-depose">
+                <p class="avis-deja-titre">Votre évaluation a été envoyée.</p>
+                <div class="avis-recap">
+                  <div class="avis-recap-ligne">
+                    <span>Ponctualité</span>
+                    <div class="etoiles-recap">
+                      <span
+                        v-for="i in 5" :key="i"
+                        class="etoile-recap"
+                        :class="{ 'etoile-recap--active': i <= match.monAvis.ponctualite }"
+                      >★</span>
+                    </div>
+                  </div>
+                  <div class="avis-recap-ligne">
+                    <span>Fair-play</span>
+                    <div class="etoiles-recap">
+                      <span
+                        v-for="i in 5" :key="i"
+                        class="etoile-recap"
+                        :class="{ 'etoile-recap--active': i <= match.monAvis.fairPlay }"
+                      >★</span>
+                    </div>
+                  </div>
+                  <div class="avis-recap-ligne">
+                    <span>Niveau conforme</span>
+                    <div class="etoiles-recap">
+                      <span
+                        v-for="i in 5" :key="i"
+                        class="etoile-recap"
+                        :class="{ 'etoile-recap--active': i <= match.monAvis.niveauConforme }"
+                      >★</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Pas encore évalué — bouton déclencheur -->
+            <template v-else-if="!formAvisOuvert">
+              <p class="avis-desc">Ce match est terminé. Évaluez votre adversaire sur 3 critères.</p>
+              <button class="btn btn-primaire" @click="formAvisOuvert = true">
+                Évaluer l'adversaire
+              </button>
+            </template>
+
+            <!-- Formulaire de notation -->
+            <template v-else>
+              <div v-if="erreurAvis" class="alerte alerte-erreur avis-erreur">{{ erreurAvis }}</div>
+              <FormAvis
+                @soumis="soumettreAvis"
+                @annule="formAvisOuvert = false; erreurAvis = ''"
+              />
+              <div v-if="avisEnvoi" class="avis-envoi">Envoi en cours…</div>
+            </template>
+          </section>
+
           <!-- Messagerie -->
           <section class="carte section-messages" v-if="estParticipantLocal">
             <h2 class="section-h2">Discussion</h2>
@@ -507,11 +654,20 @@ function formaterHeure(dateStr: string) {
             <h2 class="section-h2">Participation</h2>
 
             <p class="aide-participation">
-              Le match est <strong>confirmé</strong> quand les <strong>2 participants</strong> sont inscrits.
-              Le statut « invité » est réservé aux invitations envoyées par un autre utilisateur.
+              Le match est <strong>confirmé</strong> quand le créateur accepte une demande de participation.
             </p>
 
-            <template v-if="peutRejoindre && sportCollectif && estClub">
+            <!-- Demande en attente du user courant -->
+            <template v-if="aDemandeEnAttente">
+              <div class="ma-demande-encours">
+                <p class="ma-demande-statut">Votre demande est en attente de validation.</p>
+                <button class="btn btn-secondaire btn-pleine-largeur" @click="annulerLaDemande">
+                  Annuler ma demande
+                </button>
+              </div>
+            </template>
+
+            <template v-else-if="peutRejoindre && sportCollectif && estClub">
               <div class="champ-groupe">
                 <label for="equipeMatch">Votre équipe</label>
                 <select
@@ -534,14 +690,14 @@ function formaterHeure(dateStr: string) {
                   </option>
                 </select>
               </div>
-              <button class="btn btn-primaire btn-pleine-largeur" @click="rejoindreMatch">
-                Inscrire mon équipe
+              <button class="btn btn-primaire btn-pleine-largeur" @click="demanderRejoindreLeMatch">
+                Envoyer ma demande
               </button>
             </template>
 
             <template v-else-if="peutRejoindre && !sportCollectif">
-              <button class="btn btn-primaire btn-pleine-largeur" @click="rejoindreMatch">
-                Rejoindre ce match
+              <button class="btn btn-primaire btn-pleine-largeur" @click="demanderRejoindreLeMatch">
+                Demander à rejoindre
               </button>
             </template>
 
@@ -581,6 +737,35 @@ function formaterHeure(dateStr: string) {
             </p>
             <p v-else-if="matchComplet" class="participants-vide">Ce match est complet.</p>
 
+            <!-- Demandes en attente — section créateur -->
+            <template v-if="estCreateur && match?.statut === 'en_attente'">
+              <div v-if="demandesEnAttente.length > 0" class="demandes-section">
+                <h3 class="demandes-titre">Demandes en attente ({{ demandesEnAttente.length }})</h3>
+                <div
+                  v-for="demande in demandesEnAttente"
+                  :key="demande.id"
+                  class="demande-item"
+                >
+                  <span class="demande-nom">
+                    {{ demande.equipe ? demande.equipe.nom : nomAffichage(demande.demandeur) }}
+                  </span>
+                  <div class="demande-actions">
+                    <button
+                      class="btn btn-primaire btn-xs"
+                      title="Accepter"
+                      @click="accepterDemandeParticipation(demande.id)"
+                    >✓ Accepter</button>
+                    <button
+                      class="btn btn-danger btn-xs"
+                      title="Refuser"
+                      @click="refuserDemandeParticipation(demande.id)"
+                    >✗ Refuser</button>
+                  </div>
+                </div>
+              </div>
+              <p v-else class="demandes-vide">Aucune demande de participation pour l'instant.</p>
+            </template>
+
             <!-- Participants inscrits -->
             <div class="participants-liste" v-if="match.camps?.length">
               <h3 class="participants-titre">
@@ -600,7 +785,9 @@ function formaterHeure(dateStr: string) {
                 <div v-else class="participant-avatar participant-avatar-joueur">
                   {{ initialesUtilisateur(camp.joueur) }}
                 </div>
-                <span v-if="camp.equipe">{{ camp.equipe.nom }}</span>
+                <RouterLink v-if="camp.equipe?.club?.id" :to="`/profils/${camp.equipe.club.id}`" class="participant-lien">{{ camp.equipe.nom }}</RouterLink>
+                <span v-else-if="camp.equipe">{{ camp.equipe.nom }}</span>
+                <RouterLink v-else-if="camp.joueur?.id" :to="`/profils/${camp.joueur.id}`" class="participant-lien">{{ nomAffichage(camp.joueur) }}</RouterLink>
                 <span v-else>{{ nomAffichage(camp.joueur) }}</span>
                 <span class="tag-inscription" :class="'tag-inscription-' + camp.statut">
                   {{ libelleInscription(camp.statut) }}
@@ -753,9 +940,75 @@ function formaterHeure(dateStr: string) {
 .section-infos,
 .section-camps,
 .section-resultat,
+.section-avis,
 .section-messages,
 .section-participation {
   padding: var(--espace-l);
+}
+
+/* ── Section évaluation ── */
+.avis-desc {
+  font-size: 0.88rem;
+  color: var(--couleur-texte-discret);
+  margin-bottom: var(--espace-m);
+  line-height: 1.5;
+}
+
+.avis-erreur {
+  margin-bottom: var(--espace-m);
+}
+
+.avis-envoi {
+  font-size: 0.82rem;
+  color: var(--couleur-texte-discret);
+  font-style: italic;
+  text-align: center;
+  margin-top: var(--espace-s);
+}
+
+.avis-deja-depose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espace-m);
+}
+
+.avis-deja-titre {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--couleur-primaire);
+}
+
+.avis-recap {
+  display: flex;
+  flex-direction: column;
+}
+
+.avis-recap-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--couleur-bordure);
+  font-size: 0.88rem;
+  color: var(--couleur-texte);
+}
+
+.avis-recap-ligne:last-child {
+  border-bottom: none;
+}
+
+.etoiles-recap {
+  display: flex;
+  gap: 2px;
+}
+
+.etoile-recap {
+  font-size: 1rem;
+  color: #d0d0d0;
+}
+
+.etoile-recap--active {
+  color: #f5a623;
 }
 
 /* ══════════════════════════════════════
@@ -798,6 +1051,30 @@ function formaterHeure(dateStr: string) {
 .camp-secondaire {
   font-size: 0.8rem;
   color: var(--couleur-texte-discret);
+}
+
+.camp-lien {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.camp-lien:hover {
+  color: var(--couleur-primaire);
+  text-decoration: underline;
+}
+
+.participant-lien {
+  flex: 1;
+  color: var(--couleur-titre);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.88rem;
+  transition: color 0.15s;
+}
+
+.participant-lien:hover {
+  color: var(--couleur-primaire);
+  text-decoration: underline;
 }
 
 .camp-recherche {
@@ -1149,6 +1426,84 @@ function formaterHeure(dateStr: string) {
 button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* ── Demande en attente (non-créateur) ── */
+.ma-demande-encours {
+  text-align: center;
+  padding: var(--espace-m);
+  background: var(--couleur-attente-fond, #fff8e1);
+  border-radius: var(--rayon-bouton);
+  margin-bottom: var(--espace-m);
+}
+
+.ma-demande-statut {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--couleur-attente, #b45309);
+  margin-bottom: var(--espace-s);
+}
+
+/* ── Demandes créateur ── */
+.demandes-section {
+  margin-top: var(--espace-m);
+  border-top: 1px solid var(--couleur-bordure);
+  padding-top: var(--espace-m);
+}
+
+.demandes-titre {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--couleur-texte-discret);
+  margin-bottom: var(--espace-s);
+}
+
+.demande-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espace-s);
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--couleur-bordure);
+  font-size: 0.88rem;
+}
+
+.demande-item:last-child {
+  border-bottom: none;
+}
+
+.demande-nom {
+  font-weight: 600;
+  color: var(--couleur-titre);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demande-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.btn-xs {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: var(--rayon-bouton);
+}
+
+.demandes-vide {
+  font-size: 0.82rem;
+  color: var(--couleur-texte-discret);
+  text-align: center;
+  padding: var(--espace-s);
+  margin-top: var(--espace-m);
+  border-top: 1px solid var(--couleur-bordure);
+  padding-top: var(--espace-m);
 }
 
 /* ══════════════════════════════════════

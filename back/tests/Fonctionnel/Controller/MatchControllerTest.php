@@ -15,38 +15,7 @@ use App\Tests\Fonctionnel\BaseTestFonctionnel;
 
 class MatchControllerTest extends BaseTestFonctionnel
 {
-    // ---- Helpers privés (état hors-service, bypass rules métier intentionnel) --
-
-    /**
-     * Crée un match en base avec un statut arbitraire et camp_1 confirmé pour
-     * le créateur. Permet de tester les gardes de statut côté serveur.
-     */
-    private function creerMatchAvecStatut(
-        Utilisateur $createur,
-        Sport $sport,
-        StatutGame $statut,
-        string $dateMatch = '-1 day',
-    ): Game {
-        $match = new Game();
-        $match->setSport($sport);
-        $match->setDateMatch(new \DateTime($dateMatch));
-        $match->setLieu('Terrain test');
-        $match->setStatut($statut);
-        $match->setCreateur($createur);
-        $this->em->persist($match);
-
-        $camp1 = new MatchCamp();
-        $camp1->setRole(RoleMatchCamp::Camp1);
-        $camp1->setStatut(StatutMatchCamp::Confirme);
-        if ($sport->getType() === TypeSport::Individuel) {
-            $camp1->setJoueur($createur);
-        }
-        $match->addCamp($camp1);  // popule la collection en mémoire (même EM que le kernel)
-        $this->em->persist($camp1);
-
-        $this->em->flush();
-        return $match;
-    }
+    // ---- Helper privé (état hors-service, bypass rules métier intentionnel) ---
 
     /**
      * Crée un match Terminé avec 2 camps confirmés (sport individuel).
@@ -196,9 +165,7 @@ class MatchControllerTest extends BaseTestFonctionnel
 
         $match = $this->creerMatchAvecStatut($joueur1, $tennis, StatutGame::Termine);
 
-        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur2), [
-            'joueurId' => $joueur2->getId(),
-        ]);
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/demandes", $this->obtenirToken($joueur2));
 
         $this->assertStatut(422);
     }
@@ -211,25 +178,20 @@ class MatchControllerTest extends BaseTestFonctionnel
 
         $match = $this->creerMatchAvecStatut($joueur1, $tennis, StatutGame::Annule);
 
-        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur2), [
-            'joueurId' => $joueur2->getId(),
-        ]);
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/demandes", $this->obtenirToken($joueur2));
 
         $this->assertStatut(422);
     }
 
-    public function testRejoindreMatchEnAttenteFuturReussit(): void
+    public function testDemanderRejoindreMatchEnAttenteFuturReussit(): void
     {
         $tennis  = $this->getSport('Tennis');
         $joueur1 = $this->creerUtilisateur('j1.rejoin.ok@test.fr', TypeUtilisateur::Joueur, $tennis);
         $joueur2 = $this->creerUtilisateur('j2.rejoin.ok@test.fr', TypeUtilisateur::Joueur, $tennis);
 
-        // creerMatch() → EnAttente + camp_1 = joueur1, date +30 days, place libre
         $match = $this->creerMatch($joueur1, $tennis, '+30 days');
 
-        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur2), [
-            'joueurId' => $joueur2->getId(),
-        ]);
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/demandes", $this->obtenirToken($joueur2));
 
         $this->assertStatut(201);
     }
@@ -526,7 +488,7 @@ class MatchControllerTest extends BaseTestFonctionnel
     // C3 — XOR équipe/joueur à l'ajout d'un camp
     // =========================================================================
 
-    public function testAjouterCampEquipeEtJoueurSimultanementRefuse(): void
+    public function testDemanderRejoindreMatchIndividuelAvecEquipeRefuse(): void
     {
         $tennis  = $this->getSport('Tennis');
         $joueur1 = $this->creerUtilisateur('j1.c3@test.fr', TypeUtilisateur::Joueur, $tennis);
@@ -534,44 +496,56 @@ class MatchControllerTest extends BaseTestFonctionnel
 
         $match = $this->creerMatch($joueur1, $tennis, '+30 days');
 
-        // Fournir equipeId ET joueurId simultanément — le XOR est contrôlé en premier,
-        // avant toute lookup ; equipeId=999 n'a donc pas besoin d'exister.
-        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur2), [
+        // Match individuel : fournir equipeId est interdit (422)
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/demandes", $this->obtenirToken($joueur2), [
             'equipeId' => 999,
-            'joueurId' => $joueur2->getId(),
         ]);
 
         $this->assertStatut(422);
     }
 
     // =========================================================================
-    // C6 — Troisième camp refusé sur un match déjà complet
+    // C6 — Demande refusée sur un match déjà complet
     // =========================================================================
 
-    public function testTroisiemeCampRefuse(): void
+    public function testDemanderRejoindreMatchDejaCompletRefuse(): void
     {
         $tennis  = $this->getSport('Tennis');
         $joueur1 = $this->creerUtilisateur('j1.c6@test.fr', TypeUtilisateur::Joueur, $tennis);
         $joueur2 = $this->creerUtilisateur('j2.c6@test.fr', TypeUtilisateur::Joueur, $tennis);
         $joueur3 = $this->creerUtilisateur('j3.c6@test.fr', TypeUtilisateur::Joueur, $tennis);
 
-        // Match EnAttente avec camp_1 (via helper)
         $match = $this->creerMatch($joueur1, $tennis, '+30 days');
 
         // Ajout direct de camp_2 sans passer par le service (statut reste EnAttente)
         $camp2 = new MatchCamp();
         $camp2->setRole(RoleMatchCamp::Camp2);
-        $camp2->setStatut(StatutMatchCamp::Invite);
+        $camp2->setStatut(StatutMatchCamp::Confirme);
         $camp2->setJoueur($joueur2);
         $match->addCamp($camp2);
         $this->em->persist($camp2);
         $this->em->flush();
 
-        // Joueur3 tente d'ajouter un 3e camp — le match en a déjà 2 (C6)
-        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur3), [
-            'joueurId' => $joueur3->getId(),
-        ]);
+        // Joueur3 tente de demander alors que le match est déjà complet (2 camps)
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/demandes", $this->obtenirToken($joueur3));
 
         $this->assertStatut(422);
+    }
+
+    // =========================================================================
+    // Restriction POST /camps — non-créateur reçoit 403
+    // =========================================================================
+
+    public function testAjouterCampParNonCreateurRefuse(): void
+    {
+        $tennis  = $this->getSport('Tennis');
+        $joueur1 = $this->creerUtilisateur('j1.403.camps@test.fr', TypeUtilisateur::Joueur, $tennis);
+        $joueur2 = $this->creerUtilisateur('j2.403.camps@test.fr', TypeUtilisateur::Joueur, $tennis);
+
+        $match = $this->creerMatch($joueur1, $tennis, '+30 days');
+
+        $this->requeteAuth('POST', "/api/matchs/{$match->getId()}/camps", $this->obtenirToken($joueur2));
+
+        $this->assertStatut(403);
     }
 }

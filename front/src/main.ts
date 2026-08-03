@@ -1,5 +1,6 @@
 import './assets/main.css'
 import 'leaflet/dist/leaflet.css'
+import 'vue-cal/dist/vuecal.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

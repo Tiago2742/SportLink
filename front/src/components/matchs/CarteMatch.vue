@@ -22,8 +22,10 @@ const props = defineProps<{
     createur?: { id: number; nom: string; prenom?: string | null; type?: string }
     nombreCamps?: number
     camps?: CampResume[]
+    monStatutDemande?: string | null
   }
   afficherBoutonRejoindre?: boolean
+  demandeEnvoyee?: boolean
 }>()
 
 const auth = useAuthStore()
@@ -58,10 +60,16 @@ const dejaInscrit = computed(() =>
   utilisateurEstInscrit(props.match, auth.utilisateur?.id),
 )
 
+// Demande active = demande en_attente connue côté API OU envoyée dans cette session
+const aDemandeActive = computed(
+  () => props.demandeEnvoyee || props.match.monStatutDemande === 'en_attente',
+)
+
 const peutRejoindreIndividuel = computed(
   () =>
     props.afficherBoutonRejoindre &&
     !dejaInscrit.value &&
+    !aDemandeActive.value &&
     props.match.sport?.type === 'individuel' &&
     props.match.statut !== 'termine' &&
     props.match.statut !== 'annule' &&
@@ -72,6 +80,7 @@ const lienEquipeCollectif = computed(
   () =>
     props.afficherBoutonRejoindre &&
     !dejaInscrit.value &&
+    !aDemandeActive.value &&
     props.match.sport?.type === 'collectif' &&
     auth.utilisateur?.type === 'club' &&
     placesRestantes.value > 0,
@@ -105,6 +114,7 @@ const lienEquipeCollectif = computed(
           <IconeLigne :icone="Users" :taille="14" discret>{{ libellePlaces }}</IconeLigne>
         </span>
         <span v-if="dejaInscrit" class="tag-inscrit">Vous participez</span>
+        <span v-else-if="aDemandeActive" class="tag-demande">Demande envoyée</span>
       </div>
     </div>
 
@@ -114,7 +124,7 @@ const lienEquipeCollectif = computed(
         class="btn btn-primaire"
         @click="emit('rejoindre', match.id)"
       >
-        Rejoindre le match
+        Demander à rejoindre
       </button>
       <RouterLink
         v-else-if="lienEquipeCollectif"
@@ -226,6 +236,16 @@ const lienEquipeCollectif = computed(
   font-weight: 600;
   color: var(--couleur-primaire);
   background: var(--couleur-primaire-tres-claire);
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--rayon-badge);
+  margin-left: auto;
+}
+
+.tag-demande {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--couleur-attente, #b45309);
+  background: var(--couleur-attente-fond, #fff8e1);
   padding: 0.2rem 0.55rem;
   border-radius: var(--rayon-badge);
   margin-left: auto;

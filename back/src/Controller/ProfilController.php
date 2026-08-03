@@ -6,6 +6,7 @@ use App\Entity\UtilisateurNiveau;
 use App\Entity\Utilisateur;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
+use App\Repository\AvisRepository;
 use App\Repository\NiveauRepository;
 use App\Repository\SportRepository;
 use App\Repository\UtilisateurNiveauRepository;
@@ -22,10 +23,16 @@ class ProfilController extends AbstractController
 {
     private const GROUPS = ['utilisateur:read', 'utilisateur:detail', 'utilisateur_niveau:read', 'sport:read', 'niveau:read'];
 
+    public function __construct(private AvisRepository $avisRepository) {}
+
     #[Route('', methods: ['GET'])]
     public function profil(): JsonResponse
     {
-        return $this->json($this->getUser(), 200, [], ['groups' => self::GROUPS]);
+        /** @var Utilisateur $user */
+        $user = $this->getUser();
+        $user->setReputation($this->avisRepository->calculerMoyennesRecues($user));
+
+        return $this->json($user, 200, [], ['groups' => self::GROUPS]);
     }
 
     #[Route('', methods: ['DELETE'])]

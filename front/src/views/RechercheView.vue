@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs, ajouterCamp } from '@/services/api'
+import { chargerMatchs, demanderRejoindreMatch } from '@/services/api'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
@@ -32,6 +32,7 @@ const triParDate = ref('asc')
 
 const pageCourante = ref(1)
 const parPage = 6
+const demandesEnvoyees = ref<number[]>([])
 
 const sportsDeclares = computed(() =>
   (auth.utilisateur?.niveaux ?? []).map((un: any) => un.sport).filter(Boolean),
@@ -79,6 +80,9 @@ function filtreRapideAujourdhui() {
 
 const matchsFiltres = computed(() => {
   let liste = matchs.value
+  if (auth.utilisateur?.type === 'joueur') {
+    liste = liste.filter((m) => m.sport?.type !== 'collectif')
+  }
   if (recherche.value) {
     const q = recherche.value.toLowerCase()
     liste = liste.filter(
@@ -155,15 +159,16 @@ async function rejoindreMatch(matchId: number) {
   if (!auth.utilisateur) return
   const m = matchs.value.find((x) => x.id === matchId)
   if (m && utilisateurEstInscrit(m, auth.utilisateur.id)) return
+  if (demandesEnvoyees.value.includes(matchId)) return
   try {
     if (m?.sport?.type === 'individuel') {
-      await ajouterCamp(auth.token!, matchId, { joueurId: auth.utilisateur.id })
-      await charger()
+      await demanderRejoindreMatch(auth.token!, matchId)
+      demandesEnvoyees.value = [...demandesEnvoyees.value, matchId]
     } else {
       router.push(`/matchs/${matchId}`)
     }
   } catch (e: any) {
-    alert(e.message || 'Impossible de rejoindre ce match.')
+    alert(e.message || 'Impossible d\'envoyer la demande.')
   }
 }
 </script>
@@ -268,6 +273,7 @@ async function rejoindreMatch(matchId: number) {
             :key="match.id"
             :match="match"
             :afficher-bouton-rejoindre="true"
+            :demande-envoyee="demandesEnvoyees.includes(match.id)"
             @rejoindre="rejoindreMatch"
           />
         </div>

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs, chargerMesMatchs, ajouterCamp } from '@/services/api'
+import { chargerMatchs, chargerMesMatchs, demanderRejoindreMatch } from '@/services/api'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import { useSports } from '@/composables/useSports'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
@@ -14,6 +14,7 @@ const { listeSports, niveauxPour, chargerCatalogue } = useSports()
 
 const matchsDisponibles = ref<any[]>([])
 const mesMatchs = ref<any[]>([])
+const demandesEnvoyees = ref<number[]>([])
 const chargementMatchs = ref(true)
 const erreur = ref('')
 
@@ -35,7 +36,10 @@ async function charger() {
       chargerMatchs(auth.token!, { statut: 'disponible' }),
       userId ? chargerMesMatchs(auth.token!) : Promise.resolve([]),
     ])
-    matchsDisponibles.value = disponibles.slice(0, 3)
+    const dispFiltres = auth.utilisateur?.type === 'joueur'
+      ? disponibles.filter((m: any) => m.sport?.type !== 'collectif')
+      : disponibles
+    matchsDisponibles.value = dispFiltres.slice(0, 3)
     const maintenant = new Date()
     mesMatchs.value = miens.filter((m: any) => new Date(m.dateMatch) > maintenant)
   } catch {
@@ -61,15 +65,16 @@ async function rejoindreMatch(matchId: number) {
   if (!auth.utilisateur) return
   const m = matchsDisponibles.value.find((x) => x.id === matchId)
   if (m && utilisateurEstInscrit(m, auth.utilisateur.id)) return
+  if (demandesEnvoyees.value.includes(matchId)) return
   try {
     if (m?.sport?.type === 'individuel') {
-      await ajouterCamp(auth.token!, matchId, { joueurId: auth.utilisateur.id })
-      await charger()
+      await demanderRejoindreMatch(auth.token!, matchId)
+      demandesEnvoyees.value = [...demandesEnvoyees.value, matchId]
     } else {
       router.push(`/matchs/${matchId}`)
     }
   } catch (e: any) {
-    alert(e.message || 'Impossible de rejoindre ce match.')
+    alert(e.message || 'Impossible d\'envoyer la demande.')
   }
 }
 
@@ -153,6 +158,7 @@ function jourMois(dateStr: string) {
             :key="match.id"
             :match="match"
             :afficher-bouton-rejoindre="true"
+            :demande-envoyee="demandesEnvoyees.includes(match.id)"
             @rejoindre="rejoindreMatch"
           />
         </div>

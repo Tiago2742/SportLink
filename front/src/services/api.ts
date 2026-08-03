@@ -88,6 +88,10 @@ export const chargerMatchs = (token: string, filtres: Record<string, unknown> = 
 export const chargerMesMatchs = (token: string, filtres: Record<string, unknown> = {}) =>
   chargerMatchs(token, { mesMatchs: 1, ...filtres })
 
+/** Matchs des équipes dont le joueur est membre confirmé */
+export const chargerMesMatchsEquipes = (token: string) =>
+  requete('GET', '/matchs?mesMatchsEquipes=1', null, token)
+
 export const chargerMatch = (token: string, id: number) =>
   requete('GET', `/matchs/${id}`, null, token)
 
@@ -200,3 +204,33 @@ export const rechercherJoueurs = (token: string, q: string, sportId?: number) =>
 
 export const supprimerCompte = (token: string) =>
   requete('DELETE', '/profil', null, token)
+
+// Demandes de match
+export const demanderRejoindreMatch = (token: string, matchId: number, equipeId?: number) =>
+  requete('POST', `/matchs/${matchId}/demandes`, equipeId ? { equipeId } : {}, token)
+
+export const chargerMaDemande = (token: string, matchId: number) =>
+  requete('GET', `/matchs/${matchId}/ma-demande`, null, token)
+
+export const chargerDemandesMatch = (token: string, matchId: number, statut?: string) =>
+  requete('GET', `/matchs/${matchId}/demandes` + (statut ? `?statut=${statut}` : ''), null, token)
+
+export const repondreDemandeMatch = (
+  token: string,
+  matchId: number,
+  demandeId: number,
+  statut: 'acceptee' | 'refusee',
+) => requete('PATCH', `/matchs/${matchId}/demandes/${demandeId}`, { statut }, token)
+
+export const annulerDemandeMatch = (token: string, matchId: number, demandeId: number) =>
+  requete('DELETE', `/matchs/${matchId}/demandes/${demandeId}`, null, token)
+
+// Avis / Réputation
+export const deposerAvis = (
+  token: string,
+  matchId: number,
+  donnees: { ponctualite: number; fairPlay: number; niveauConforme: number },
+) => requete('POST', `/matchs/${matchId}/avis`, donnees, token)
+
+export const chargerProfilPublic = (token: string, id: number) =>
+  requete('GET', `/profils/${id}`, null, token)

@@ -2,18 +2,21 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMesMatchs } from '@/services/api'
+import { chargerMesMatchs, chargerMesMatchsEquipes } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
+import BadgeCompteur from '@/components/ui/BadgeCompteur.vue'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
-import { MapPin, Trophy } from 'lucide-vue-next'
+import { MapPin, Trophy, Users } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
 
 const matchs = ref<any[]>([])
+const matchsEquipes = ref<any[]>([])
 const chargement = ref(true)
 const erreur = ref('')
 const filtreStatut = ref('')
+const ongletActif = ref<'individuels' | 'equipes'>('individuels')
 
 onMounted(charger)
 
@@ -22,7 +25,16 @@ async function charger() {
   erreur.value = ''
   const userId = auth.utilisateur?.id
   try {
-    matchs.value = userId ? await chargerMesMatchs(auth.token!) : []
+    if (auth.utilisateur?.type === 'joueur') {
+      const [individuels, equipes] = await Promise.all([
+        userId ? chargerMesMatchs(auth.token!) : Promise.resolve([]),
+        userId ? chargerMesMatchsEquipes(auth.token!) : Promise.resolve([]),
+      ])
+      matchs.value = individuels
+      matchsEquipes.value = equipes
+    } else {
+      matchs.value = userId ? await chargerMesMatchs(auth.token!) : []
+    }
   } catch {
     erreur.value = 'Impossible de charger vos matchs.'
   } finally {
@@ -38,7 +50,20 @@ function estTermine(match: { statut: string; dateMatch: string }) {
   return match.statut === 'termine' || estPasse(match.dateMatch)
 }
 
-const mesMatchs = computed(() => matchs.value)
+function nomsCamps(match: any): string {
+  const equipes = (match.camps ?? [])
+    .filter((c: any) => c.equipe?.nom)
+    .map((c: any) => c.equipe.nom)
+  return equipes.join(' vs ')
+}
+
+const sourceActive = computed(() =>
+  auth.utilisateur?.type === 'joueur' && ongletActif.value === 'equipes'
+    ? matchsEquipes.value
+    : matchs.value,
+)
+
+const mesMatchs = computed(() => sourceActive.value)
 
 const matchsFiltres = computed(() => {
   let liste = mesMatchs.value
@@ -97,6 +122,28 @@ function formaterDate(dateStr: string) {
         <RouterLink to="/creer-match" class="btn btn-primaire">+ Créer un match</RouterLink>
       </div>
 
+      <!-- ── Onglets joueur ── -->
+      <nav v-if="auth.utilisateur?.type === 'joueur'" class="onglets" aria-label="Basculer entre les types de matchs">
+        <button
+          class="onglet"
+          :class="{ actif: ongletActif === 'individuels' }"
+          @click="ongletActif = 'individuels'; filtreStatut = ''"
+        >
+          <Trophy :size="15" stroke-width="2.25" aria-hidden="true" />
+          Mes matchs
+          <span class="onglet-count">{{ matchs.length }}</span>
+        </button>
+        <button
+          class="onglet"
+          :class="{ actif: ongletActif === 'equipes' }"
+          @click="ongletActif = 'equipes'; filtreStatut = ''"
+        >
+          <Users :size="15" stroke-width="2.25" aria-hidden="true" />
+          Matchs d'équipe
+          <span class="onglet-count">{{ matchsEquipes.length }}</span>
+        </button>
+      </nav>
+
       <!-- ── Filtres (pill container) ── -->
       <nav class="filtres-statut" aria-label="Filtrer les matchs">
         <button class="chip" :class="{ actif: filtreStatut === '' }" @click="filtreStatut = ''">
@@ -154,6 +201,9 @@ function formaterDate(dateStr: string) {
                   </div>
                   <div class="ligne-info">
                     <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                    <span v-if="ongletActif === 'equipes' && nomsCamps(match)" class="ligne-equipes">
+                      {{ nomsCamps(match) }}
+                    </span>
                     <span>{{ formaterDate(match.dateMatch) }}</span>
                     <IconeLigne v-if="match.lieu" :icone="MapPin" :taille="13" discret class="ligne-lieu">
                       {{ match.lieu }}
@@ -161,6 +211,10 @@ function formaterDate(dateStr: string) {
                   </div>
                 </div>
                 <div class="ligne-droite">
+                  <BadgeCompteur
+                    v-if="match.createur?.id === auth.utilisateur?.id"
+                    :nombre="match.demandesEnAttenteCount ?? 0"
+                  />
                   <BadgeStatut :statut="match.statut" />
                   <span class="ligne-fleche" aria-hidden="true">›</span>
                 </div>
@@ -184,6 +238,9 @@ function formaterDate(dateStr: string) {
                   </div>
                   <div class="ligne-info">
                     <strong>{{ match.sport?.nom ?? 'Sport' }}</strong>
+                    <span v-if="ongletActif === 'equipes' && nomsCamps(match)" class="ligne-equipes">
+                      {{ nomsCamps(match) }}
+                    </span>
                     <span>{{ formaterDate(match.dateMatch) }}</span>
                     <IconeLigne v-if="match.lieu" :icone="MapPin" :taille="13" discret class="ligne-lieu">
                       {{ match.lieu }}
@@ -191,6 +248,10 @@ function formaterDate(dateStr: string) {
                   </div>
                 </div>
                 <div class="ligne-droite">
+                  <BadgeCompteur
+                    v-if="match.createur?.id === auth.utilisateur?.id"
+                    :nombre="match.demandesEnAttenteCount ?? 0"
+                  />
                   <BadgeStatut :statut="match.statut" />
                   <span class="ligne-fleche" aria-hidden="true">›</span>
                 </div>
@@ -230,6 +291,10 @@ function formaterDate(dateStr: string) {
                 </div>
               </div>
               <div class="ligne-droite">
+                <BadgeCompteur
+                  v-if="match.createur?.id === auth.utilisateur?.id"
+                  :nombre="match.demandesEnAttenteCount ?? 0"
+                />
                 <BadgeStatut :statut="match.statut" />
                 <span class="ligne-fleche" aria-hidden="true">›</span>
               </div>
@@ -240,11 +305,18 @@ function formaterDate(dateStr: string) {
         <!-- État vide global -->
         <div v-if="mesMatchs.length === 0" class="etat-vide">
           <div class="vide-icone-cercle" aria-hidden="true">
-            <Trophy :size="28" stroke-width="1.5" />
+            <component :is="ongletActif === 'equipes' ? Users : Trophy" :size="28" stroke-width="1.5" />
           </div>
-          <p class="vide-titre">Aucun match pour le moment</p>
-          <p class="vide-desc">Participez à votre premier match ou créez-en un.</p>
-          <RouterLink to="/rechercher" class="btn btn-secondaire">Trouver un match</RouterLink>
+          <template v-if="ongletActif === 'equipes'">
+            <p class="vide-titre">Aucun match d'équipe</p>
+            <p class="vide-desc">Rejoignez une équipe pour voir ses matchs ici.</p>
+            <RouterLink to="/mes-equipes" class="btn btn-secondaire">Mes équipes</RouterLink>
+          </template>
+          <template v-else>
+            <p class="vide-titre">Aucun match pour le moment</p>
+            <p class="vide-desc">Participez à votre premier match ou créez-en un.</p>
+            <RouterLink to="/rechercher" class="btn btn-secondaire">Trouver un match</RouterLink>
+          </template>
         </div>
 
         <!-- Filtre sans résultat -->
@@ -338,6 +410,68 @@ function formaterDate(dateStr: string) {
 .sous-titre {
   color: var(--couleur-texte-discret);
   font-size: 0.88rem;
+}
+
+/* ══════════════════════════════════════
+   ONGLETS JOUEUR
+══════════════════════════════════════ */
+.onglets {
+  display: flex;
+  gap: 4px;
+  background: #ffffff;
+  border: 1.5px solid #dde8dd;
+  border-radius: 10px;
+  padding: 4px;
+  animation: fadeUp 0.48s cubic-bezier(0.22, 1, 0.36, 1) 0.04s both;
+}
+
+.onglet {
+  flex: 1;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+  color: var(--couleur-texte-discret);
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.onglet:hover {
+  background: var(--couleur-primaire-tres-claire);
+  color: var(--couleur-primaire);
+}
+
+.onglet.actif {
+  background: var(--couleur-primaire);
+  color: white;
+  font-weight: 700;
+}
+
+.onglet-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--rayon-badge);
+  background: var(--couleur-accent-fond);
+  color: var(--couleur-accent-texte);
+  line-height: 1.5;
+}
+
+.onglet.actif .onglet-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+
+.ligne-equipes {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--couleur-primaire);
 }
 
 /* ══════════════════════════════════════

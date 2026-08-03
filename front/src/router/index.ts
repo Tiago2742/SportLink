@@ -32,6 +32,12 @@ const router = createRouter({
       meta: { requiertAuth: true },
     },
     {
+      path: '/calendrier',
+      name: 'calendrier',
+      component: () => import('@/views/CalendrierView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
       path: '/rechercher',
       name: 'rechercher',
       component: () => import('@/views/RechercheView.vue'),
@@ -84,6 +90,12 @@ const router = createRouter({
       path: '/matchs/:id',
       name: 'match-detail',
       component: () => import('@/views/DetailMatchView.vue'),
+      meta: { requiertAuth: true },
+    },
+    {
+      path: '/profils/:id',
+      name: 'profil-public',
+      component: () => import('@/views/ProfilPublicView.vue'),
       meta: { requiertAuth: true },
     },
     {

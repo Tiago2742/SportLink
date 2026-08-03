@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\StatutDemande;
 use App\Enum\StatutGame;
 use App\Repository\GameRepository;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -71,10 +72,23 @@ class Game
     #[Groups(['game:read'])]
     private ?Resultat $resultat = null;
 
+    /** @var Collection<int, DemandeMatch> */
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: DemandeMatch::class, orphanRemoval: true)]
+    private Collection $demandes;
+
+    /** @var Collection<int, Avis> */
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: Avis::class, orphanRemoval: true)]
+    private Collection $avis;
+
+    /** Statut de la demande de l'utilisateur courant — valorisé par le contrôleur, jamais persisté. */
+    private ?string $monStatutDemande = null;
+
     public function __construct()
     {
         $this->camps    = new ArrayCollection();
         $this->messages = new ArrayCollection();
+        $this->demandes = new ArrayCollection();
+        $this->avis     = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -244,6 +258,55 @@ class Game
             $resultat->setGame($this);
         }
         $this->resultat = $resultat;
+        return $this;
+    }
+
+    /** @return Collection<int, DemandeMatch> */
+    public function getDemandes(): Collection
+    {
+        return $this->demandes;
+    }
+
+    /** Nombre de demandes en attente — exposé dans game:list pour le badge. */
+    #[Groups(['game:list', 'game:read'])]
+    public function getDemandesEnAttenteCount(): int
+    {
+        return $this->demandes->filter(
+            static fn(DemandeMatch $d) => $d->getStatut() === StatutDemande::EnAttente
+        )->count();
+    }
+
+    /** Statut de la demande de l'utilisateur courant (null si aucune). Valorisé par le contrôleur avant serialisation. */
+    #[Groups(['game:list', 'game:read'])]
+    public function getMonStatutDemande(): ?string
+    {
+        return $this->monStatutDemande;
+    }
+
+    public function setMonStatutDemande(?string $statut): static
+    {
+        $this->monStatutDemande = $statut;
+        return $this;
+    }
+
+    /** @return Collection<int, Avis> */
+    public function getAvis(): Collection
+    {
+        return $this->avis;
+    }
+
+    /** Avis déposé par l'utilisateur courant — valorisé par le contrôleur, jamais persisté. */
+    private ?array $monAvis = null;
+
+    #[Groups(['game:read'])]
+    public function getMonAvis(): ?array
+    {
+        return $this->monAvis;
+    }
+
+    public function setMonAvis(?array $avis): static
+    {
+        $this->monAvis = $avis;
         return $this;
     }
 }

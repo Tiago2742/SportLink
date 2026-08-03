@@ -8,6 +8,7 @@ import { useEspaceEquipesJoueur } from '@/composables/useEspaceEquipesJoueur'
 import { nomAffichage } from '@/utils/nomAffichage'
 import {
   CalendarDays,
+  CalendarRange,
   CirclePlus,
   Home,
   LogOut,
@@ -40,6 +41,7 @@ const estMesEquipesJoueur = computed(
     route.path.startsWith('/equipes/') ||
     route.path === '/invitations-equipes',
 )
+const estCalendrier = computed(() => route.path.startsWith('/calendrier'))
 const estRecherche = computed(() => route.path.startsWith('/rechercher'))
 const estCreerMatch = computed(() => route.path === '/creer-match')
 const estProfil = computed(() => route.path === '/profil')
@@ -133,6 +135,16 @@ function deconnecter() {
           >
             <CalendarDays :size="18" stroke-width="2.25" aria-hidden="true" />
             <span>Mes matchs</span>
+          </RouterLink>
+
+          <RouterLink
+            to="/calendrier"
+            class="nav-lien"
+            :class="{ 'nav-lien--actif': estCalendrier }"
+            @click="fermerMenus"
+          >
+            <CalendarRange :size="18" stroke-width="2.25" aria-hidden="true" />
+            <span>Calendrier</span>
           </RouterLink>
 
           <RouterLink

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import {
   chargerMesMatchs,
   chargerEquipes,
+  chargerProfil,
   mettreAJourLogo,
   ajouterSportNiveau,
   modifierNiveauSport,
@@ -14,7 +15,7 @@ import { useSports } from '@/composables/useSports'
 import IconeSection from '@/components/ui/IconeSection.vue'
 import SelecteurSportNiveau from '@/components/form/SelecteurSportNiveau.vue'
 import type { EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
-import { AlertTriangle, Calendar, Image, KeyRound, Lock, Pencil, Trash2, Trophy, Users } from 'lucide-vue-next'
+import { AlertTriangle, Calendar, Image, KeyRound, Lock, Pencil, Star, Trash2, Trophy, Users } from 'lucide-vue-next'
 
 const auth    = useAuthStore()
 const router  = useRouter()
@@ -46,10 +47,13 @@ onMounted(async () => {
   const userId = auth.utilisateur?.id
   if (!userId) { chargement.value = false; return }
   try {
-    const [matchs, equipes] = await Promise.all([
+    const [profilFrais, matchs, equipes] = await Promise.all([
+      chargerProfil(auth.token!),
       chargerMesMatchs(auth.token!),
       chargerEquipes(auth.token!, { clubId: userId }),
     ])
+    profil.value = profilFrais
+    auth.rafraichirProfil(profilFrais)
     mesMatchs.value  = matchs
     mesEquipes.value = equipes
   } finally {
@@ -410,6 +414,69 @@ function formaterDate(dateStr: string) {
               Les clubs ne peuvent déclarer que des sports collectifs.
             </p>
           </div>
+        </section>
+
+        <!-- ── Carte Réputation ── -->
+        <section class="carte section-reputation">
+          <div class="section-titre-icone">
+            <IconeSection :icone="Star" label="Réputation" />
+            <h2>Réputation</h2>
+            <span v-if="profil?.reputation?.total" class="section-badge">
+              {{ profil.reputation.total }} avis
+            </span>
+          </div>
+
+          <template v-if="profil?.reputation">
+            <div class="reputation-grille">
+              <div class="reputation-critere">
+                <span class="reputation-label">Ponctualité</span>
+                <div class="reputation-score">
+                  <span class="reputation-note">{{ profil.reputation.ponctualite.toFixed(1) }}</span>
+                  <div class="etoiles" aria-hidden="true">
+                    <span
+                      v-for="i in 5" :key="i"
+                      class="etoile"
+                      :class="{ 'etoile--active': i <= Math.round(profil.reputation.ponctualite) }"
+                    >★</span>
+                  </div>
+                </div>
+              </div>
+              <div class="reputation-critere">
+                <span class="reputation-label">Fair-play</span>
+                <div class="reputation-score">
+                  <span class="reputation-note">{{ profil.reputation.fairPlay.toFixed(1) }}</span>
+                  <div class="etoiles" aria-hidden="true">
+                    <span
+                      v-for="i in 5" :key="i"
+                      class="etoile"
+                      :class="{ 'etoile--active': i <= Math.round(profil.reputation.fairPlay) }"
+                    >★</span>
+                  </div>
+                </div>
+              </div>
+              <div class="reputation-critere">
+                <span class="reputation-label">Niveau conforme</span>
+                <div class="reputation-score">
+                  <span class="reputation-note">{{ profil.reputation.niveauConforme.toFixed(1) }}</span>
+                  <div class="etoiles" aria-hidden="true">
+                    <span
+                      v-for="i in 5" :key="i"
+                      class="etoile"
+                      :class="{ 'etoile--active': i <= Math.round(profil.reputation.niveauConforme) }"
+                    >★</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="reputation-total">
+              Basé sur {{ profil.reputation.total }} évaluation{{ profil.reputation.total > 1 ? 's' : '' }}
+            </p>
+          </template>
+
+          <template v-else>
+            <p class="section-desc">Aucune évaluation reçue pour le moment.</p>
+            <p class="reputation-sous-desc">Les évaluations apparaîtront ici après vos matchs terminés.</p>
+          </template>
         </section>
 
         <!-- ── Grid secondaire (sécurité + équipes) ── -->
@@ -1094,6 +1161,82 @@ button:disabled {
   .btn-modifier { width: 100%; justify-content: center; }
   .logo-form { width: 100%; }
   .sport-ligne-info { flex-wrap: wrap; }
+}
+
+/* ══════════════════════════════════════
+   SECTION RÉPUTATION
+══════════════════════════════════════ */
+.section-reputation {
+  padding: var(--espace-l);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.11s both;
+}
+
+.reputation-grille {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--espace-m);
+}
+
+.reputation-critere {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--couleur-bordure);
+}
+
+.reputation-critere:last-child {
+  border-bottom: none;
+}
+
+.reputation-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--couleur-titre);
+}
+
+.reputation-score {
+  display: flex;
+  align-items: center;
+  gap: var(--espace-s);
+}
+
+.reputation-note {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--couleur-titre);
+  min-width: 2.2rem;
+  text-align: right;
+}
+
+.etoiles {
+  display: flex;
+  gap: 2px;
+}
+
+.etoile {
+  font-size: 1.1rem;
+  color: #d0d0d0;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.etoile--active {
+  color: #f5a623;
+}
+
+.reputation-total {
+  font-size: 0.8rem;
+  color: var(--couleur-texte-discret);
+  text-align: right;
+  font-style: italic;
+}
+
+.reputation-sous-desc {
+  font-size: 0.82rem;
+  color: var(--couleur-texte-discret);
+  font-style: italic;
+  margin-top: 0.25rem;
 }
 
 /* ══════════════════════════════════════

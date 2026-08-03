@@ -11,6 +11,7 @@ import {
   retirerMembre,
 } from '@/services/api'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
+import LienUtilisateur from '@/components/utilisateurs/LienUtilisateur.vue'
 import {
   classeBadgeStatutMembre,
   libelleRoleEquipe,
@@ -389,7 +390,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
                 <span class="membre-avatar membre-avatar-sm">
                   {{ initialesUtilisateur(demande.utilisateur) }}
                 </span>
-                <strong>{{ nomAffichage(demande.utilisateur) }}</strong>
+                <LienUtilisateur :utilisateur="demande.utilisateur" />
               </div>
               <div class="demande-boutons">
                 <button
@@ -466,7 +467,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
                 {{ initialesUtilisateur(membre.utilisateur) }}
               </div>
               <div class="membre-info">
-                <strong>{{ nomAffichage(membre.utilisateur) }}</strong>
+                <LienUtilisateur :utilisateur="membre.utilisateur" />
                 <span class="membre-role">{{ libelleRoleEquipe(membre.role) }}</span>
                 <span
                   v-if="membre.statut && membre.statut !== 'confirme'"
@@ -823,6 +824,17 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   gap: var(--espace-s);
 }
 
+.demande-joueur :deep(.lien-utilisateur) {
+  font-weight: 700;
+  border-bottom: none;
+}
+
+.demande-joueur :deep(.lien-utilisateur):hover {
+  color: var(--couleur-primaire);
+  text-decoration: underline;
+  border-bottom: none;
+}
+
 .demande-boutons {
   display: flex;
   gap: var(--espace-s);
@@ -949,10 +961,18 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
   text-align: left;
 }
 
-.membre-info strong {
+.membre-info strong,
+.membre-info :deep(.lien-utilisateur) {
   font-size: 0.9rem;
   color: var(--couleur-titre);
   font-weight: 700;
+  border-bottom: none;
+}
+
+.membre-info :deep(.lien-utilisateur):hover {
+  color: var(--couleur-primaire);
+  border-bottom: none;
+  text-decoration: underline;
 }
 
 .membre-role {

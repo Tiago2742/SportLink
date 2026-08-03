@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Game;
+use App\Enum\StatutMembreEquipe;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -95,6 +96,36 @@ class GameRepository extends ServiceEntityRepository
             ->where('g.dateMatch < :maintenant')
             ->andWhere("g.statut IN ('en_attente', 'confirme')")
             ->setParameter('maintenant', new \DateTime())
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Matchs des équipes d'un joueur : matchs où une équipe dont le joueur est membre confirmé participe.
+     *
+     * @return Game[]
+     */
+    public function trouverPourEquipesJoueur(int $joueurId): array
+    {
+        return $this->createQueryBuilder('g')
+            ->distinct()
+            ->addSelect('s', 'n', 'c', 'camps')
+            ->leftJoin('g.sport', 's')
+            ->leftJoin('g.niveauRequis', 'n')
+            ->leftJoin('g.createur', 'c')
+            ->leftJoin('g.camps', 'camps')
+            ->where('EXISTS (
+                SELECT 1 FROM App\Entity\MatchCamp mc
+                JOIN mc.equipe e
+                JOIN e.membres ej
+                JOIN ej.utilisateur u
+                WHERE mc.game = g
+                AND u.id = :joueurId
+                AND ej.statut = :statut
+            )')
+            ->setParameter('joueurId', $joueurId)
+            ->setParameter('statut', StatutMembreEquipe::Confirme)
+            ->orderBy('g.dateMatch', 'ASC')
             ->getQuery()
             ->getResult();
     }

@@ -14,6 +14,7 @@ use App\Enum\StatutGame;
 use App\Enum\StatutMatchCamp;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
+use App\Repository\DemandeMatchRepository;
 use App\Repository\EquipeRepository;
 use App\Repository\UtilisateurNiveauRepository;
 use App\Repository\UtilisateurRepository;
@@ -26,6 +27,7 @@ class MatchService
         private EquipeRepository            $equipeRepository,
         private UtilisateurRepository       $utilisateurRepository,
         private UtilisateurNiveauRepository $utilisateurNiveauRepository,
+        private DemandeMatchRepository      $demandeMatchRepository,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -301,6 +303,12 @@ class MatchService
 
         $camp->setStatut($nouveauStatut);
         $this->actualiserStatutMatch($camp->getGame());
+
+        // Greffe : si le match vient de passer confirmé, purger les demandes en attente
+        if ($camp->getGame()->getStatut() === StatutGame::Confirme) {
+            $this->demandeMatchRepository->refuserToutesEnAttente($camp->getGame());
+        }
+
         $this->em->flush();
 
         return $camp;

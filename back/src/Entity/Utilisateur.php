@@ -93,13 +93,18 @@ class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'expediteur', orphanRemoval: true)]
     private Collection $messages;
 
+    /** @var Collection<int, Avis> */
+    #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'evalue', orphanRemoval: true)]
+    private Collection $avisRecus;
+
     public function __construct()
     {
         $this->equipesGerees = new ArrayCollection();
-        $this->matchsCrees = new ArrayCollection();
+        $this->matchsCrees   = new ArrayCollection();
         $this->equipesJoueur = new ArrayCollection();
-$this->messages = new ArrayCollection();
-        $this->niveaux = new ArrayCollection();
+        $this->messages      = new ArrayCollection();
+        $this->niveaux       = new ArrayCollection();
+        $this->avisRecus     = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -381,6 +386,27 @@ $this->messages = new ArrayCollection();
             }
         }
 
+        return $this;
+    }
+
+    /** @return Collection<int, Avis> */
+    public function getAvisRecus(): Collection
+    {
+        return $this->avisRecus;
+    }
+
+    /** Réputation calculée — valorisée par le contrôleur, jamais persistée. */
+    private ?array $reputation = null;
+
+    #[Groups(['utilisateur:read', 'utilisateur:public'])]
+    public function getReputation(): ?array
+    {
+        return $this->reputation;
+    }
+
+    public function setReputation(?array $reputation): static
+    {
+        $this->reputation = $reputation;
         return $this;
     }
 }

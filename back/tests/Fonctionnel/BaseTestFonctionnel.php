@@ -158,6 +158,37 @@ abstract class BaseTestFonctionnel extends WebTestCase
         return $equipe;
     }
 
+    /**
+     * Crée un match en base avec un statut arbitraire et camp_1 confirmé pour
+     * le créateur. Permet de tester les gardes de statut côté serveur.
+     */
+    protected function creerMatchAvecStatut(
+        Utilisateur $createur,
+        Sport $sport,
+        StatutGame $statut,
+        string $dateMatch = '-1 day',
+    ): Game {
+        $match = new Game();
+        $match->setSport($sport);
+        $match->setDateMatch(new \DateTime($dateMatch));
+        $match->setLieu('Terrain test');
+        $match->setStatut($statut);
+        $match->setCreateur($createur);
+        $this->em->persist($match);
+
+        $camp1 = new MatchCamp();
+        $camp1->setRole(RoleMatchCamp::Camp1);
+        $camp1->setStatut(StatutMatchCamp::Confirme);
+        if ($sport->getType() === TypeSport::Individuel) {
+            $camp1->setJoueur($createur);
+        }
+        $match->addCamp($camp1);
+        $this->em->persist($camp1);
+
+        $this->em->flush();
+        return $match;
+    }
+
     protected function obtenirToken(Utilisateur $utilisateur): string
     {
         $jwtManager = static::getContainer()->get('lexik_jwt_authentication.jwt_manager');
