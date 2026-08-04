@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useSports } from '@/composables/useSports'
+import AppSelect from '@/components/form/AppSelect.vue'
 
 export interface EntreeSportNiveau {
   sportId: number
@@ -80,21 +81,21 @@ function retirer(index: number) {
 
     <!-- Ajout d'un sport -->
     <div class="ajout-sport">
-      <select v-model="sportEnCours" class="champ" @change="onSportChange">
-        <option value="">Choisir un sport</option>
-        <option v-for="sport in sportsFiltres" :key="sport.id" :value="sport.id">
-          {{ sport.nom }}
-        </option>
-      </select>
+      <AppSelect
+        v-model="sportEnCours"
+        :options="sportsFiltres.map(s => ({ value: s.id, label: s.nom }))"
+        :searchable="true"
+        placeholder="Choisir un sport"
+        @change="onSportChange"
+      />
 
-      <select v-model="niveauEnCours" class="champ" :disabled="sportEnCours === ''">
-        <option value="">
-          {{ sportEnCours !== '' ? 'Choisir un niveau' : '— sélectionner un sport d\'abord —' }}
-        </option>
-        <option v-for="niveau in niveauxDisponibles" :key="niveau.id" :value="niveau.id">
-          {{ niveau.libelle }}
-        </option>
-      </select>
+      <AppSelect
+        v-model="niveauEnCours"
+        :options="niveauxDisponibles.map(n => ({ value: n.id, label: n.libelle }))"
+        :searchable="false"
+        :placeholder="sportEnCours !== '' ? 'Choisir un niveau' : '— sélectionner un sport d\'abord —'"
+        :disabled="sportEnCours === ''"
+      />
 
       <button
         type="button"

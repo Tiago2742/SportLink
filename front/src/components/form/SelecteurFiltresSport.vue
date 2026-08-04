@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useSports } from '@/composables/useSports'
+import AppSelect from '@/components/form/AppSelect.vue'
 
 const props = defineProps<{
   sport: number | ''
@@ -23,29 +24,39 @@ const niveauxDisponibles = computed(() =>
   props.sport !== '' ? niveauxPour(props.sport as number) : [],
 )
 
-function onSportChange(event: Event) {
-  const val = (event.target as HTMLSelectElement).value
-  emit('update:sport', val !== '' ? Number(val) : '')
-  emit('update:niveau', '')
-}
+// Computed v-models : évitent des event handlers natifs
+const sportComputed = computed({
+  get: (): number | '' => props.sport,
+  set: (val: number | string | '') => {
+    emit('update:sport', val === '' ? '' : (val as number))
+    emit('update:niveau', '')
+  },
+})
 
-function onNiveauChange(event: Event) {
-  const val = (event.target as HTMLSelectElement).value
-  emit('update:niveau', val !== '' ? Number(val) : '')
-}
+const niveauComputed = computed({
+  get: (): number | '' => props.niveau,
+  set: (val: number | string | '') => {
+    emit('update:niveau', val === '' ? '' : (val as number))
+  },
+})
 </script>
 
 <template>
   <div class="filtres-sport">
-    <select class="champ" :value="sport !== '' ? sport : ''" @change="onSportChange">
-      <option value="">Tous les sports</option>
-      <option v-for="s in listeFiltree" :key="s.id" :value="s.id">{{ s.nom }}</option>
-    </select>
+    <AppSelect
+      v-model="sportComputed"
+      :options="listeFiltree.map(s => ({ value: s.id, label: s.nom }))"
+      :searchable="true"
+      placeholder="Tous les sports"
+    />
 
-    <select class="champ" :value="niveau !== '' ? niveau : ''" @change="onNiveauChange" :disabled="sport === ''">
-      <option value="">Tous niveaux</option>
-      <option v-for="n in niveauxDisponibles" :key="n.id" :value="n.id">{{ n.libelle }}</option>
-    </select>
+    <AppSelect
+      v-model="niveauComputed"
+      :options="niveauxDisponibles.map(n => ({ value: n.id, label: n.libelle }))"
+      :searchable="false"
+      placeholder="Tous niveaux"
+      :disabled="sport === ''"
+    />
   </div>
 </template>
 

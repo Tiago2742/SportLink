@@ -26,6 +26,7 @@ import FormAvis from '@/components/matchs/FormAvis.vue'
 import LienUtilisateur from '@/components/utilisateurs/LienUtilisateur.vue'
 import { initialesUtilisateur, nomAffichage } from '@/utils/nomAffichage'
 import { ArrowLeft, Calendar, FileText, MapPin, Target, User } from 'lucide-vue-next'
+import AppSelect from '@/components/form/AppSelect.vue'
 import L from 'leaflet'
 
 const auth = useAuthStore()
@@ -670,25 +671,20 @@ function formaterHeure(dateStr: string) {
             <template v-else-if="peutRejoindre && sportCollectif && estClub">
               <div class="champ-groupe">
                 <label for="equipeMatch">Votre équipe</label>
-                <select
-                  id="equipeMatch"
+                <AppSelect
                   v-model="equipeSelectionnee"
-                  class="champ"
+                  :options="equipesDuClub.map(eq => ({ value: eq.id, label: eq.nom }))"
+                  :searchable="true"
+                  :placeholder="
+                    chargementEquipes
+                      ? 'Chargement…'
+                      : equipesDuClub.length === 0
+                        ? 'Aucune équipe pour ce sport'
+                        : 'Choisir une équipe'
+                  "
                   :disabled="chargementEquipes || equipesDuClub.length === 0"
-                >
-                  <option value="">
-                    {{
-                      chargementEquipes
-                        ? 'Chargement…'
-                        : equipesDuClub.length === 0
-                          ? 'Aucune équipe pour ce sport'
-                          : 'Choisir une équipe'
-                    }}
-                  </option>
-                  <option v-for="eq in equipesDuClub" :key="eq.id" :value="eq.id">
-                    {{ eq.nom }}
-                  </option>
-                </select>
+                  :loading="chargementEquipes"
+                />
               </div>
               <button class="btn btn-primaire btn-pleine-largeur" @click="demanderRejoindreLeMatch">
                 Envoyer ma demande
@@ -811,7 +807,7 @@ function formaterHeure(dateStr: string) {
   background: #f5f9f5;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
 }
 
 .page-detail::before {
@@ -873,7 +869,6 @@ function formaterHeure(dateStr: string) {
   border: 1.5px solid #dde8dd;
   box-shadow: none;
   position: relative;
-  overflow: hidden;
 }
 
 .carte::before {

@@ -7,6 +7,7 @@ import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
 import { Search } from 'lucide-vue-next'
+import AppSelect from '@/components/form/AppSelect.vue'
 import L from 'leaflet'
 
 const auth = useAuthStore()
@@ -28,15 +29,19 @@ const filtres = ref({
 })
 
 const recherche = ref((route.query.q as string) || '')
-const triParDate = ref('asc')
 
 const pageCourante = ref(1)
 const parPage = 6
 const demandesEnvoyees = ref<number[]>([])
 
-const sportsDeclares = computed(() =>
-  (auth.utilisateur?.niveaux ?? []).map((un: any) => un.sport).filter(Boolean),
-)
+const sportsDeclares = computed(() => {
+  const tous = (auth.utilisateur?.niveaux ?? []).map((un: any) => un.sport).filter(Boolean)
+  // Un joueur ne peut rejoindre que des matchs individuels → filtrer la liste
+  if (auth.utilisateur?.type === 'joueur') {
+    return tous.filter((s: any) => s.type === 'individuel')
+  }
+  return tous
+})
 
 const chipsRapides = computed(() => sportsDeclares.value.slice(0, 5))
 
@@ -92,26 +97,22 @@ const matchsFiltres = computed(() => {
         m.niveauRequis?.libelle?.toLowerCase().includes(q),
     )
   }
-  return liste
-})
-
-const matchsTries = computed(() => {
-  return [...matchsFiltres.value].sort((a, b) => {
-    const diff = new Date(a.dateMatch).getTime() - new Date(b.dateMatch).getTime()
-    return triParDate.value === 'asc' ? diff : -diff
-  })
+  // Toujours triés par date croissante (prochain match en premier)
+  return [...liste].sort(
+    (a, b) => new Date(a.dateMatch).getTime() - new Date(b.dateMatch).getTime(),
+  )
 })
 
 const matchsGeocodes = computed(() =>
-  matchsTries.value.filter((m: any) => m.latitude != null && m.longitude != null),
+  matchsFiltres.value.filter((m: any) => m.latitude != null && m.longitude != null),
 )
 
 const aCarteActive = computed(() => matchsGeocodes.value.length > 0)
 
-const totalPages = computed(() => Math.ceil(matchsTries.value.length / parPage))
+const totalPages = computed(() => Math.ceil(matchsFiltres.value.length / parPage))
 
 const matchsPage = computed(() =>
-  matchsTries.value.slice((pageCourante.value - 1) * parPage, pageCourante.value * parPage),
+  matchsFiltres.value.slice((pageCourante.value - 1) * parPage, pageCourante.value * parPage),
 )
 
 function initCarteRecherche() {
@@ -243,16 +244,10 @@ async function rejoindreMatch(matchId: number) {
         </div>
 
         <!-- En-tête résultats -->
-        <div class="resultats-entete">
-          <h2 class="section-titre">
-            Matchs disponibles
-            <span class="resultats-count">({{ matchsFiltres.length }} résultats)</span>
-          </h2>
-          <select v-model="triParDate" class="champ champ-tri">
-            <option value="asc">Trier par date (plus ancien)</option>
-            <option value="desc">Trier par date (plus récent)</option>
-          </select>
-        </div>
+        <h2 class="section-titre">
+          Matchs disponibles
+          <span class="resultats-count">({{ matchsFiltres.length }} résultats)</span>
+        </h2>
 
         <!-- Carte des matchs géolocalisés -->
         <section v-if="aCarteActive" class="section-carte-matchs">
@@ -318,7 +313,7 @@ async function rejoindreMatch(matchId: number) {
   background: #f5f9f5;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
 }
 
 .page-recherche::before {
@@ -392,7 +387,6 @@ async function rejoindreMatch(matchId: number) {
   border: 1.5px solid #dde8dd;
   box-shadow: none;
   position: relative;
-  overflow: hidden;
 }
 
 .carte::before {

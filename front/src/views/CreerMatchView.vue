@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { creerMatch, chargerEquipes } from '@/services/api'
 import { CircleCheck, Users, Zap } from 'lucide-vue-next'
 import ChampLieuAutoComplete from '@/components/form/ChampLieuAutoComplete.vue'
+import AppSelect from '@/components/form/AppSelect.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -184,12 +185,14 @@ function annuler() {
               <div class="grille-champs">
                 <div class="champ-groupe">
                   <label for="sport">Sport <span class="obligatoire">*</span></label>
-                  <select id="sport" v-model="form.sportId" class="champ" required @change="onSportChange">
-                    <option value="">Choisir un sport</option>
-                    <option v-for="sport in sportsDeclares" :key="sport.id" :value="sport.id">
-                      {{ sport.nom }}
-                    </option>
-                  </select>
+                  <AppSelect
+                    v-model="form.sportId"
+                    :options="(sportsDeclares as any[]).map((s) => ({ value: s.id, label: s.nom }))"
+                    :searchable="true"
+                    :clearable="false"
+                    placeholder="Choisir un sport"
+                    @change="onSportChange"
+                  />
                 </div>
 
                 <div class="champ-groupe">
@@ -207,18 +210,14 @@ function annuler() {
 
               <div v-if="besoinEquipe" class="champ-groupe">
                 <label for="equipe">Votre équipe <span class="obligatoire">*</span></label>
-                <select
-                  id="equipe"
+                <AppSelect
                   v-model="form.equipeId"
-                  class="champ"
-                  required
+                  :options="equipes.map(e => ({ value: e.id, label: e.nom }))"
+                  :searchable="true"
+                  :placeholder="chargementEquipes ? 'Chargement…' : 'Choisir une équipe'"
                   :disabled="chargementEquipes || equipes.length === 0"
-                >
-                  <option value="">{{ chargementEquipes ? 'Chargement…' : 'Choisir une équipe' }}</option>
-                  <option v-for="equipe in equipes" :key="equipe.id" :value="equipe.id">
-                    {{ equipe.nom }}
-                  </option>
-                </select>
+                  :loading="chargementEquipes"
+                />
                 <p
                   v-if="!chargementEquipes && equipes.length === 0 && form.sportId !== ''"
                   class="avertissement-equipe"
@@ -275,7 +274,7 @@ function annuler() {
   background: #f5f9f5;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
 }
 
 /* Orbe décoratif haut-droit */
@@ -445,7 +444,6 @@ function annuler() {
   border-radius: var(--rayon-carte);
   padding: var(--espace-xl) var(--espace-xl) var(--espace-l);
   position: relative;
-  overflow: hidden;
 }
 
 .formulaire-carte::before {

@@ -6,6 +6,7 @@ import { creerEquipe } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import { ArrowLeft, Shield, UserPlus, Trophy } from 'lucide-vue-next'
 import type { NiveauRef } from '@/services/api'
+import AppSelect from '@/components/form/AppSelect.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -139,42 +140,32 @@ async function soumettre() {
 
             <div class="champ-groupe">
               <label for="sport">Sport <span class="obligatoire">*</span></label>
-              <select
-                id="sport"
+              <AppSelect
                 v-model="form.sportId"
-                class="champ"
-                required
+                :options="sportsCollectifs.map(s => ({ value: s.id, label: s.nom }))"
+                :searchable="true"
+                :clearable="false"
+                placeholder="Choisir un sport collectif"
                 @change="onSportChange"
-              >
-                <option value="">Choisir un sport collectif</option>
-                <option v-for="sport in sportsCollectifs" :key="sport.id" :value="sport.id">
-                  {{ sport.nom }}
-                </option>
-              </select>
+              />
             </div>
 
             <div class="cols-2">
               <div class="champ-groupe">
                 <label for="niveau">Niveau</label>
-                <select
-                  id="niveau"
+                <AppSelect
                   v-model="form.niveauId"
-                  class="champ"
+                  :options="niveauxDisponibles.map((n: NiveauRef) => ({ value: n.id, label: n.libelle }))"
+                  :searchable="false"
+                  :placeholder="
+                    form.sportId === ''
+                      ? 'Choisissez d\'abord un sport'
+                      : niveauxDisponibles.length === 0
+                        ? 'Aucun niveau'
+                        : 'Sans niveau précis'
+                  "
                   :disabled="form.sportId === '' || niveauxDisponibles.length === 0"
-                >
-                  <option value="">
-                    {{
-                      form.sportId === ''
-                        ? "Choisissez d'abord un sport"
-                        : niveauxDisponibles.length === 0
-                          ? 'Aucun niveau'
-                          : 'Sans niveau précis'
-                    }}
-                  </option>
-                  <option v-for="n in niveauxDisponibles" :key="n.id" :value="n.id">
-                    {{ n.libelle }}
-                  </option>
-                </select>
+                />
               </div>
 
               <div class="champ-groupe">
@@ -224,7 +215,7 @@ async function soumettre() {
   background: #f5f9f5;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
 }
 
 .page-creer-equipe::before {
@@ -442,7 +433,6 @@ async function soumettre() {
   border-radius: var(--rayon-carte);
   padding: var(--espace-xl) var(--espace-xl) var(--espace-l);
   position: relative;
-  overflow: hidden;
 }
 
 .formulaire-carte::before {

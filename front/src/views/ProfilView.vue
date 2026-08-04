@@ -16,6 +16,7 @@ import IconeSection from '@/components/ui/IconeSection.vue'
 import SelecteurSportNiveau from '@/components/form/SelecteurSportNiveau.vue'
 import type { EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
 import { AlertTriangle, Image, KeyRound, Lock, Pencil, Star, Trash2, Trophy, Users } from 'lucide-vue-next'
+import AppSelect from '@/components/form/AppSelect.vue'
 
 const auth    = useAuthStore()
 const router  = useRouter()
@@ -469,17 +470,13 @@ function formaterDate(dateStr: string) {
                   >Changer niveau</button>
                 </template>
                 <template v-else>
-                  <select
+                  <AppSelect
                     v-model="sportEnCoursEdit[un.id].niveauId"
-                    class="champ champ-niveau-inline"
-                  >
-                    <option value="">Choisir un niveau</option>
-                    <option
-                      v-for="niv in niveauxPour(un.sport?.id)"
-                      :key="niv.id"
-                      :value="niv.id"
-                    >{{ niv.libelle }}</option>
-                  </select>
+                    :options="niveauxPour(un.sport?.id).map(niv => ({ value: niv.id, label: niv.libelle }))"
+                    :searchable="false"
+                    placeholder="Choisir un niveau"
+                    class="champ-niveau-inline"
+                  />
                   <button
                     class="btn btn-primaire btn-sm"
                     :disabled="!sportEnCoursEdit[un.id]?.niveauId || !!enregistreSport[un.id]"
@@ -675,7 +672,7 @@ function formaterDate(dateStr: string) {
   background: #f5f9f5;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
 }
 
 .page-profil::before {
@@ -750,7 +747,6 @@ function formaterDate(dateStr: string) {
   border: 1.5px solid #dde8dd;
   box-shadow: none;
   position: relative;
-  overflow: hidden;
 }
 
 .carte::before {

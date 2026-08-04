@@ -8,6 +8,7 @@ import { peutDemanderRejoindre, type AdhesionEquipe } from '@/utils/adhesionEqui
 import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { nomAffichage } from '@/utils/nomAffichage'
 import { MapPin } from 'lucide-vue-next'
+import AppSelect from '@/components/form/AppSelect.vue'
 
 const props = defineProps<{
   adhesions: AdhesionEquipe[]
@@ -95,10 +96,12 @@ async function demander(equipeId: number) {
         class="champ"
         placeholder="Nom de l'équipe (min. 2 car.)"
       />
-      <select v-model="sportId" class="champ">
-        <option value="">Tous mes sports collectifs</option>
-        <option v-for="s in sportsDeclaresCollectifs" :key="s.id" :value="s.id">{{ s.nom }}</option>
-      </select>
+      <AppSelect
+        v-model="sportId"
+        :options="sportsDeclaresCollectifs.map(s => ({ value: s.id, label: s.nom }))"
+        :searchable="true"
+        placeholder="Tous mes sports collectifs"
+      />
       <input
         v-model="localisation"
         type="search"
