@@ -3,14 +3,14 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { chargerEquipes } from '@/services/api'
+import { chargerEquipes, type EquipeResume } from '@/services/api'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { MapPin, Plus } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
 
-const equipes = ref<any[]>([])
+const equipes = ref<EquipeResume[]>([])
 const chargement = ref(true)
 const erreur = ref('')
 
@@ -34,16 +34,12 @@ async function charger() {
 const nbEquipes = computed(() => equipes.value.length)
 
 const nbSports = computed(() =>
-  new Set(equipes.value.map((e: any) => e.sport?.id).filter(Boolean)).size,
+  new Set(equipes.value.map((e) => e.sport.id).filter(Boolean)).size,
 )
 
-// membresConfirmesCount est injecté par le backend (equipe:list group)
-// Retourne null si le backend n'expose pas encore ce champ (graceful fallback)
 const nbJoueurs = computed<number | null>(() => {
   if (!equipes.value.length) return null
-  const hasData = equipes.value.some((e: any) => e.membresConfirmesCount !== undefined)
-  if (!hasData) return null
-  return equipes.value.reduce((sum: number, e: any) => sum + (e.membresConfirmesCount ?? 0), 0)
+  return equipes.value.reduce((sum, e) => sum + e.membresConfirmesCount, 0)
 })
 </script>
 

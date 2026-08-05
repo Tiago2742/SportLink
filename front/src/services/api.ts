@@ -1,6 +1,6 @@
 const API_URL = 'http://localhost:8000/api'
 
-interface ErreurApi extends Error {
+export interface ErreurApi extends Error {
   statut: number
   donnees: unknown
 }
@@ -279,10 +279,10 @@ export const saisirResultat = (
 ) => requete('POST', `/matchs/${matchId}/resultat`, { scoreCamp1, scoreCamp2 }, token)
 
 // Équipes
-export const chargerEquipes = (token: string, filtres: Record<string, unknown> = {}) =>
+export const chargerEquipes = (token: string, filtres: Record<string, unknown> = {}): Promise<EquipeResume[]> =>
   requete('GET', '/equipes' + construireParams(filtres), null, token)
 
-export const chargerEquipe = (token: string, id: number) =>
+export const chargerEquipe = (token: string, id: number): Promise<EquipeDetail> =>
   requete('GET', `/equipes/${id}`, null, token)
 
 export const creerEquipe = (token: string, donnees: Record<string, unknown>) =>
@@ -331,7 +331,7 @@ export interface EspaceEquipesJoueur {
 export const chargerEspaceEquipesJoueur = (token: string): Promise<EspaceEquipesJoueur> =>
   requete('GET', '/joueur/espace-equipes', null, token)
 
-export const rechercherJoueurs = (token: string, q: string, sportId?: number) =>
+export const rechercherJoueurs = (token: string, q: string, sportId?: number): Promise<UtilisateurPublic[]> =>
   requete('GET', '/joueurs/recherche' + construireParams({ q, ...(sportId ? { sportId } : {}) }), null, token)
 
 export const supprimerCompte = (token: string) =>

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { repondreAdhesionEquipe } from '@/services/api'
+import { repondreAdhesionEquipe, type EquipeJoueur } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { nomAffichage } from '@/utils/nomAffichage'
 import { MapPin } from 'lucide-vue-next'
 
 defineProps<{
-  invitations: any[]
+  invitations: EquipeJoueur[]
   chargement: boolean
 }>()
 
@@ -20,7 +20,8 @@ const auth = useAuthStore()
 const erreur = ref('')
 const actionEnCours = ref<number | null>(null)
 
-async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
+async function repondre(invitation: EquipeJoueur, statut: 'confirme' | 'refuse') {
+  if (!invitation.equipe) return
   actionEnCours.value = invitation.id
   erreur.value = ''
   try {
@@ -31,8 +32,8 @@ async function repondre(invitation: any, statut: 'confirme' | 'refuse') {
       statut,
     )
     emit('actualiser')
-  } catch (e: any) {
-    erreur.value = e.message || 'Action impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Action impossible.'
   } finally {
     actionEnCours.value = null
   }

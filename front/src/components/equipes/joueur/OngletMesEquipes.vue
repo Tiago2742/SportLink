@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { retirerMembre } from '@/services/api'
+import { retirerMembre, type EquipeJoueur } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { libelleRoleEquipe } from '@/utils/equipeAffichage'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
@@ -10,7 +10,7 @@ import { nomAffichage } from '@/utils/nomAffichage'
 import { MapPin } from 'lucide-vue-next'
 
 defineProps<{
-  mesEquipes: any[]
+  mesEquipes: EquipeJoueur[]
   chargement: boolean
 }>()
 
@@ -22,8 +22,9 @@ const auth = useAuthStore()
 const erreur = ref('')
 const quitterEnCours = ref<number | null>(null)
 
-async function quitter(adhesion: any) {
-  const nom = adhesion.equipe?.nom ?? 'cette équipe'
+async function quitter(adhesion: EquipeJoueur) {
+  if (!adhesion.equipe) return
+  const nom = adhesion.equipe.nom
   if (
     !confirm(
       `Quitter l'équipe « ${nom} » ? Vous ne pourrez plus participer aux matchs de cette équipe.`,
@@ -37,8 +38,8 @@ async function quitter(adhesion: any) {
   try {
     await retirerMembre(auth.token!, adhesion.equipe.id, adhesion.id)
     emit('actualiser')
-  } catch (e: any) {
-    erreur.value = e.message || 'Impossible de quitter cette équipe.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Impossible de quitter cette équipe.'
   } finally {
     quitterEnCours.value = null
   }

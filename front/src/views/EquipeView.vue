@@ -9,6 +9,10 @@ import {
   rechercherJoueurs,
   repondreAdhesionEquipe,
   retirerMembre,
+  type EquipeDetail,
+  type EquipeJoueur,
+  type ErreurApi,
+  type UtilisateurPublic,
 } from '@/services/api'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import LienUtilisateur from '@/components/utilisateurs/LienUtilisateur.vue'
@@ -34,13 +38,13 @@ import {
 const auth = useAuthStore()
 const route = useRoute()
 
-const equipe = ref<any>(null)
+const equipe = ref<EquipeDetail | null>(null)
 const chargement = ref(true)
 const erreur = ref('')
 const messageSucces = ref('')
 
 const rechercheJoueur = ref('')
-const resultatsRecherche = ref<any[]>([])
+const resultatsRecherche = ref<UtilisateurPublic[]>([])
 const rechercheEnCours = ref(false)
 const invitationEnCours = ref<number | null>(null)
 const annulationEnCours = ref<number | null>(null)
@@ -52,25 +56,23 @@ let debounceRecherche: ReturnType<typeof setTimeout> | null = null
 
 const equipeId = Number(route.params.id)
 
-const estProprietaire = computed(() => {
-  const club = equipe.value?.club
-  const clubId = typeof club === 'object' ? club?.id : club
-  return auth.utilisateur?.type === 'club' && clubId === auth.utilisateur?.id
-})
+const estProprietaire = computed(() =>
+  auth.utilisateur?.type === 'club' && equipe.value?.club.id === auth.utilisateur?.id
+)
 
 const monMembre = computed(() =>
-  equipe.value?.membres?.find((m: any) => m.utilisateur?.id === auth.utilisateur?.id) ?? null,
+  equipe.value?.membres?.find((m) => m.utilisateur?.id === auth.utilisateur?.id) ?? null,
 )
 
 const demandesEnAttente = computed(() =>
   (equipe.value?.membres ?? []).filter(
-    (m: any) => m.origine === 'demande_joueur' && m.statut === 'en_attente',
+    (m) => m.origine === 'demande_joueur' && m.statut === 'en_attente',
   ),
 )
 
 const membresAffichés = computed(() =>
   (equipe.value?.membres ?? []).filter(
-    (m: any) =>
+    (m) =>
       m.role === 'gestionnaire'
       || m.statut === 'confirme'
       || (m.statut === 'en_attente' && m.origine === 'invitation_club'),
@@ -104,8 +106,8 @@ async function charger() {
   erreur.value = ''
   try {
     equipe.value = await chargerEquipe(auth.token!, equipeId)
-  } catch (e: any) {
-    if (e.statut === 404) {
+  } catch (e) {
+    if ((e as ErreurApi).statut === 404) {
       erreur.value = 'Cette équipe est introuvable.'
     } else {
       erreur.value = 'Impossible de charger les données de l\'équipe.'
@@ -147,8 +149,8 @@ async function inviter(joueurId: number) {
     rechercheJoueur.value = ''
     resultatsRecherche.value = []
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Invitation impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Invitation impossible.'
   } finally {
     invitationEnCours.value = null
   }
@@ -161,14 +163,14 @@ async function annulerInvitation(membreId: number) {
     await retirerMembre(auth.token!, equipeId, membreId)
     messageSucces.value = 'Invitation annulée.'
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Annulation impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Annulation impossible.'
   } finally {
     annulationEnCours.value = null
   }
 }
 
-function peutAnnulerInvitation(membre: any): boolean {
+function peutAnnulerInvitation(membre: EquipeJoueur): boolean {
   return (
     membre.statut === 'en_attente' &&
     membre.origine === 'invitation_club' &&
@@ -176,7 +178,7 @@ function peutAnnulerInvitation(membre: any): boolean {
   )
 }
 
-function peutRetirerMembre(membre: any): boolean {
+function peutRetirerMembre(membre: EquipeJoueur): boolean {
   return (
     estProprietaire.value
     && membre.role === 'joueur'
@@ -184,7 +186,7 @@ function peutRetirerMembre(membre: any): boolean {
   )
 }
 
-async function retirerMembreEquipe(membre: any) {
+async function retirerMembreEquipe(membre: EquipeJoueur) {
   const nom = nomAffichage(membre.utilisateur)
   if (
     !confirm(
@@ -200,8 +202,8 @@ async function retirerMembreEquipe(membre: any) {
     await retirerMembre(auth.token!, equipeId, membre.id)
     messageSucces.value = 'Membre retiré.'
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Retrait impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Retrait impossible.'
   } finally {
     retraitEnCours.value = null
   }
@@ -224,8 +226,8 @@ async function quitterEquipe() {
     await retirerMembre(auth.token!, equipeId, monMembre.value.id)
     messageSucces.value = 'Vous avez quitté l\'équipe.'
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Impossible de quitter l\'équipe.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Impossible de quitter l\'équipe.'
   } finally {
     annulationEnCours.value = null
   }
@@ -233,10 +235,10 @@ async function quitterEquipe() {
 
 function dejaDansEquipe(joueurId: number): boolean {
   return equipe.value?.membres?.some(
-    (m: any) =>
+    (m) =>
       m.utilisateur?.id === joueurId &&
       m.statut !== 'refuse',
-  )
+  ) ?? false
 }
 
 async function demanderRejoindre() {
@@ -247,8 +249,8 @@ async function demanderRejoindre() {
     await demanderRejoindreEquipe(auth.token!, equipeId)
     messageSucces.value = 'Demande envoyée au club.'
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Demande impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Demande impossible.'
   } finally {
     demandeEnCours.value = false
   }
@@ -262,8 +264,8 @@ async function annulerMaDemande() {
     await retirerMembre(auth.token!, equipeId, monMembre.value.id)
     messageSucces.value = 'Demande annulée.'
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Annulation impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Annulation impossible.'
   } finally {
     annulationEnCours.value = null
   }
@@ -276,8 +278,8 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
     await repondreAdhesionEquipe(auth.token!, equipeId, membreId, statut)
     messageSucces.value = statut === 'confirme' ? 'Joueur accepté.' : 'Demande refusée.'
     await charger()
-  } catch (e: any) {
-    erreur.value = e.message || 'Action impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Action impossible.'
   } finally {
     reponseDemandeEnCours.value = null
   }
@@ -430,7 +432,7 @@ async function repondreDemande(membreId: number, statut: 'confirme' | 'refuse') 
           <p v-if="rechercheEnCours" class="recherche-etat">Recherche...</p>
           <ul v-else-if="resultatsRecherche.length" class="resultats-recherche">
             <li v-for="j in resultatsRecherche" :key="j.id">
-              <span>{{ nomAffichage(j) }} <small>{{ j.email }}</small></span>
+              <span>{{ nomAffichage(j) }}</span>
               <button
                 v-if="!dejaDansEquipe(j.id)"
                 class="btn btn-primaire btn-compact"

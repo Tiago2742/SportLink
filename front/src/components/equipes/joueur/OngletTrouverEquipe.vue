@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { chargerEquipes, demanderRejoindreEquipe } from '@/services/api'
+import { chargerEquipes, demanderRejoindreEquipe, type EquipeResume } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { peutDemanderRejoindre, type AdhesionEquipe } from '@/utils/adhesionEquipe'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
@@ -23,7 +23,7 @@ const auth = useAuthStore()
 const nom = ref('')
 const sportId = ref<number | ''>('')
 const localisation = ref('')
-const resultats = ref<any[]>([])
+const resultats = ref<EquipeResume[]>([])
 const chargement = ref(false)
 const erreur = ref('')
 const demandeEnCours = ref<number | null>(null)
@@ -75,8 +75,8 @@ async function demander(equipeId: number) {
     await demanderRejoindreEquipe(auth.token!, equipeId)
     emit('actualiser')
     await rechercher()
-  } catch (e: any) {
-    erreur.value = e.message || 'Demande impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Demande impossible.'
   } finally {
     demandeEnCours.value = null
   }

@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
-import { retirerMembre } from '@/services/api'
+import { retirerMembre, type EquipeJoueur } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import {
   classeBadgeStatutMembre,
@@ -11,7 +11,7 @@ import {
 import { nomAffichage } from '@/utils/nomAffichage'
 
 defineProps<{
-  demandes: any[]
+  demandes: EquipeJoueur[]
   chargement: boolean
 }>()
 
@@ -23,14 +23,15 @@ const auth = useAuthStore()
 const erreur = ref('')
 const annulationEnCours = ref<number | null>(null)
 
-async function annuler(demande: any) {
+async function annuler(demande: EquipeJoueur) {
+  if (!demande.equipe) return
   annulationEnCours.value = demande.id
   erreur.value = ''
   try {
     await retirerMembre(auth.token!, demande.equipe.id, demande.id)
     emit('actualiser')
-  } catch (e: any) {
-    erreur.value = e.message || 'Annulation impossible.'
+  } catch (e) {
+    erreur.value = (e as Error).message || 'Annulation impossible.'
   } finally {
     annulationEnCours.value = null
   }
