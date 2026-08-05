@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  tests:
+  back:
     name: PHPUnit — Symfony 7.4 / PHP 8.3
     runs-on: ubuntu-latest
 
@@ -54,3 +54,32 @@ jobs:
 
       - name: Lancer la suite de tests
         run: php vendor/bin/phpunit
+
+  front:
+    name: Lint & Build — Vue 3 / Node 22
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: front
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances npm
+        run: npm ci
+
+      - name: Lint (oxlint + eslint)
+        run: npm run lint
+
+      - name: Type-check (vue-tsc)
+        run: npm run type-check
+
+      - name: Build (vite build)
+        run: npm run build-only
