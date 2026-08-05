@@ -10,7 +10,7 @@ const route = useRoute()
 
 const email = ref('')
 const motDePasse = ref('')
-const erreur = ref('')
+const erreur = ref('') 
 const chargement = ref(false)
 
 const messageSessionExpiree = computed(() =>
