@@ -20,10 +20,10 @@ export function nomParticipant(camp: CampResume | null | undefined): string {
 /** @deprecated alias */
 export const nomCamp = nomParticipant
 
-export function campParRole(
-  camps: CampResume[] | undefined,
+export function campParRole<T extends CampResume>(
+  camps: T[] | undefined,
   role: 'camp_1' | 'camp_2',
-) {
+): T | null {
   return camps?.find((c) => c.role === role) ?? null
 }
 

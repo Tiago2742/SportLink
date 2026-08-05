@@ -220,7 +220,7 @@ export const chargerMesMatchs = (token: string, filtres: Record<string, unknown>
 export const chargerMesMatchsEquipes = (token: string): Promise<Match[]> =>
   requete('GET', '/matchs?mesMatchsEquipes=1', null, token)
 
-export const chargerMatch = (token: string, id: number) =>
+export const chargerMatch = (token: string, id: number): Promise<Match> =>
   requete('GET', `/matchs/${id}`, null, token)
 
 export const creerMatch = (token: string, donnees: Record<string, unknown>): Promise<Match> =>
@@ -261,14 +261,14 @@ export const supprimerCamp = (token: string, matchId: number, campId: number) =>
   requete('DELETE', `/matchs/${matchId}/camps/${campId}`, null, token)
 
 // Messages
-export const chargerMessages = (token: string, matchId: number) =>
+export const chargerMessages = (token: string, matchId: number): Promise<Message[]> =>
   requete('GET', `/matchs/${matchId}/messages`, null, token)
 
-export const envoyerMessage = (token: string, matchId: number, contenu: string) =>
+export const envoyerMessage = (token: string, matchId: number, contenu: string): Promise<Message> =>
   requete('POST', `/matchs/${matchId}/messages`, { contenu }, token)
 
 // Résultat
-export const chargerResultat = (token: string, matchId: number) =>
+export const chargerResultat = (token: string, matchId: number): Promise<Resultat> =>
   requete('GET', `/matchs/${matchId}/resultat`, null, token)
 
 export const saisirResultat = (
@@ -276,7 +276,7 @@ export const saisirResultat = (
   matchId: number,
   scoreCamp1: number,
   scoreCamp2: number,
-) => requete('POST', `/matchs/${matchId}/resultat`, { scoreCamp1, scoreCamp2 }, token)
+): Promise<Resultat> => requete('POST', `/matchs/${matchId}/resultat`, { scoreCamp1, scoreCamp2 }, token)
 
 // Équipes
 export const chargerEquipes = (token: string, filtres: Record<string, unknown> = {}): Promise<EquipeResume[]> =>
@@ -338,13 +338,13 @@ export const supprimerCompte = (token: string) =>
   requete('DELETE', '/profil', null, token)
 
 // Demandes de match
-export const demanderRejoindreMatch = (token: string, matchId: number, equipeId?: number) =>
+export const demanderRejoindreMatch = (token: string, matchId: number, equipeId?: number): Promise<DemandeMatch> =>
   requete('POST', `/matchs/${matchId}/demandes`, equipeId ? { equipeId } : {}, token)
 
-export const chargerMaDemande = (token: string, matchId: number) =>
+export const chargerMaDemande = (token: string, matchId: number): Promise<DemandeMatch> =>
   requete('GET', `/matchs/${matchId}/ma-demande`, null, token)
 
-export const chargerDemandesMatch = (token: string, matchId: number, statut?: string) =>
+export const chargerDemandesMatch = (token: string, matchId: number, statut?: string): Promise<DemandeMatch[]> =>
   requete('GET', `/matchs/${matchId}/demandes` + (statut ? `?statut=${statut}` : ''), null, token)
 
 export const repondreDemandeMatch = (

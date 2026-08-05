@@ -19,6 +19,7 @@ import {
   annulerDemandeMatch,
   deposerAvis,
 } from '@/services/api'
+import type { Match, MatchCamp, Message, Resultat, DemandeMatch, EquipeResume, ErreurApi } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
@@ -34,9 +35,9 @@ const route = useRoute()
 const router = useRouter()
 
 const matchId = Number(route.params.id)
-const match = ref<any>(null)
-const messages = ref<any[]>([])
-const resultat = ref<any>(null)
+const match = ref<Match | null>(null)
+const messages = ref<Message[]>([])
+const resultat = ref<Resultat | null>(null)
 const chargement = ref(true)
 const erreur = ref('')
 
@@ -47,12 +48,12 @@ const scoreCamp1 = ref<number | null>(null)
 const scoreCamp2 = ref<number | null>(null)
 const saisieResultat = ref(false)
 
-const equipesDuClub = ref<{ id: number; nom: string }[]>([])
+const equipesDuClub = ref<EquipeResume[]>([])
 const equipeSelectionnee = ref<number | ''>('')
 const chargementEquipes = ref(false)
 
-const maDemande = ref<any>(null)
-const demandesEnAttente = ref<any[]>([])
+const maDemande = ref<DemandeMatch | null>(null)
+const demandesEnAttente = ref<DemandeMatch[]>([])
 
 const avisEnvoi   = ref(false)
 const erreurAvis  = ref('')
@@ -101,8 +102,8 @@ async function charger() {
     } else if (!estCreateurMatch && !estParticipant) {
       maDemande.value = await chargerMaDemande(auth.token!, matchId).catch(() => null)
     }
-  } catch (e: any) {
-    erreur.value = e.statut === 404 ? 'Match introuvable.' : 'Erreur de chargement.'
+  } catch (e) {
+    erreur.value = (e as ErreurApi).statut === 404 ? 'Match introuvable.' : 'Erreur de chargement.'
   } finally {
     chargement.value = false
   }
@@ -149,7 +150,7 @@ async function chargerEquipesDuMatch(m: typeof match.value) {
   try {
     equipesDuClub.value = await chargerEquipes(auth.token!, {
       sportId: m.sport.id,
-      clubId: auth.utilisateur.id,
+      clubId: auth.utilisateur!.id,
     })
   } catch {
     equipesDuClub.value = []
@@ -163,7 +164,7 @@ const monCamp = computed(() => {
   if (!uid || Number.isNaN(uid)) return null
   return (
     match.value?.camps?.find(
-      (c: any) =>
+      (c) =>
         Number(c.joueur?.id) === uid || Number(c.equipe?.club?.id) === uid,
     ) ?? null
   )
@@ -220,8 +221,8 @@ async function demanderRejoindreLeMatch() {
     } else {
       maDemande.value = await demanderRejoindreMatch(auth.token!, matchId)
     }
-  } catch (e: any) {
-    alert(e.message || 'Impossible d\'envoyer la demande.')
+  } catch (e) {
+    alert((e as Error).message || 'Impossible d\'envoyer la demande.')
   }
 }
 
@@ -231,8 +232,8 @@ async function annulerLaDemande() {
   try {
     await annulerDemandeMatch(auth.token!, matchId, maDemande.value.id)
     maDemande.value = { ...maDemande.value, statut: 'annulee' }
-  } catch (e: any) {
-    alert(e.message || 'Impossible d\'annuler la demande.')
+  } catch (e) {
+    alert((e as Error).message || 'Impossible d\'annuler la demande.')
   }
 }
 
@@ -240,17 +241,17 @@ async function accepterDemandeParticipation(demandeId: number) {
   try {
     await repondreDemandeMatch(auth.token!, matchId, demandeId, 'acceptee')
     await charger()
-  } catch (e: any) {
-    alert(e.message || 'Impossible d\'accepter la demande.')
+  } catch (e) {
+    alert((e as Error).message || 'Impossible d\'accepter la demande.')
   }
 }
 
 async function refuserDemandeParticipation(demandeId: number) {
   try {
     await repondreDemandeMatch(auth.token!, matchId, demandeId, 'refusee')
-    demandesEnAttente.value = demandesEnAttente.value.filter((d: any) => d.id !== demandeId)
-  } catch (e: any) {
-    alert(e.message || 'Impossible de refuser la demande.')
+    demandesEnAttente.value = demandesEnAttente.value.filter((d) => d.id !== demandeId)
+  } catch (e) {
+    alert((e as Error).message || 'Impossible de refuser la demande.')
   }
 }
 
@@ -316,8 +317,8 @@ async function soumettreResultat() {
       scoreCamp2.value,
     )
     saisieResultat.value = false
-  } catch (e: any) {
-    alert(e.message || 'Impossible d\'enregistrer le résultat.')
+  } catch (e) {
+    alert((e as Error).message || 'Impossible d\'enregistrer le résultat.')
   }
 }
 
@@ -332,10 +333,10 @@ async function soumettreAvis(donnees: { ponctualite: number; fairPlay: number; n
   erreurAvis.value = ''
   try {
     await deposerAvis(auth.token!, matchId, donnees)
-    match.value = { ...match.value, monAvis: donnees }
+    if (match.value) match.value = { ...match.value, monAvis: donnees }
     formAvisOuvert.value = false
-  } catch (e: any) {
-    erreurAvis.value = e.message || 'Impossible de soumettre l\'évaluation.'
+  } catch (e) {
+    erreurAvis.value = (e as Error).message || 'Impossible de soumettre l\'évaluation.'
   } finally {
     avisEnvoi.value = false
   }
