@@ -1,4 +1,4 @@
-name: Tests back
+name: CI
 
 on:
   push:
@@ -76,7 +76,7 @@ jobs:
         run: npm ci
 
       - name: Lint (oxlint + eslint)
-        run: npm run lint
+        run: npm run lint:check
 
       - name: Type-check (vue-tsc)
         run: npm run type-check
