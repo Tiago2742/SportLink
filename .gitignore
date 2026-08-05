@@ -3,9 +3,9 @@
 /front/node_modules/
 
 # Env & secrets
-/back/.env
 /back/.env.dev
 /back/.env.local
+/back/.env.*.local
 /back/config/jwt/*.pem
 /back/nul
 
