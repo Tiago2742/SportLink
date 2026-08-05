@@ -101,6 +101,106 @@ export interface UtilisateurPublic {
   niveaux?:     UtilisateurNiveau[]
 }
 
+// Profil de l'utilisateur connecté (utilisateur:read + utilisateur:detail)
+export interface Profil extends UtilisateurPublic {
+  email:           string
+  dateInscription: string
+  niveaux:         UtilisateurNiveau[]
+}
+
+// Résultat d'un match (resultat:read)
+export interface Resultat {
+  id:         number
+  scoreCamp1: number
+  scoreCamp2: number
+}
+
+// Équipe — base commune aux deux contextes de sérialisation
+export interface EquipeBase {
+  id:           number
+  nom:          string
+  sport:        SportRef
+  niveau:       NiveauRef | null
+  localisation: string | null
+  logo:         string | null
+  club:         UtilisateurPublic
+}
+
+// equipe:list — inclut membresConfirmesCount, absent de equipe:read
+export interface EquipeResume extends EquipeBase {
+  membresConfirmesCount: number
+}
+
+// equipe_joueur:read + optionnellement equipe_joueur:invitation
+// equipe absent quand embarqué dans EquipeDetail.membres (groupe invitation non actif)
+export interface EquipeJoueur {
+  id:          number
+  utilisateur: UtilisateurPublic
+  role:        'gestionnaire' | 'joueur'
+  statut:      'en_attente' | 'confirme' | 'refuse'
+  origine:     'invitation_club' | 'demande_joueur'
+  equipe?:     EquipeResume
+}
+
+// equipe:read — inclut membres[], absent de equipe:list
+export interface EquipeDetail extends EquipeBase {
+  membres: EquipeJoueur[]
+}
+
+// match_camp:read ; equipe XOR joueur selon le type de sport
+export interface MatchCamp {
+  id:     number
+  role:   'camp_1' | 'camp_2'
+  statut: 'invite' | 'confirme' | 'refuse'
+  equipe: EquipeResume | null
+  joueur: UtilisateurPublic | null
+}
+
+// Avis déposé par l'utilisateur courant sur un match (game:read uniquement)
+export interface MonAvis {
+  ponctualite:    number
+  fairPlay:       number
+  niveauConforme: number
+}
+
+// game:list ou game:read
+// description, resultat, monAvis présents uniquement sur game:read (GET /matchs/{id})
+export interface Match {
+  id:                     number
+  sport:                  SportRef
+  niveauRequis:           NiveauRef | null
+  dateMatch:              string
+  lieu:                   string | null
+  latitude:               number | null
+  longitude:              number | null
+  statut:                 'en_attente' | 'confirme' | 'termine' | 'annule'
+  createur:               UtilisateurPublic
+  camps:                  MatchCamp[]
+  nombreCamps:            number
+  demandesEnAttenteCount: number
+  monStatutDemande:       'en_attente' | 'acceptee' | 'refusee' | 'annulee' | null
+  description?:           string | null
+  resultat?:              Resultat | null
+  monAvis?:               MonAvis | null
+}
+
+// message:read
+export interface Message {
+  id:         number
+  contenu:    string
+  dateEnvoi:  string
+  expediteur: UtilisateurPublic
+}
+
+// demande:read ; clé JSON = "demandeur" (getDemandeur(), pas getJoueur())
+export interface DemandeMatch {
+  id:           number
+  demandeur:    UtilisateurPublic
+  equipe:       EquipeResume | null
+  statut:       'en_attente' | 'acceptee' | 'refusee' | 'annulee'
+  dateCreation: string
+}
+
 export const chargerSports = (): Promise<SportRef[]> =>
   fetch(`${API_URL}/sports`).then((r) => r.json())
 
@@ -222,9 +322,9 @@ export const chargerInvitationsEquipes = (token: string) =>
   requete('GET', '/invitations-equipes', null, token)
 
 export interface EspaceEquipesJoueur {
-  mesEquipes: unknown[]
-  invitations: unknown[]
-  demandes: unknown[]
+  mesEquipes:    EquipeJoueur[]
+  invitations:   EquipeJoueur[]
+  demandes:      EquipeJoueur[]
   nbInvitations: number
 }
 
