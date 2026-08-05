@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import type { ErreurApi } from '@/services/api'
 import LogoSportLink from '@/components/brand/LogoSportLink.vue'
 import SelecteurSportNiveau, { type EntreeSportNiveau } from '@/components/form/SelecteurSportNiveau.vue'
 
@@ -62,14 +63,13 @@ async function soumettre() {
     donnees.consentement = form.value.consentement
     await auth.sInscrire(donnees as Record<string, unknown> & { email: string; password: string })
     router.push('/')
-  } catch (e: any) {
-    if (e.statut === 409) {
+  } catch (e) {
+    const err = e as ErreurApi
+    if (err.statut === 409) {
       erreur.value = 'Cette adresse email est déjà utilisée.'
-    } else if (e.statut === 400 || e.statut === 422) {
-      const msg =
-        e.message ||
-        (e.donnees as { erreur?: string })?.erreur ||
-        (e.donnees as { erreurs?: Record<string, string> })?.erreurs?.prenom
+    } else if (err.statut === 400 || err.statut === 422) {
+      const donnees = err.donnees as { erreur?: string; erreurs?: Record<string, string> } | null
+      const msg = err.message || donnees?.erreur || donnees?.erreurs?.['prenom']
       erreur.value = msg || 'Veuillez remplir tous les champs obligatoires.'
     } else {
       erreur.value = "Une erreur est survenue lors de l'inscription."

@@ -19,7 +19,7 @@ import {
   annulerDemandeMatch,
   deposerAvis,
 } from '@/services/api'
-import type { Match, MatchCamp, Message, Resultat, DemandeMatch, EquipeResume, ErreurApi } from '@/services/api'
+import type { Match, Message, Resultat, DemandeMatch, EquipeResume, ErreurApi } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import { nomParticipant, campParRole, utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
@@ -321,12 +321,6 @@ async function soumettreResultat() {
     alert((e as Error).message || 'Impossible d\'enregistrer le résultat.')
   }
 }
-
-const peutNoter = computed(() =>
-  match.value?.statut === 'termine' &&
-  (dejaInscrit.value || estCreateur.value) &&
-  match.value?.monAvis === null
-)
 
 async function soumettreAvis(donnees: { ponctualite: number; fairPlay: number; niveauConforme: number }) {
   avisEnvoi.value  = true

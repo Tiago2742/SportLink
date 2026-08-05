@@ -23,7 +23,7 @@ async function soumettre() {
   try {
     await auth.seConnecter(email.value, motDePasse.value)
     router.push('/')
-  } catch (e: any) {
+  } catch {
     erreur.value = 'Email ou mot de passe incorrect.'
   } finally {
     chargement.value = false

@@ -49,7 +49,7 @@ async function rechercherAdresse(q: string) {
     const reponse = await fetch(url)
     if (!reponse.ok) return
     const donnees = await reponse.json()
-    suggestions.value = (donnees.features ?? []).map((f: any) => ({
+    suggestions.value = (donnees.features ?? []).map((f: { properties: { label: string }; geometry: { coordinates: [number, number] } }) => ({
       label: f.properties.label,
       latitude:  f.geometry.coordinates[1],
       longitude: f.geometry.coordinates[0],

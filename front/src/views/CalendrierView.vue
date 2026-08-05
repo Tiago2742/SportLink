@@ -2,9 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { chargerMesMatchs, chargerMesMatchsEquipes, type Match } from '@/services/api'
-// @ts-ignore
+// @ts-expect-error — vue-cal n'expose pas de types TS
 import VueCal from 'vue-cal'
-// @ts-ignore
+// @ts-expect-error — vue-cal n'expose pas de types TS
 import fr from 'vue-cal/dist/i18n/fr.es.js'
 import { CalendarRange, ListTodo } from 'lucide-vue-next'
 

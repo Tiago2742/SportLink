@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerProfilPublic } from '@/services/api'
+import { chargerProfilPublic, type UtilisateurPublic, type ErreurApi } from '@/services/api'
 import IconeSection from '@/components/ui/IconeSection.vue'
 import { ArrowLeft, Star, Trophy } from 'lucide-vue-next'
 
@@ -11,7 +11,7 @@ const route  = useRoute()
 const router = useRouter()
 
 const profilId    = Number(route.params.id)
-const profil      = ref<any>(null)
+const profil      = ref<UtilisateurPublic | null>(null)
 const chargement  = ref(true)
 const erreur      = ref('')
 
@@ -22,8 +22,8 @@ onMounted(async () => {
   }
   try {
     profil.value = await chargerProfilPublic(auth.token!, profilId)
-  } catch (e: any) {
-    erreur.value = e?.statut === 404
+  } catch (e) {
+    erreur.value = (e as ErreurApi).statut === 404
       ? 'Ce profil est introuvable.'
       : 'Impossible de charger ce profil.'
   } finally {

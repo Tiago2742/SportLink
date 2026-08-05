@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { creerEquipe } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import { ArrowLeft, Shield, UserPlus, Trophy } from 'lucide-vue-next'
-import type { NiveauRef } from '@/services/api'
+import type { NiveauRef, ErreurApi } from '@/services/api'
 import AppSelect from '@/components/form/AppSelect.vue'
 
 const auth = useAuthStore()
@@ -54,10 +54,10 @@ async function soumettre() {
       logo: form.value.logo.trim() || undefined,
     })
     router.push(`/equipes/${equipe.id}`)
-  } catch (e: any) {
+  } catch (e) {
     erreur.value =
-      e.message ||
-      (e.donnees as { erreur?: string })?.erreur ||
+      (e as Error).message ||
+      ((e as ErreurApi).donnees as { erreur?: string })?.erreur ||
       "Impossible de créer l'équipe."
   } finally {
     chargement.value = false

@@ -10,6 +10,9 @@ import {
   modifierNiveauSport,
   supprimerCompte,
   changerMotDePasse,
+  type Profil,
+  type EquipeResume,
+  type UtilisateurNiveau,
 } from '@/services/api'
 import { useSports } from '@/composables/useSports'
 import IconeSection from '@/components/ui/IconeSection.vue'
@@ -22,8 +25,8 @@ const auth    = useAuthStore()
 const router  = useRouter()
 const { niveauxPour } = useSports()
 
-const profil      = ref<any>(auth.utilisateur)
-const mesEquipes  = ref<any[]>([])
+const profil      = ref<Profil | null>(auth.utilisateur)
+const mesEquipes  = ref<EquipeResume[]>([])
 const chargement  = ref(true)
 
 // ── Édition profil ────────────────────────────────────────────────────────────
@@ -79,11 +82,6 @@ const typeLabel = computed(() =>
   profil.value?.type === 'club' ? 'Club / Association' : 'Joueur',
 )
 
-// IDs des sports déjà déclarés par l'utilisateur
-const sportsDeclaresIds = computed<number[]>(() =>
-  (profil.value?.niveaux ?? []).map((un: any) => un.sport?.id),
-)
-
 // ── Profil édition ────────────────────────────────────────────────────────────
 function ouvrirEdition() {
   formEdition.value = {
@@ -112,8 +110,8 @@ async function sauvegarderLogo() {
     profil.value         = mis
     auth.rafraichirProfil(mis)
     modeEditionLogo.value = false
-  } catch (e: any) {
-    erreurLogo.value = e.message || 'Impossible de mettre à jour le logo.'
+  } catch (e) {
+    erreurLogo.value = (e as Error).message || 'Impossible de mettre à jour le logo.'
   } finally {
     enregistreLogo.value = false
   }
@@ -127,7 +125,7 @@ function annulerChangementNiveau(unId: number) {
   delete sportEnCoursEdit.value[unId]
 }
 
-async function sauvegarderNiveau(un: any) {
+async function sauvegarderNiveau(un: UtilisateurNiveau) {
   const edit = sportEnCoursEdit.value[un.id]
   if (!edit || edit.niveauId === '') return
   enregistreSport.value[un.id] = true
@@ -137,8 +135,8 @@ async function sauvegarderNiveau(un: any) {
     profil.value = mis
     auth.rafraichirProfil(mis)
     delete sportEnCoursEdit.value[un.id]
-  } catch (e: any) {
-    erreurSport.value = e.message || 'Impossible de modifier le niveau.'
+  } catch (e) {
+    erreurSport.value = (e as Error).message || 'Impossible de modifier le niveau.'
   } finally {
     delete enregistreSport.value[un.id]
   }
@@ -151,7 +149,7 @@ async function onAjoutSport(liste: EntreeSportNiveau[]) {
 
   // Ignore si déjà dans la liste (sport déjà déclaré avec même niveau)
   const existant = (profil.value?.niveaux ?? []).find(
-    (un: any) => un.sport?.id === derniere.sportId && un.niveau?.id === derniere.niveauId,
+    (un) => un.sport.id === derniere.sportId && un.niveau.id === derniere.niveauId,
   )
   if (existant) return
 
@@ -161,8 +159,8 @@ async function onAjoutSport(liste: EntreeSportNiveau[]) {
     const mis = await ajouterSportNiveau(auth.token!, derniere.sportId, derniere.niveauId)
     profil.value = mis
     auth.rafraichirProfil(mis)
-  } catch (e: any) {
-    erreurSport.value = e.message || 'Impossible d\'ajouter ce sport.'
+  } catch (e) {
+    erreurSport.value = (e as Error).message || 'Impossible d\'ajouter ce sport.'
   } finally {
     ajoutEnCours.value = false
   }
@@ -211,8 +209,8 @@ async function soumettreChangementMdp() {
       modeChangementMdp.value = false
       succesMdp.value         = false
     }, 2500)
-  } catch (e: any) {
-    erreurMdp.value = e?.body?.erreur ?? e?.message ?? 'Une erreur est survenue.'
+  } catch (e) {
+    erreurMdp.value = (e as Error).message || 'Une erreur est survenue.'
   } finally {
     enregistreMdp.value = false
   }
@@ -240,13 +238,19 @@ async function confirmerSuppression() {
     await supprimerCompte(auth.token!)
     auth.seDeconnecter()
     router.push('/connexion')
-  } catch (e: any) {
-    suppressionErreur.value = e.message || 'Une erreur est survenue.'
+  } catch (e) {
+    suppressionErreur.value = (e as Error).message || 'Une erreur est survenue.'
     suppressionEnCours.value = false
   }
 }
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
+const _editVide: { ouvert: boolean; niveauId: number | '' } = { ouvert: false, niveauId: '' }
+
+function editOuvert(id: number): { ouvert: boolean; niveauId: number | '' } {
+  return sportEnCoursEdit.value[id] ?? _editVide
+}
+
 function formaterDate(dateStr: string) {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleDateString('fr-FR', {
@@ -471,7 +475,7 @@ function formaterDate(dateStr: string) {
                 </template>
                 <template v-else>
                   <AppSelect
-                    v-model="sportEnCoursEdit[un.id].niveauId"
+                    v-model="editOuvert(un.id).niveauId"
                     :options="niveauxPour(un.sport?.id).map(niv => ({ value: niv.id, label: niv.libelle }))"
                     :searchable="false"
                     placeholder="Choisir un niveau"

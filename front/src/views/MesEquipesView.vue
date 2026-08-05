@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import AvatarEquipe from '@/components/equipes/AvatarEquipe.vue'
 import { chargerEquipes, type EquipeResume } from '@/services/api'
@@ -8,7 +7,6 @@ import IconeLigne from '@/components/ui/IconeLigne.vue'
 import { MapPin, Plus } from 'lucide-vue-next'
 
 const auth = useAuthStore()
-const router = useRouter()
 
 const equipes = ref<EquipeResume[]>([])
 const chargement = ref(true)

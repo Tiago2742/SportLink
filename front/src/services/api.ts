@@ -17,6 +17,7 @@ async function requete(
   chemin: string,
   donnees: unknown = null,
   token: string | null = null,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 
@@ -42,8 +43,9 @@ async function requete(
       _onSessionExpiree?.()
     }
 
+    const jsonErr = json as { erreur?: string; message?: string } | null
     const erreur = new Error(
-      (json as any)?.erreur || (json as any)?.message || `Erreur ${reponse.status}`,
+      jsonErr?.erreur || jsonErr?.message || `Erreur ${reponse.status}`,
     ) as ErreurApi
     erreur.statut = reponse.status
     erreur.donnees = json
@@ -243,7 +245,7 @@ export const repondreCamp = (token: string, matchId: number, campId: number, sta
   requete('PATCH', `/matchs/${matchId}/camps/${campId}`, { statut }, token)
 
 // Profil — logo
-export const mettreAJourLogo = (token: string, logo: string | null) =>
+export const mettreAJourLogo = (token: string, logo: string | null): Promise<Profil> =>
   requete('PATCH', '/profil/logo', { logo }, token)
 
 // Profil — mot de passe
@@ -251,10 +253,10 @@ export const changerMotDePasse = (token: string, ancienMotDePasse: string, nouve
   requete('PATCH', '/profil/mot-de-passe', { ancienMotDePasse, nouveauMotDePasse }, token)
 
 // Profil — sports/niveaux
-export const ajouterSportNiveau = (token: string, sportId: number, niveauId: number) =>
+export const ajouterSportNiveau = (token: string, sportId: number, niveauId: number): Promise<Profil> =>
   requete('POST', '/profil/sports', { sportId, niveauId }, token)
 
-export const modifierNiveauSport = (token: string, sportId: number, niveauId: number) =>
+export const modifierNiveauSport = (token: string, sportId: number, niveauId: number): Promise<Profil> =>
   requete('PATCH', `/profil/sports/${sportId}`, { niveauId }, token)
 
 export const supprimerCamp = (token: string, matchId: number, campId: number) =>
@@ -364,7 +366,7 @@ export const deposerAvis = (
   donnees: { ponctualite: number; fairPlay: number; niveauConforme: number },
 ) => requete('POST', `/matchs/${matchId}/avis`, donnees, token)
 
-export const chargerProfilPublic = (token: string, id: number) =>
+export const chargerProfilPublic = (token: string, id: number): Promise<UtilisateurPublic> =>
   requete('GET', `/profils/${id}`, null, token)
 
 // Stats matchs

@@ -15,7 +15,7 @@ import { setOnSessionExpiree } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 // Fix Leaflet default marker icon detection (broken by Vite's asset bundler)
-delete (L.Icon.Default.prototype as any)._getIconUrl
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)['_getIconUrl']
 L.Icon.Default.mergeOptions({
   iconUrl: markerIconUrl,
   iconRetinaUrl: markerIconRetinaUrl,
