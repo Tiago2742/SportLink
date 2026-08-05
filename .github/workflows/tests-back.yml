@@ -1,0 +1,56 @@
+name: Tests back
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    name: PHPUnit — Symfony 7.4 / PHP 8.3
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: sportlink
+          MYSQL_USER: sportlink
+          MYSQL_PASSWORD: sportlink
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: "mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4"
+
+    defaults:
+      run:
+        working-directory: back
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer PHP 8.3 et les extensions requises
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_mysql, intl, zip, ctype, iconv
+          coverage: none
+
+      - name: Installer les dépendances Composer
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Créer le schéma de la base de test
+        run: php bin/console doctrine:schema:create --env=test
+
+      - name: Charger les fixtures de référence (Sports + Niveaux)
+        run: php bin/console doctrine:fixtures:load --env=test --group=test --no-interaction
+
+      - name: Lancer la suite de tests
+        run: php vendor/bin/phpunit
