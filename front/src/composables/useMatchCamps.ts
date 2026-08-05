@@ -3,8 +3,8 @@ import { nomAffichage, type UtilisateurAffichage } from '@/utils/nomAffichage'
 /** Résumé d'une inscription au match (côté API). */
 export type CampResume = {
   role?: string
-  joueur?: UtilisateurAffichage & { id: number }
-  equipe?: { id?: number; nom?: string; logo?: string | null; club?: UtilisateurAffichage & { id: number } }
+  joueur?: (UtilisateurAffichage & { id: number }) | null
+  equipe?: { id?: number; nom?: string; logo?: string | null; club?: (UtilisateurAffichage & { id: number }) | null } | null
 }
 
 /** Libellé d'un participant (équipe ou joueur) pour l'affichage du score — R6 */

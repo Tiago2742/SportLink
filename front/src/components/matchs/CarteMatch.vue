@@ -16,8 +16,8 @@ const props = defineProps<{
     id: number
     sport?: { id: number; nom: string; type: string }
     dateMatch: string
-    lieu?: string
-    niveauRequis?: { id: number; libelle: string; ordre: number }
+    lieu?: string | null
+    niveauRequis?: { id: number; libelle: string; ordre: number } | null
     statut: string
     createur?: { id: number; nom: string; prenom?: string | null; type?: string }
     nombreCamps?: number

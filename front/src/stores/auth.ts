@@ -1,10 +1,10 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { connexion as apiConnexion, inscrire as apiInscrire, chargerProfil } from '@/services/api'
+import { connexion as apiConnexion, inscrire as apiInscrire, chargerProfil, type Profil } from '@/services/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
-  const utilisateur = ref<any | null>(
+  const utilisateur = ref<Profil | null>(
     JSON.parse(localStorage.getItem('utilisateur') || 'null'),
   )
 
@@ -32,7 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** Met à jour le profil en mémoire ET dans localStorage (évite de perdre les niveaux après F5). */
-  function rafraichirProfil(profil: any) {
+  function rafraichirProfil(profil: Profil) {
     utilisateur.value = profil
     localStorage.setItem('utilisateur', JSON.stringify(profil))
   }

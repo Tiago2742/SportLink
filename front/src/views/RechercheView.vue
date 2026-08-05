@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMatchs, demanderRejoindreMatch } from '@/services/api'
+import { chargerMatchs, demanderRejoindreMatch, type Match } from '@/services/api'
 import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
@@ -13,7 +13,7 @@ const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
-const matchs = ref<any[]>([])
+const matchs = ref<Match[]>([])
 const chargement = ref(true)
 const erreur = ref('')
 
@@ -34,10 +34,10 @@ const parPage = 6
 const demandesEnvoyees = ref<number[]>([])
 
 const sportsDeclares = computed(() => {
-  const tous = (auth.utilisateur?.niveaux ?? []).map((un: any) => un.sport).filter(Boolean)
+  const tous = (auth.utilisateur?.niveaux ?? []).map((un) => un.sport).filter(Boolean)
   // Un joueur ne peut rejoindre que des matchs individuels → filtrer la liste
   if (auth.utilisateur?.type === 'joueur') {
-    return tous.filter((s: any) => s.type === 'individuel')
+    return tous.filter((s) => s.type === 'individuel')
   }
   return tous
 })
@@ -99,7 +99,7 @@ const matchsFiltres = computed(() => {
 })
 
 const matchsGeocodes = computed(() =>
-  matchsFiltres.value.filter((m: any) => m.latitude != null && m.longitude != null),
+  matchsFiltres.value.filter((m) => m.latitude != null && m.longitude != null),
 )
 
 const aCarteActive = computed(() => matchsGeocodes.value.length > 0)
@@ -120,19 +120,19 @@ function initCarteRecherche() {
   mettreAJourMarqueurs(matchsGeocodes.value)
 }
 
-function mettreAJourMarqueurs(geocodes: any[]) {
+function mettreAJourMarqueurs(geocodes: Match[]) {
   if (!carteRecherche || !grpMarqueurs) return
   grpMarqueurs.clearLayers()
   if (geocodes.length === 0) return
-  geocodes.forEach((m: any) => {
-    L.marker([m.latitude, m.longitude])
+  geocodes.forEach((m) => {
+    L.marker([m.latitude!, m.longitude!])
       .addTo(grpMarqueurs!)
       .bindPopup(
         `<strong>${m.sport?.nom ?? 'Match'}</strong><br>${m.lieu ?? ''}<br>` +
         `<a href="/matchs/${m.id}" style="color:#4caf50;font-weight:600;font-size:0.85em">Voir le match →</a>`,
       )
   })
-  const bounds = L.latLngBounds(geocodes.map((m: any) => [m.latitude, m.longitude] as L.LatLngTuple))
+  const bounds = L.latLngBounds(geocodes.map((m) => [m.latitude!, m.longitude!] as L.LatLngTuple))
   carteRecherche.fitBounds(bounds, { padding: [30, 30] })
 }
 
@@ -163,8 +163,8 @@ async function rejoindreMatch(matchId: number) {
     } else {
       router.push(`/matchs/${matchId}`)
     }
-  } catch (e: any) {
-    alert(e.message || 'Impossible d\'envoyer la demande.')
+  } catch (e) {
+    alert((e as Error).message || 'Impossible d\'envoyer la demande.')
   }
 }
 </script>
@@ -229,7 +229,7 @@ async function rejoindreMatch(matchId: number) {
         <div class="chips-rapides">
           <button
             v-for="sport in chipsRapides"
-            :key="sport"
+            :key="sport.id"
             class="chip"
             :class="{ actif: filtres.sportId === sport.id }"
             @click="appliquerFiltreRapide(sport.id)"

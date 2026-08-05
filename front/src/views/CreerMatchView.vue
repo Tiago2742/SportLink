@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { creerMatch, chargerEquipes } from '@/services/api'
+import { creerMatch, chargerEquipes, type EquipeResume, type ErreurApi } from '@/services/api'
 import { CircleCheck, Users, Zap } from 'lucide-vue-next'
 import ChampLieuAutoComplete from '@/components/form/ChampLieuAutoComplete.vue'
 import AppSelect from '@/components/form/AppSelect.vue'
@@ -13,9 +13,9 @@ const router = useRouter()
 // Filtre par type : joueur → sports individuels, club → sports collectifs
 const sportsDeclares = computed(() =>
   (auth.utilisateur?.niveaux ?? [])
-    .map((un: any) => un.sport)
+    .map((un) => un.sport)
     .filter(Boolean)
-    .filter((s: any) =>
+    .filter((s) =>
       auth.utilisateur?.type === 'joueur' ? s.type === 'individuel' : s.type === 'collectif',
     ),
 )
@@ -30,7 +30,7 @@ const form = ref({
   description: '',
 })
 
-const equipes = ref<{ id: number; nom: string }[]>([])
+const equipes = ref<EquipeResume[]>([])
 const chargementEquipes = ref(false)
 
 const sportSelectionne = computed(() =>
@@ -58,11 +58,11 @@ async function chargerEquipesDuClub() {
   try {
     equipes.value = await chargerEquipes(auth.token!, {
       sportId: form.value.sportId,
-      clubId: auth.utilisateur.id,
+      clubId: auth.utilisateur!.id,
     })
     // Présélectionner la première équipe disponible
     if (equipes.value.length > 0) {
-      form.value.equipeId = equipes.value[0].id
+      form.value.equipeId = equipes.value[0]!.id
     }
   } catch {
     equipes.value = []
@@ -107,10 +107,10 @@ async function soumettre() {
       equipeId:    form.value.equipeId !== '' ? form.value.equipeId : undefined,
     })
     router.push(`/matchs/${match.id}`)
-  } catch (e: any) {
-    if (e.statut === 400) {
+  } catch (e) {
+    if ((e as ErreurApi).statut === 400) {
       erreur.value = 'Données invalides. Vérifiez les champs.'
-    } else if (e.statut === 422) {
+    } else if ((e as ErreurApi).statut === 422) {
       erreur.value = (e as Error).message
     } else {
       erreur.value = 'Impossible de créer le match. Réessayez.'

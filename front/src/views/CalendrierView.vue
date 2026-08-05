@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { chargerMesMatchs, chargerMesMatchsEquipes } from '@/services/api'
+import { chargerMesMatchs, chargerMesMatchsEquipes, type Match } from '@/services/api'
 // @ts-ignore
 import VueCal from 'vue-cal'
 // @ts-ignore
@@ -10,8 +10,8 @@ import { CalendarRange, ListTodo } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 
-const matchs = ref<any[]>([])
-const matchsEquipes = ref<any[]>([])
+const matchs = ref<Match[]>([])
+const matchsEquipes = ref<Match[]>([])
 const chargement = ref(true)
 const erreur = ref('')
 
@@ -46,12 +46,12 @@ function estAujourdhui(date: Date): boolean {
     && date.getDate() === auj.getDate()
 }
 
-function nomEquipeChef(match: any): string {
-  const camp = (match.camps ?? []).find((c: any) => c.equipe?.nom)
+function nomEquipeChef(match: Match): string {
+  const camp = match.camps.find((c) => c.equipe?.nom)
   return camp?.equipe?.nom ?? match.sport?.nom ?? 'Match'
 }
 
-function toEvent(match: any, source: 'individuel' | 'equipe') {
+function toEvent(match: Match, source: 'individuel' | 'equipe') {
   const start = new Date(match.dateMatch)
   const end = new Date(start.getTime() + 90 * 60 * 1000)
   return {

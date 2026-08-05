@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { chargerMesMatchs, chargerMesMatchsEquipes, chargerMesStats } from '@/services/api'
-import type { MesStats, StatBloc } from '@/services/api'
+import type { MesStats, Match } from '@/services/api'
 import BadgeStatut from '@/components/commun/BadgeStatut.vue'
 import BadgeCompteur from '@/components/ui/BadgeCompteur.vue'
 import IconeLigne from '@/components/ui/IconeLigne.vue'
@@ -12,8 +12,8 @@ import { MapPin, Trophy, Users } from 'lucide-vue-next'
 const auth = useAuthStore()
 const router = useRouter()
 
-const matchs = ref<any[]>([])
-const matchsEquipes = ref<any[]>([])
+const matchs = ref<Match[]>([])
+const matchsEquipes = ref<Match[]>([])
 const mesStats = ref<MesStats | null>(null)
 const chargement = ref(true)
 const erreur = ref('')
@@ -59,11 +59,10 @@ function estTermine(match: { statut: string; dateMatch: string }) {
   return match.statut === 'termine' || estPasse(match.dateMatch)
 }
 
-function nomsCamps(match: any): string {
-  const equipes = (match.camps ?? [])
-    .filter((c: any) => c.equipe?.nom)
-    .map((c: any) => c.equipe.nom)
-  return equipes.join(' vs ')
+function nomsCamps(match: Match): string {
+  return match.camps
+    .flatMap((c) => c.equipe ? [c.equipe.nom] : [])
+    .join(' vs ')
 }
 
 const sourceActive = computed(() =>
@@ -75,7 +74,7 @@ const sourceActive = computed(() =>
 const mesMatchs = computed(() => sourceActive.value)
 
 const matchsFiltres = computed(() => {
-  let liste = mesMatchs.value
+  const liste = mesMatchs.value
 
   if (filtreStatut.value === 'passe') {
     return liste.filter((m) => estPasse(m.dateMatch))

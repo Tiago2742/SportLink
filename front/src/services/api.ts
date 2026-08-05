@@ -205,25 +205,25 @@ export const chargerSports = (): Promise<SportRef[]> =>
   fetch(`${API_URL}/sports`).then((r) => r.json())
 
 // Profil
-export const chargerProfil = (token: string) =>
+export const chargerProfil = (token: string): Promise<Profil> =>
   requete('GET', '/profil', null, token)
 
 // Matchs
-export const chargerMatchs = (token: string, filtres: Record<string, unknown> = {}) =>
+export const chargerMatchs = (token: string, filtres: Record<string, unknown> = {}): Promise<Match[]> =>
   requete('GET', '/matchs' + construireParams(filtres), null, token)
 
 /** Matchs créés ou rejoints par l'utilisateur connecté */
-export const chargerMesMatchs = (token: string, filtres: Record<string, unknown> = {}) =>
+export const chargerMesMatchs = (token: string, filtres: Record<string, unknown> = {}): Promise<Match[]> =>
   chargerMatchs(token, { mesMatchs: 1, ...filtres })
 
 /** Matchs des équipes dont le joueur est membre confirmé */
-export const chargerMesMatchsEquipes = (token: string) =>
+export const chargerMesMatchsEquipes = (token: string): Promise<Match[]> =>
   requete('GET', '/matchs?mesMatchsEquipes=1', null, token)
 
 export const chargerMatch = (token: string, id: number) =>
   requete('GET', `/matchs/${id}`, null, token)
 
-export const creerMatch = (token: string, donnees: Record<string, unknown>) =>
+export const creerMatch = (token: string, donnees: Record<string, unknown>): Promise<Match> =>
   requete('POST', '/matchs', donnees, token)
 
 export const modifierMatch = (token: string, id: number, donnees: Record<string, unknown>) =>

@@ -31,8 +31,8 @@ const demandeEnCours = ref<number | null>(null)
 // Seuls les sports collectifs que le joueur a déclarés dans son profil
 const sportsDeclaresCollectifs = computed(() =>
   (auth.utilisateur?.niveaux ?? [])
-    .map((un: any) => un.sport)
-    .filter((s: any) => s?.type === 'collectif'),
+    .map((un) => un.sport)
+    .filter((s) => s?.type === 'collectif'),
 )
 
 async function rechercher() {
