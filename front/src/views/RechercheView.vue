@@ -7,7 +7,6 @@ import CarteMatch from '@/components/matchs/CarteMatch.vue'
 import { utilisateurEstInscrit } from '@/composables/useMatchCamps'
 import SelecteurFiltresSport from '@/components/form/SelecteurFiltresSport.vue'
 import { Search } from 'lucide-vue-next'
-import AppSelect from '@/components/form/AppSelect.vue'
 import L from 'leaflet'
 
 const auth = useAuthStore()
@@ -78,10 +77,6 @@ function appliquerFiltreRapide(sportId: number) {
   filtres.value.sportId = filtres.value.sportId === sportId ? '' : sportId
 }
 
-function filtreRapideAujourdhui() {
-  const auj = new Date().toISOString().split('T')[0]
-  filtres.value.lieu = filtres.value.lieu === auj ? '' : auj
-}
 
 const matchsFiltres = computed(() => {
   let liste = matchs.value

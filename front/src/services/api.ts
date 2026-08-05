@@ -71,7 +71,35 @@ export const inscrire = (donnees: Record<string, unknown>) =>
 
 // Sports (référentiel public)
 export interface NiveauRef { id: number; libelle: string; ordre: number }
-export interface SportRef  { id: number; nom: string; type: string; niveaux: NiveauRef[] }
+export interface SportRef  { id: number; nom: string; type: 'collectif' | 'individuel'; niveaux?: NiveauRef[] }
+
+// Réputation (calculée par AvisRepository.calculerMoyennesRecues)
+export interface Reputation {
+  ponctualite:    number
+  fairPlay:       number
+  niveauConforme: number
+  total:          number
+}
+
+// Niveau déclaré par un utilisateur (groupe utilisateur_niveau:read)
+export interface UtilisateurNiveau {
+  id:     number
+  sport:  SportRef
+  niveau: NiveauRef
+}
+
+// Profil public d'un utilisateur (groupe utilisateur:public)
+// niveaux présent uniquement quand utilisateur:detail est aussi dans le contexte (GET /profils/{id})
+export interface UtilisateurPublic {
+  id:           number
+  nom:          string
+  prenom:       string | null
+  type:         'club' | 'joueur'
+  localisation: string | null
+  logo:         string | null
+  reputation:   Reputation | null
+  niveaux?:     UtilisateurNiveau[]
+}
 
 export const chargerSports = (): Promise<SportRef[]> =>
   fetch(`${API_URL}/sports`).then((r) => r.json())

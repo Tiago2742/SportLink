@@ -27,7 +27,7 @@ export function useSports() {
 
   function nomNiveau(niveauId: number): string {
     for (const sport of catalogue.value) {
-      const n = sport.niveaux.find((n) => n.id === niveauId)
+      const n = sport.niveaux?.find((n) => n.id === niveauId)
       if (n) return n.libelle
     }
     return ''
