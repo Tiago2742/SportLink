@@ -1,0 +1,3 @@
+sportlink-duval.tech, www.sportlink-duval.tech {
+    reverse_proxy nginx:80
+}
