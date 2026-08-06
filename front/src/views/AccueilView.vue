@@ -79,7 +79,6 @@ const lienEquipes = computed(() =>
       </div>
     </section>
     
-
     <!-- ══ PROCHAINS MATCHS ══ -->
     <section class="section-matchs">
       <div class="conteneur">
