@@ -12,7 +12,7 @@
 #   3. docker compose -f docker-compose.prod.yml build
 #   4. docker compose -f docker-compose.prod.yml up -d
 #   5. docker compose -f docker-compose.prod.yml exec php php bin/console doctrine:migrations:migrate --no-interaction
-#   6. docker compose -f docker-compose.prod.yml exec php php bin/console cache:warmup
+#      (cache:warmup est automatique — l'entrypoint le lance en prod avant Apache)
 
 services:
   nginx:
