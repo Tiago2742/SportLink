@@ -1,3 +1,7 @@
+# Secrets locaux (racine du projet)
+/.env
+/.env.local
+
 # Dépendances
 /back/vendor/
 /front/node_modules/

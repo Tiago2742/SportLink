@@ -1,6 +1,8 @@
 services:
   php:
-    build: ./back
+    build:
+      context: ./back
+      target: base    # stage base uniquement : pas de COPY code ni composer --no-dev
     container_name: sportlink_api
     volumes:
       - ./back:/var/www/html

@@ -1,4 +1,7 @@
-FROM php:8.3-apache
+# ── Stage base : dépendances système, Apache, config ──────────────────────
+# Utilisé en DEV (target: base dans docker-compose.yml).
+# Le code arrive par bind-mount ; vendor par le volume back_vendor.
+FROM php:8.3-apache AS base
 
 RUN apt-get update && apt-get install -y \
     git unzip libicu-dev libzip-dev \
@@ -25,3 +28,16 @@ WORKDIR /var/www/html
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["apache2-foreground"]
+
+# ── Stage prod : code figé + dépendances Composer sans dev ────────────────
+# Utilisé en PROD (target: prod dans docker-compose.prod.yml).
+# Pas de bind-mount : le code est figé dans l'image au moment du build.
+# Les clés JWT et .env.local sont montés depuis l'hôte (voir docker-compose.prod.yml).
+FROM base AS prod
+
+COPY . .
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --optimize-autoloader \
+    --classmap-authoritative

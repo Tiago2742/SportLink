@@ -1,32 +1,56 @@
 # docker-compose.prod.yml — Production
-# Usage : docker compose -f docker-compose.prod.yml up -d
+#
+# Point d'entrée unique : nginx (:8090 en local, :80 sur le serveur)
+# Sert le front Vue en statique et proxifie /api vers PHP/Apache.
 #
 # AVANT DE LANCER :
-#   1. Copier back/.env.prod.example → back/.env.local (ou définir les variables ci-dessous
-#      via les secrets de votre hôte / CI-CD)
-#   2. Builder l'image : docker compose -f docker-compose.prod.yml build
-#   3. Lancer les migrations : docker compose -f docker-compose.prod.yml exec php php bin/console doctrine:migrations:migrate --no-interaction
-#   4. Générer le cache : docker compose -f docker-compose.prod.yml exec php php bin/console cache:warmup
+#   1. Créer un fichier .env à la racine du projet avec les secrets (voir bas de fichier)
+#   2. Vérifier que back/config/jwt/private.pem et public.pem existent sur l'hôte
+#      → En local : déjà générés (gitignorés, jamais dans l'image)
+#      → Sur un nouveau serveur : docker compose -f docker-compose.prod.yml run --rm php \
+#            php bin/console lexik:jwt:generate-keypair
+#   3. docker compose -f docker-compose.prod.yml build
+#   4. docker compose -f docker-compose.prod.yml up -d
+#   5. docker compose -f docker-compose.prod.yml exec php php bin/console doctrine:migrations:migrate --no-interaction
+#   6. docker compose -f docker-compose.prod.yml exec php php bin/console cache:warmup
 
 services:
+  nginx:
+    build:
+      context: ./front
+      target: production
+    container_name: sportlink_nginx_prod
+    restart: unless-stopped
+    ports:
+      # 8090 en local pour éviter un conflit avec le port 80 système.
+      # Remplacer par "80:80" (ou "443:443" + TLS) sur le serveur de déploiement.
+      - "8090:80"
+    depends_on:
+      - php
+
   php:
     build:
       context: ./back
-      target: prod           # à adapter si votre Dockerfile a un multi-stage build
+      target: prod
     container_name: sportlink_api_prod
     restart: unless-stopped
-    # Pas de volume monté sur ./back : le code est figé dans l'image (pratique prod standard)
     volumes:
+      # var/ : cache Symfony (warmup) + logs — survit aux redémarrages du conteneur
       - php_var_prod:/var/www/html/var
-    ports:
-      - "8000:80"
+      # Clés JWT montées depuis l'hôte en lecture seule.
+      # Les clés ne sont PAS dans l'image (exclues par .dockerignore).
+      # → En local : back/config/jwt/ contient déjà private.pem et public.pem
+      # → Sur le serveur : générer une fois via lexik:jwt:generate-keypair (voir ci-dessus)
+      - ./back/config/jwt:/var/www/html/config/jwt:ro
+    # Aucun port exposé publiquement — seul nginx peut atteindre ce service
     environment:
       APP_ENV: prod
       APP_DEBUG: "0"
-      # Les secrets ci-dessous NE DOIVENT PAS être définis ici en clair.
-      # Utilisez les secrets Docker, un fichier .env.local monté via volume,
-      # ou les variables d'environnement de votre hôte / CI-CD.
-      # Voir back/.env.prod.example pour la liste complète.
+      # Secrets fournis depuis le .env racine (local) ou les variables d'environnement de l'hôte
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:-'^http://localhost:8090$'}
     depends_on:
       - db
 
@@ -35,15 +59,25 @@ services:
     container_name: sportlink_db_prod
     restart: unless-stopped
     environment:
-      # Remplacer par des secrets réels — ne jamais laisser "root" en prod
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-sportlink}
-      MYSQL_USER: ${MYSQL_USER:-sportlink}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE:-sportlink}
+      MYSQL_USER:          ${MYSQL_USER:-sportlink}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD}
     volumes:
       - db_data_prod:/var/lib/mysql
-    # Ne pas exposer le port 3306 publiquement en prod (retirer le mapping)
+    # Aucun port exposé publiquement
 
 volumes:
   db_data_prod:
   php_var_prod:
+
+# ── Variables requises dans le .env racine (non commité) ──────────────────
+# Copier le bloc ci-dessous dans un fichier .env à la racine du projet
+# et renseigner chaque valeur :
+#
+# MYSQL_ROOT_PASSWORD=changeme_root
+# MYSQL_PASSWORD=changeme_db
+# APP_SECRET=changeme_32_chars_hex         # openssl rand -hex 32
+# DATABASE_URL=mysql://sportlink:changeme_db@db:3306/sportlink?serverVersion=8.0&charset=utf8mb4
+# JWT_PASSPHRASE=changeme_passphrase
+# CORS_ALLOW_ORIGIN=^http://localhost:8090$  # adapter au domaine réel en déploiement

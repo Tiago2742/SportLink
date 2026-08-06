@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:8000/api'
+// En prod (build Vite sans VITE_API_URL) : URL relative → nginx proxifie vers le back
+// En dev : VITE_API_URL=http://localhost:8000/api (défini dans front/.env.development)
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 export interface ErreurApi extends Error {
   statut: number

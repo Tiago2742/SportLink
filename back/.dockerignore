@@ -1,0 +1,14 @@
+# Dépendances — réinstallées dans l'image par composer install
+vendor/
+
+# Cache, logs, sessions — données runtime, pas du code
+var/
+
+# Secrets locaux — ne doivent jamais entrer dans l'image
+.env.local
+.env.*.local
+/config/jwt/private.pem
+/config/jwt/public.pem
+
+# Tests — inutiles en prod
+tests/
