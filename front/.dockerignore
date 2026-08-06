@@ -1,0 +1,13 @@
+# Dépendances — réinstallées dans l'image par npm ci
+node_modules/
+
+# Build précédent — le build Docker produit le sien
+dist/
+
+# Secrets locaux
+.env.local
+.env.*.local
+
+# Fichiers inutiles au build
+.git/
+*.md
