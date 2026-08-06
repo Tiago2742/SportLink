@@ -1,4 +1,4 @@
-name: CI
+name: "CI — Tests & Qualité"
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   back:
-    name: PHPUnit — Symfony 7.4 / PHP 8.3
+    name: "Back-end — Tests PHPUnit"
     runs-on: ubuntu-latest
 
     services:
@@ -33,30 +33,30 @@ jobs:
         working-directory: back
 
     steps:
-      - name: Récupérer le dépôt
+      - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Installer PHP 8.3 et les extensions requises
+      - name: Installer PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: pdo, pdo_mysql, intl, zip, ctype, iconv
           coverage: none
 
-      - name: Installer les dépendances Composer
+      - name: Installer les dépendances (Composer)
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Créer le schéma de la base de test
+      - name: Créer la base de test
         run: php bin/console doctrine:schema:create --env=test
 
-      - name: Charger les fixtures de référence (Sports + Niveaux)
+      - name: Charger les données de référence
         run: php bin/console doctrine:fixtures:load --env=test --group=test --no-interaction
 
-      - name: Lancer la suite de tests
+      - name: Lancer les tests (PHPUnit)
         run: php vendor/bin/phpunit
 
   front:
-    name: Lint & Build — Vue 3 / Node 22
+    name: "Front-end — Lint, Types & Build"
     runs-on: ubuntu-latest
 
     defaults:
@@ -64,7 +64,7 @@ jobs:
         working-directory: front
 
     steps:
-      - name: Récupérer le dépôt
+      - name: Récupérer le code
         uses: actions/checkout@v4
 
       - name: Installer Node 22
@@ -72,14 +72,14 @@ jobs:
         with:
           node-version: 22
 
-      - name: Installer les dépendances npm
+      - name: Installer les dépendances (npm ci)
         run: npm ci
 
       - name: Lint (oxlint + eslint)
         run: npm run lint:check
 
-      - name: Type-check (vue-tsc)
+      - name: Vérifier les types (vue-tsc)
         run: npm run type-check
 
-      - name: Build (vite build)
+      - name: Build de production (vite)
         run: npm run build-only

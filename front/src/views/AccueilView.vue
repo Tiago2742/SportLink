@@ -74,7 +74,7 @@ const lienEquipes = computed(() =>
           Bonjour<template v-if="prenomOuNom">, {{ prenomOuNom }}</template>
         </h1>
         <p class="hero-sous-titre">
-          Organisez et rejoignez des matchs amicaux près de chez vous entre équipes ou entre joueurs.
+          Organisez et rejoignez des matchs près de chez vous entre équipes ou entre joueurs.
         </p>
       </div>
     </section>
