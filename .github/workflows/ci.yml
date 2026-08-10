@@ -125,7 +125,13 @@ jobs:
 
       - name: Générer les clés JWT de test
         working-directory: back
-        run: php bin/console lexik:jwt:generate-keypair --env=test --overwrite
+        run: |
+          mkdir -p tests/fixtures/jwt
+          openssl genrsa -aes256 -passout pass:sportlink_test \
+            -out tests/fixtures/jwt/private.pem 4096
+          openssl rsa -in tests/fixtures/jwt/private.pem \
+            -passin pass:sportlink_test \
+            -pubout -out tests/fixtures/jwt/public.pem
 
       - name: Créer la base de test
         working-directory: back
@@ -148,6 +154,11 @@ jobs:
 
       - name: Diagnostic — API login + profil (à retirer quand 7/7 passent)
         run: |
+          echo "=== JWT private key check ==="
+          openssl rsa -in back/tests/fixtures/jwt/private.pem \
+            -passin pass:sportlink_test -check -noout 2>&1 \
+            && echo "OK" || echo "FAIL"
+          echo ""
           echo "=== Utilisateurs en base (sportlink_test) ==="
           mysql -u sportlink -psportlink -h 127.0.0.1 sportlink_test \
             -e "SELECT id, email, type FROM utilisateur ORDER BY id DESC LIMIT 5;" 2>/dev/null \
