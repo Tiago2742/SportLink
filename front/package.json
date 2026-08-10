@@ -16,7 +16,9 @@
     "lint:check": "run-s lint:check:*",
     "lint:check:oxlint": "oxlint .",
     "lint:check:eslint": "eslint .",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
@@ -50,7 +52,8 @@
     "vite": "^8.0.8",
     "vite-plugin-vue-devtools": "^8.1.1",
     "vitest": "^4.1.4",
-    "vue-tsc": "^3.2.6"
+    "vue-tsc": "^3.2.6",
+    "@playwright/test": "^1.49.1"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
