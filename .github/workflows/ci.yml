@@ -13,7 +13,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_DATABASE: sportlink_test
+          MYSQL_DATABASE: sportlink
           MYSQL_USER: sportlink
           MYSQL_PASSWORD: sportlink
           MYSQL_ROOT_PASSWORD: root
@@ -93,7 +93,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_DATABASE: sportlink_test
+          MYSQL_DATABASE: sportlink
           MYSQL_USER: sportlink
           MYSQL_PASSWORD: sportlink
           MYSQL_ROOT_PASSWORD: root
@@ -145,6 +145,22 @@ jobs:
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
+
+      - name: Diagnostic — réponses API login (à retirer quand les tests passent)
+        run: |
+          echo "=== Login valide ==="
+          curl -s -w "\nHTTP %{http_code}" -X POST http://localhost:8000/api/login_check \
+            -H "Content-Type: application/json" \
+            -d '{"email":"e2e-joueur@sportlink.test","password":"Test1234!"}'
+          echo ""
+          echo "=== Login mauvais mot de passe ==="
+          curl -s -w "\nHTTP %{http_code}" -X POST http://localhost:8000/api/login_check \
+            -H "Content-Type: application/json" \
+            -d '{"email":"e2e-joueur@sportlink.test","password":"wrong"}'
+          echo ""
+          echo "=== Utilisateurs en base ==="
+          mysql -u sportlink -psportlink -h 127.0.0.1 sportlink \
+            -e "SELECT id, email, type FROM utilisateur LIMIT 5;" 2>/dev/null || echo "(mysql CLI indisponible)"
 
       - name: Installer Node 22
         uses: actions/setup-node@v4
