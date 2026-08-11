@@ -107,6 +107,10 @@ jobs:
 
     env:
       DATABASE_URL: "mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4"
+      # Injecter explicitement pour que DotEnv (qui ne fait pas d'overwrite en built-in server)
+      # ne puisse pas écraser les valeurs de .env.test avec les valeurs vides de .env
+      JWT_PASSPHRASE: sportlink_test
+      APP_SECRET: sportlink_test_app_secret_for_rate_limiter_hashing
 
     steps:
       - name: Récupérer le code
@@ -122,14 +126,6 @@ jobs:
       - name: Installer les dépendances (Composer)
         working-directory: back
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Générer les clés JWT de test
-        working-directory: back
-        run: |
-          mkdir -p tests/fixtures/jwt
-          openssl genrsa -out tests/fixtures/jwt/private.pem 4096
-          openssl rsa -in tests/fixtures/jwt/private.pem \
-            -pubout -out tests/fixtures/jwt/public.pem
 
       - name: Créer la base de test
         working-directory: back
@@ -150,38 +146,44 @@ jobs:
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
 
-      - name: Diagnostic — API login + profil (à retirer quand 7/7 passent)
+      - name: Diagnostic — vérifier JWT + API login (bloquant)
         run: |
-          echo "=== JWT private key check ==="
-          openssl rsa -in back/tests/fixtures/jwt/private.pem \
-            -check -noout 2>&1 \
-            && echo "OK" || echo "FAIL"
+          echo "=== Clé JWT : chargement PHP (passphrase depuis JWT_PASSPHRASE) ==="
+          php -r "
+            \$key = file_get_contents('back/tests/fixtures/jwt/private.pem');
+            echo 'Format : ' . strtok(\$key, '\n') . PHP_EOL;
+            \$pass = getenv('JWT_PASSPHRASE') ?: '';
+            echo 'Passphrase env : ' . (strlen(\$pass) > 0 ? 'SET (' . strlen(\$pass) . ' chars)' : 'EMPTY') . PHP_EOL;
+            \$res = openssl_pkey_get_private(\$key, \$pass);
+            if (\$res === false) {
+              echo 'FAIL — openssl_pkey_get_private retourne false' . PHP_EOL;
+              while (\$e = openssl_error_string()) echo \$e . PHP_EOL;
+              exit(1);
+            }
+            echo 'OK — clé chargée' . PHP_EOL;
+          "
           echo ""
           echo "=== Utilisateurs en base (sportlink_test) ==="
           mysql -u sportlink -psportlink -h 127.0.0.1 sportlink_test \
             -e "SELECT id, email, type FROM utilisateur ORDER BY id DESC LIMIT 5;" 2>/dev/null \
-            || echo "(mysql CLI indisponible ou base vide)"
+            || echo "(mysql CLI indisponible)"
           echo ""
           echo "=== POST /api/login_check (identifiants valides) ==="
-          LOGIN=$(curl -s -w "\n---HTTP_CODE:%{http_code}" -X POST http://localhost:8000/api/login_check \
+          HTTP_CODE=$(curl -s -o /tmp/login_resp.json -w "%{http_code}" \
+            -X POST http://localhost:8000/api/login_check \
             -H "Content-Type: application/json" \
             -d '{"email":"e2e-joueur@sportlink.test","password":"Test1234!"}')
-          echo "$LOGIN"
-          TOKEN=$(echo "$LOGIN" | head -1 | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',''))" 2>/dev/null || true)
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/login_resp.json
           echo ""
-          if [ -n "$TOKEN" ]; then
-            echo "=== GET /api/profil (avec le token) ==="
-            curl -s -w "\n---HTTP_CODE:%{http_code}" http://localhost:8000/api/profil \
-              -H "Authorization: Bearer $TOKEN"
-            echo ""
-          else
-            echo "(pas de token — login a échoué, /profil non testé)"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Login API retourne HTTP $HTTP_CODE — les tests e2e vont échouer"
+            exit 1
           fi
-          echo ""
-          echo "=== POST /api/login_check (mauvais mot de passe) ==="
-          curl -s -w "\n---HTTP_CODE:%{http_code}" -X POST http://localhost:8000/api/login_check \
-            -H "Content-Type: application/json" \
-            -d '{"email":"e2e-joueur@sportlink.test","password":"wrong"}'
+          TOKEN=$(python3 -c "import json; d=json.load(open('/tmp/login_resp.json')); print(d.get('token',''))" 2>/dev/null || true)
+          echo "=== GET /api/profil ==="
+          curl -s -w "\n---HTTP %{http_code}" http://localhost:8000/api/profil \
+            -H "Authorization: Bearer $TOKEN"
           echo ""
 
       - name: Installer Node 22
