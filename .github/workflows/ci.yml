@@ -107,10 +107,13 @@ jobs:
 
     env:
       DATABASE_URL: "mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4"
-      # Injecter explicitement pour que DotEnv (qui ne fait pas d'overwrite en built-in server)
-      # ne puisse pas écraser les valeurs de .env.test avec les valeurs vides de .env
-      JWT_PASSPHRASE: sportlink_test
+      # APP_ENV doit être dans le job env (pas seulement en shell-prefix) pour que le PHP
+      # built-in server et composer cache:clear voient vraiment l'env test, et non dev.
+      APP_ENV: test
+      # Les valeurs de .env sont vides (APP_SECRET=, JWT_PASSPHRASE=). DotEnv ne peut
+      # pas overwrite si ces vars sont déjà dans $_ENV. On les injecte ici en OS env.
       APP_SECRET: sportlink_test_app_secret_for_rate_limiter_hashing
+      JWT_PASSPHRASE: sportlink_test
 
     steps:
       - name: Récupérer le code
@@ -141,19 +144,26 @@ jobs:
 
       - name: Démarrer le serveur PHP (arrière-plan)
         working-directory: back
-        run: APP_ENV=test php -S 0.0.0.0:8000 -t public/ &
+        run: php -S 0.0.0.0:8000 -t public/ &
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
 
       - name: Diagnostic — vérifier JWT + API login (bloquant)
         run: |
-          echo "=== Clé JWT : chargement PHP (passphrase depuis JWT_PASSPHRASE) ==="
+          echo "=== Variables d'env critiques ==="
+          php -r "
+            foreach (['APP_ENV','APP_SECRET','JWT_PASSPHRASE'] as \$k) {
+              \$v = getenv(\$k);
+              echo \$k . ' = ' . (\$v === false ? 'UNSET' : (strlen(\$v) > 0 ? 'SET (' . strlen(\$v) . ' chars)' : 'EMPTY')) . PHP_EOL;
+            }
+          "
+          echo ""
+          echo "=== Clé JWT : chargement PHP ==="
           php -r "
             \$key = file_get_contents('back/tests/fixtures/jwt/private.pem');
             echo 'Format : ' . strtok(\$key, '\n') . PHP_EOL;
             \$pass = getenv('JWT_PASSPHRASE') ?: '';
-            echo 'Passphrase env : ' . (strlen(\$pass) > 0 ? 'SET (' . strlen(\$pass) . ' chars)' : 'EMPTY') . PHP_EOL;
             \$res = openssl_pkey_get_private(\$key, \$pass);
             if (\$res === false) {
               echo 'FAIL — openssl_pkey_get_private retourne false' . PHP_EOL;
