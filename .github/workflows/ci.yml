@@ -127,10 +127,8 @@ jobs:
         working-directory: back
         run: |
           mkdir -p tests/fixtures/jwt
-          openssl genrsa -aes256 -passout pass:sportlink_test \
-            -out tests/fixtures/jwt/private.pem 4096
+          openssl genrsa -out tests/fixtures/jwt/private.pem 4096
           openssl rsa -in tests/fixtures/jwt/private.pem \
-            -passin pass:sportlink_test \
             -pubout -out tests/fixtures/jwt/public.pem
 
       - name: Créer la base de test
@@ -156,7 +154,7 @@ jobs:
         run: |
           echo "=== JWT private key check ==="
           openssl rsa -in back/tests/fixtures/jwt/private.pem \
-            -passin pass:sportlink_test -check -noout 2>&1 \
+            -check -noout 2>&1 \
             && echo "OK" || echo "FAIL"
           echo ""
           echo "=== Utilisateurs en base (sportlink_test) ==="
