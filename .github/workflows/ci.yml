@@ -187,6 +187,7 @@ jobs:
           HTTP_CODE=$(curl -s -o /tmp/login_resp.json -w "%{http_code}" \
             -X POST http://localhost:8000/api/login_check \
             -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
             -d '{"email":"e2e-joueur@sportlink.test","password":"Test1234!"}')
           echo "HTTP $HTTP_CODE"
           cat /tmp/login_resp.json
