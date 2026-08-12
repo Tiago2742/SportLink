@@ -107,11 +107,7 @@ jobs:
 
     env:
       DATABASE_URL: "mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4"
-      # APP_ENV doit être dans le job env (pas seulement en shell-prefix) pour que le PHP
-      # built-in server et composer cache:clear voient vraiment l'env test, et non dev.
       APP_ENV: test
-      # Les valeurs de .env sont vides (APP_SECRET=, JWT_PASSPHRASE=). DotEnv ne peut
-      # pas overwrite si ces vars sont déjà dans $_ENV. On les injecte ici en OS env.
       APP_SECRET: sportlink_test_app_secret_for_rate_limiter_hashing
       JWT_PASSPHRASE: sportlink_test
 
@@ -148,7 +144,12 @@ jobs:
 
       - name: Démarrer le serveur PHP (arrière-plan)
         working-directory: back
-        run: php -S 0.0.0.0:8000 -t public/ &
+        run: |
+          APP_ENV=test \
+          APP_SECRET=sportlink_test_app_secret_for_rate_limiter_hashing \
+          JWT_PASSPHRASE=sportlink_test \
+          DATABASE_URL="mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4" \
+          php -S 0.0.0.0:8000 -t public/ &
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
