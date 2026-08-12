@@ -130,6 +130,10 @@ jobs:
         working-directory: back
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
+      - name: Générer les clés JWT de test
+        working-directory: back
+        run: php bin/console lexik:jwt:generate-keypair --env=test --overwrite
+
       - name: Créer la base de test
         working-directory: back
         run: php bin/console doctrine:schema:create --env=test
