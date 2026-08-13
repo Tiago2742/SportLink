@@ -142,14 +142,23 @@ jobs:
         working-directory: back
         run: php bin/console doctrine:fixtures:load --env=test --group=e2e --append --no-interaction
 
-      - name: Démarrer le serveur PHP (arrière-plan)
+      - name: Créer .env.test.local (force $_ENV pour SymfonyRuntime)
         working-directory: back
         run: |
-          APP_ENV=test \
-          APP_SECRET=sportlink_test_app_secret_for_rate_limiter_hashing \
-          JWT_PASSPHRASE=sportlink_test \
-          DATABASE_URL="mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4" \
-          php -S 0.0.0.0:8000 -t public/ &
+          {
+            echo 'APP_ENV=test'
+            echo 'APP_SECRET=sportlink_test_app_secret_for_rate_limiter_hashing'
+            echo 'JWT_PASSPHRASE=sportlink_test'
+            echo 'DATABASE_URL="mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4"'
+          } > .env.test.local
+
+      - name: Recompiler le cache test
+        working-directory: back
+        run: php bin/console cache:clear --env=test
+
+      - name: Démarrer le serveur PHP (arrière-plan)
+        working-directory: back
+        run: php -S 0.0.0.0:8000 -t public/ &
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
