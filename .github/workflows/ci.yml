@@ -148,7 +148,6 @@ jobs:
           cat > ci-router.php << 'PHPEOF'
           <?php
           file_put_contents('/tmp/router-was-loaded.txt', date('c'));
-          if (is_file($_SERVER['SCRIPT_FILENAME'])) { return false; }
           foreach ([
               'APP_ENV'        => 'test',
               'APP_SECRET'     => 'sportlink_test_app_secret_for_rate_limiter_hashing',
@@ -159,6 +158,8 @@ jobs:
               $_ENV[$k]    = $v;
               putenv("$k=$v");
           }
+          $requestPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+          if (is_file(__DIR__ . '/public' . $requestPath)) { return false; }
           require __DIR__ . '/public/index.php';
           PHPEOF
 
