@@ -142,12 +142,19 @@ jobs:
         working-directory: back
         run: php bin/console doctrine:fixtures:load --env=test --group=e2e --append --no-interaction
 
-      - name: Créer le router CI
+      # php -S en CI ne propage pas APP_ENV dans $_SERVER/$_ENV (variables_order sans 'E').
+      # SymfonyRuntime::getContext() lit $_SERVER + $_ENV — pas getenv(). Sans ce router,
+      # Symfony démarre en env "dev" et DefaultLoginRateLimiter lève "non-empty secret required".
+      # Le router injecte les vars dans $_SERVER/$_ENV avant require index.php, ce qui garantit
+      # que l'environnement "test" est effectif pour chaque requête API.
+      - name: Créer le router CI (force APP_ENV=test pour php -S)
         working-directory: back
         run: |
           cat > ci-router.php << 'PHPEOF'
           <?php
-          file_put_contents('/tmp/router-was-loaded.txt', date('c'));
+          // Router CI uniquement — force l'environnement Symfony "test" pour php -S.
+          // Raison : php -S ne popule pas $_SERVER/$_ENV depuis l'OS env si variables_order
+          // exclut 'E'. SymfonyRuntime lit $_SERVER + $_ENV → sans injection ici, APP_ENV=dev.
           foreach ([
               'APP_ENV'        => 'test',
               'APP_SECRET'     => 'sportlink_test_app_secret_for_rate_limiter_hashing',
@@ -173,66 +180,6 @@ jobs:
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
-
-      - name: Vérifier chargement du router CI
-        run: |
-          echo "=== ci-router.php existe ? ==="
-          ls -la back/ci-router.php 2>/dev/null && head -3 back/ci-router.php || echo "ABSENT"
-          echo ""
-          echo "=== Router exécuté lors de la requête ? ==="
-          if [ -f /tmp/router-was-loaded.txt ]; then
-            echo "OUI — chargé à : $(cat /tmp/router-was-loaded.txt)"
-          else
-            echo "NON — /tmp/router-was-loaded.txt absent (router non exécuté)"
-          fi
-
-      - name: Diagnostic — vérifier JWT + API login (bloquant)
-        run: |
-          echo "=== Variables d'env critiques ==="
-          php -r "
-            foreach (['APP_ENV','APP_SECRET','JWT_PASSPHRASE'] as \$k) {
-              \$v = getenv(\$k);
-              echo \$k . ' = ' . (\$v === false ? 'UNSET' : (strlen(\$v) > 0 ? 'SET (' . strlen(\$v) . ' chars)' : 'EMPTY')) . PHP_EOL;
-            }
-          "
-          echo ""
-          echo "=== Clé JWT : chargement PHP ==="
-          php -r "
-            \$key = file_get_contents('back/tests/fixtures/jwt/private.pem');
-            echo 'Format : ' . strtok(\$key, '\n') . PHP_EOL;
-            \$pass = getenv('JWT_PASSPHRASE') ?: '';
-            \$res = openssl_pkey_get_private(\$key, \$pass);
-            if (\$res === false) {
-              echo 'FAIL — openssl_pkey_get_private retourne false' . PHP_EOL;
-              while (\$e = openssl_error_string()) echo \$e . PHP_EOL;
-              exit(1);
-            }
-            echo 'OK — clé chargée' . PHP_EOL;
-          "
-          echo ""
-          echo "=== Utilisateurs en base (sportlink_test) ==="
-          mysql -u sportlink -psportlink -h 127.0.0.1 sportlink_test \
-            -e "SELECT id, email, type FROM utilisateur ORDER BY id DESC LIMIT 5;" 2>/dev/null \
-            || echo "(mysql CLI indisponible)"
-          echo ""
-          echo "=== POST /api/login_check (identifiants valides) ==="
-          HTTP_CODE=$(curl -s -o /tmp/login_resp.json -w "%{http_code}" \
-            -X POST http://localhost:8000/api/login_check \
-            -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
-            -d '{"email":"e2e-joueur@sportlink.test","password":"Test1234!"}')
-          echo "HTTP $HTTP_CODE"
-          cat /tmp/login_resp.json
-          echo ""
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Login API retourne HTTP $HTTP_CODE — les tests e2e vont échouer"
-            exit 1
-          fi
-          TOKEN=$(python3 -c "import json; d=json.load(open('/tmp/login_resp.json')); print(d.get('token',''))" 2>/dev/null || true)
-          echo "=== GET /api/profil ==="
-          curl -s -w "\n---HTTP %{http_code}" http://localhost:8000/api/profil \
-            -H "Authorization: Bearer $TOKEN"
-          echo ""
 
       - name: Installer Node 22
         uses: actions/setup-node@v4
