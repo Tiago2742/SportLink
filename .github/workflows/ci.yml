@@ -142,15 +142,24 @@ jobs:
         working-directory: back
         run: php bin/console doctrine:fixtures:load --env=test --group=e2e --append --no-interaction
 
-      - name: Créer .env.test.local (force $_ENV pour SymfonyRuntime)
+      - name: Créer le router CI
         working-directory: back
         run: |
-          {
-            echo 'APP_ENV=test'
-            echo 'APP_SECRET=sportlink_test_app_secret_for_rate_limiter_hashing'
-            echo 'JWT_PASSPHRASE=sportlink_test'
-            echo 'DATABASE_URL="mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4"'
-          } > .env.test.local
+          cat > ci-router.php << 'PHPEOF'
+          <?php
+          if (is_file($_SERVER['SCRIPT_FILENAME'])) { return false; }
+          foreach ([
+              'APP_ENV'        => 'test',
+              'APP_SECRET'     => 'sportlink_test_app_secret_for_rate_limiter_hashing',
+              'JWT_PASSPHRASE' => 'sportlink_test',
+              'DATABASE_URL'   => 'mysql://sportlink:sportlink@127.0.0.1:3306/sportlink?serverVersion=8.0&charset=utf8mb4',
+          ] as $k => $v) {
+              $_SERVER[$k] = $v;
+              $_ENV[$k]    = $v;
+              putenv("$k=$v");
+          }
+          require __DIR__ . '/public/index.php';
+          PHPEOF
 
       - name: Recompiler le cache test
         working-directory: back
@@ -158,7 +167,7 @@ jobs:
 
       - name: Démarrer le serveur PHP (arrière-plan)
         working-directory: back
-        run: php -S 0.0.0.0:8000 -t public/ &
+        run: php -S 0.0.0.0:8000 -t public/ ci-router.php &
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
