@@ -147,6 +147,7 @@ jobs:
         run: |
           cat > ci-router.php << 'PHPEOF'
           <?php
+          file_put_contents('/tmp/router-was-loaded.txt', date('c'));
           if (is_file($_SERVER['SCRIPT_FILENAME'])) { return false; }
           foreach ([
               'APP_ENV'        => 'test',
@@ -171,6 +172,18 @@ jobs:
 
       - name: Attendre que l'API réponde
         run: until curl -s http://localhost:8000/ -o /dev/null; do sleep 1; done
+
+      - name: Vérifier chargement du router CI
+        run: |
+          echo "=== ci-router.php existe ? ==="
+          ls -la back/ci-router.php 2>/dev/null && head -3 back/ci-router.php || echo "ABSENT"
+          echo ""
+          echo "=== Router exécuté lors de la requête ? ==="
+          if [ -f /tmp/router-was-loaded.txt ]; then
+            echo "OUI — chargé à : $(cat /tmp/router-was-loaded.txt)"
+          else
+            echo "NON — /tmp/router-was-loaded.txt absent (router non exécuté)"
+          fi
 
       - name: Diagnostic — vérifier JWT + API login (bloquant)
         run: |
