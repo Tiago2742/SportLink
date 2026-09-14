@@ -1,6 +1,6 @@
 <?php
 
-namespace App\DataFixtures;
+namespace App\Command;
 
 use App\Entity\Avis;
 use App\Entity\DemandeMatch;
@@ -24,9 +24,12 @@ use App\Enum\StatutMembreEquipe;
 use App\Enum\TypeSport;
 use App\Enum\TypeUtilisateur;
 use App\Reference\SportNiveaux;
-use Doctrine\Bundle\FixturesBundle\Fixture;
-use Doctrine\Bundle\FixturesBundle\FixtureGroupInterface;
-use Doctrine\Persistence\ObjectManager;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -34,17 +37,22 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  *
  * Toutes les données sont FICTIVES (RGPD) : aucun nom, email ou contact réel.
  *
- * Chargement local (base recréée) :
- *   php bin/console doctrine:fixtures:load --group=demo --no-interaction
- *
- * Chargement prod (référentiel déjà présent via app:reference:load) :
- *   php bin/console doctrine:fixtures:load --group=demo --append --no-interaction
+ * Commande console (et non fixture) : DoctrineFixturesBundle est une dépendance
+ * `require-dev`, absente de l'image de prod construite avec `composer install --no-dev`.
+ * Même approche que `app:reference:load`, donc utilisable dans TOUS les environnements :
+ *   php bin/console app:demo:load
+ *   php bin/console app:demo:load --env=prod
  *
  * IDEMPOTENCE : les Sport/Niveau existants sont RÉUTILISÉS, jamais recréés
  * (même stratégie que App\Command\LoadReferenceDataCommand).
  * Un garde-fou empêche le double chargement des comptes de démo (UNIQUE email).
+ * Tout est exécuté dans UNE transaction : en cas d'incohérence détectée, rien n'est inséré.
  */
-class DemoFixtures extends Fixture implements FixtureGroupInterface
+#[AsCommand(
+    name: 'app:demo:load',
+    description: 'Charge le jeu de données de démonstration (comptes, équipes, matchs, avis).',
+)]
+class LoadDemoDataCommand extends Command
 {
     public const PASSWORD     = 'Demo1234!';
     public const JOUEUR_EMAIL = 'joueur@demo.fr';
@@ -284,16 +292,64 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
         ['g16', 'noah.perrin@example.com',     'Court réservé, prends une seconde raquette au cas où.',                 3],
     ];
 
-    private ObjectManager $em;
     private int $count = 0;
 
     public function __construct(
-        private readonly UserPasswordHasherInterface $hasher,
-    ) {}
+        private readonly EntityManagerInterface       $em,
+        private readonly UserPasswordHasherInterface  $hasher,
+    ) {
+        parent::__construct();
+    }
 
-    public static function getGroups(): array
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        return ['demo'];
+        $io = new SymfonyStyle($input, $output);
+
+        // Garde-fou : rien n'est inséré si le jeu de démo est déjà présent.
+        $dejaCharge = $this->emailDemoExistant();
+        if ($dejaCharge !== null) {
+            $io->warning(sprintf(
+                'Jeu de démonstration déjà chargé (%s existe) — aucune donnée insérée. '
+                . 'Supprimez les données de démo avant de relancer.',
+                $dejaCharge,
+            ));
+
+            return Command::SUCCESS;
+        }
+
+        // Tout ou rien : une incohérence détectée en cours de route annule l'insertion.
+        try {
+            $this->em->wrapInTransaction(function (): void {
+                $this->charger();
+            });
+        } catch (\Throwable $e) {
+            $io->error('Chargement annulé (transaction rollback) : ' . $e->getMessage());
+
+            return Command::FAILURE;
+        }
+
+        $io->success('Jeu de démonstration chargé.');
+        $io->table(
+            ['Entité', 'Lignes'],
+            [
+                ['utilisateur',        count(self::CLUBS) + count(self::JOUEURS)],
+                ['equipe',             count(self::EQUIPES)],
+                ['equipe_joueur',      count(self::MEMBRES) + count(self::EQUIPES)],
+                ['game',               count(self::GAMES)],
+                ['demande_match',      count(self::DEMANDES)],
+                ['resultat',           count(self::RESULTATS)],
+                ['avis',               count(self::AVIS)],
+                ['message',            count(self::MESSAGES)],
+            ],
+        );
+        $io->writeln(sprintf(
+            ' Comptes de démo : <info>%s</info> et <info>%s</info> — mot de passe <info>%s</info>',
+            self::JOUEUR_EMAIL,
+            self::CLUB_EMAIL,
+            self::PASSWORD,
+        ));
+
+        return Command::SUCCESS;
     }
 
     /** Persist + flush par batch (sans clear : les références restent valides). */
@@ -305,12 +361,9 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
         }
     }
 
-    public function load(ObjectManager $manager): void
+    private function charger(): void
     {
-        $this->em = $manager;
         mt_srand(2026);   // jeu de démo reproductible à l'identique
-
-        $this->verifierAbsenceDemo();
 
         // 1. Référentiel (idempotent : réutilise l'existant en prod)
         [$sports, $niveaux] = $this->chargerReferentiel();
@@ -344,7 +397,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
             $this->save($u);
             $users[$email] = $u;
         }
-        $manager->flush();
+        $this->em->flush();
 
         $user = function (string $email) use ($users): Utilisateur {
             if (!isset($users[$email])) {
@@ -379,7 +432,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
                ->setOrigine(OrigineMembreEquipe::InvitationClub);
             $this->save($ej);
         }
-        $manager->flush();
+        $this->em->flush();
 
         $equipe = function (string $cle) use ($equipes): Equipe {
             if (!isset($equipes[$cle])) {
@@ -418,7 +471,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
             $this->save($ej);
             $dejaMembre[$email][$cleEq] = true;
         }
-        $manager->flush();
+        $this->em->flush();
 
         // 5. Matchs + camps (R5 : équipe XOR joueur ; R2 : 2 camps confirmés)
         /** @var array<string, Game> $games */
@@ -492,7 +545,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
 
             $games[$cle] = $g;
         }
-        $manager->flush();
+        $this->em->flush();
 
         $game = function (string $cle) use ($games): Game {
             if (!isset($games[$cle])) {
@@ -547,7 +600,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
             $this->save($d);
             $dejaDemande[$cleGame][$email] = true;
         }
-        $manager->flush();
+        $this->em->flush();
 
         // 7. Résultats — R3 : match terminé, 2 camps confirmés, date passée, 1 seul par match
         $maintenant = new \DateTime();
@@ -571,7 +624,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
             $r->setScoreCamp2($s2);
             $this->save($r);
         }
-        $manager->flush();
+        $this->em->flush();
 
         // 8. Avis — UNIQUE (notant, game), uniquement sur des matchs terminés
         $dejaAvis = [];  // [clé match][email notant] = true
@@ -603,7 +656,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
             $this->save($a);
             $dejaAvis[$cleGame][$emailNotant] = true;
         }
-        $manager->flush();
+        $this->em->flush();
 
         // 9. Messages
         foreach (self::MESSAGES as [$cleGame, $email, $contenu, $ilYaJours]) {
@@ -615,7 +668,7 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
             $this->save($m);
         }
 
-        $manager->flush();
+        $this->em->flush();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -623,22 +676,22 @@ class DemoFixtures extends Fixture implements FixtureGroupInterface
     // ═══════════════════════════════════════════════════════════════════
 
     /**
-     * Garde-fou anti double chargement : en --append, relancer les fixtures
-     * démo violerait la contrainte UNIQUE sur l'email.
+     * Garde-fou anti double chargement : relancer la commande violerait la
+     * contrainte UNIQUE sur l'email.
+     *
+     * @return string|null l'email de démo déjà présent, null si la base est vierge de démo
      */
-    private function verifierAbsenceDemo(): void
+    private function emailDemoExistant(): ?string
     {
         $repo = $this->em->getRepository(Utilisateur::class);
 
         foreach ([self::JOUEUR_EMAIL, self::CLUB_EMAIL] as $email) {
             if ($repo->findOneBy(['email' => $email]) !== null) {
-                throw new \RuntimeException(sprintf(
-                    'Les fixtures "demo" semblent déjà chargées (%s existe). '
-                    . 'Supprimez les données de démo avant de relancer.',
-                    $email,
-                ));
+                return $email;
             }
         }
+
+        return null;
     }
 
     /**
