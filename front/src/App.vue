@@ -3,11 +3,13 @@ import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import BarreNavigation from '@/components/layout/BarreNavigation.vue'
 import PiedDePage from '@/components/layout/PiedDePage.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 
 const afficherLayout = computed(
-  () => route.path !== '/connexion' && route.path !== '/inscription',
+  () => auth.estConnecte && route.path !== '/connexion' && route.path !== '/inscription',
 )
 </script>
 

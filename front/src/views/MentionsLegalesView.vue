@@ -31,9 +31,9 @@
         <h2>3. Hébergement</h2>
         <p>Le site est hébergé par :</p>
         <ul>
-          <li><strong>Hébergeur</strong> : [À compléter — nom de l'hébergeur, ex : OVH, Hetzner, Railway, ou « environnement local dans le cadre du projet de formation »]</li>
-          <li><strong>Adresse de l'hébergeur</strong> : [À compléter]</li>
-          <li><strong>Contact de l'hébergeur</strong> : [À compléter]</li>
+          <li><strong>Hébergeur</strong> : Hostinger International Ltd.</li>
+          <li><strong>Adresse de l'hébergeur</strong> : 61 Lordou Vironos Street, 6023 Larnaca, Chypre</li>
+          <li><strong>Contact de l'hébergeur</strong> : <a href="https://www.hostinger.fr/contact">www.hostinger.fr/contact</a></li>
         </ul>
 
         <h2>4. Objet du site</h2>
