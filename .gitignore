@@ -24,4 +24,5 @@
 claude/
 .claude/
 agents/
+.agents/
 CLAUDE.md
