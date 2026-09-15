@@ -20,4 +20,8 @@
 # Données Docker
 /back/.env.local.php
 
-.CLAUDE.md
+# Fichiers et dossiers privés
+claude/
+.claude/
+agents/
+CLAUDE.md
